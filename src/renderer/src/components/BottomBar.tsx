@@ -65,7 +65,12 @@ export default function BottomBar({ modpack, installPath, extraModsCount = 0 }: 
 
       if (d.phase === 'done') {
         if (clearTimer.current) clearTimeout(clearTimer.current)
-        clearTimer.current = setTimeout(() => { setProgress(null); setStatus('ready') }, 1200)
+        clearTimer.current = setTimeout(() => {
+          setProgress(null)
+          // Если игра уже запущена/запускается — не сбрасываем в ready,
+          // ждём launch:close. 'done' тут лишь убирает полосу прогресса.
+          setStatus(s => (s === 'running' || s === 'launching') ? s : 'ready')
+        }, 1200)
         return
       }
       if (d.phase === 'error') {

@@ -2,7 +2,7 @@ import { join } from 'path'
 import { existsSync, mkdirSync, createWriteStream, readdirSync, statSync, rmSync } from 'fs'
 import axios from 'axios'
 import AdmZip from 'adm-zip'
-import { execSync, execFileSync } from 'child_process'
+import { execSync } from 'child_process'
 import { BrowserWindow } from 'electron'
 import { ProgressEvent } from './installer'
 
@@ -42,21 +42,16 @@ function findJavaBin(dir: string): string | null {
   return null
 }
 
-/** Проверяет что java по пути реально мажорной версии JAVA_MAJOR. */
+/** Проверяет что java по пути реально мажорной версии JAVA_MAJOR.
+ *  ВАЖНО: `java -version` печатает в stderr, поэтому ловим оба потока через 2>&1. */
 function javaVersionOk(javaPath: string): boolean {
   try {
-    const out = execFileSync(javaPath, ['-version'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
-    return checkVersionString(out)
-  } catch (e: any) {
-    // java печатает -version в stderr; execFileSync кидает, но stderr в e.stderr
-    const out = (e?.stderr ?? '') as string
-    return checkVersionString(out)
+    const out = execSync(`"${javaPath}" -version 2>&1`, { encoding: 'utf8', timeout: 5000 })
+    const m = out.match(/version "(\d+)/)
+    return !!m && parseInt(m[1], 10) >= JAVA_MAJOR
+  } catch {
+    return false
   }
-}
-
-function checkVersionString(out: string): boolean {
-  const m = out.match(/version "(\d+)/)
-  return !!m && parseInt(m[1], 10) >= JAVA_MAJOR
 }
 
 /**
@@ -68,13 +63,19 @@ export async function ensureJava(installPath: string, win: BrowserWindow): Promi
   const runtimeRoot = join(installPath, 'runtime')
   const javaDir = join(runtimeRoot, `jre-${JAVA_MAJOR}`)
 
-  // Уже установлена?
+  // Уже установлена и валидна?
   const existing = findJavaBin(javaDir)
   if (existing && javaVersionOk(existing)) return existing
 
-  // Чистим если была битая распаковка
+  // Битая/неполная распаковка — пробуем снести и переустановить.
+  // Если файлы залочены (запущен Minecraft) — не падаем, а используем что есть.
   if (existsSync(javaDir)) {
-    try { rmSync(javaDir, { recursive: true, force: true }) } catch {}
+    try {
+      rmSync(javaDir, { recursive: true, force: true })
+    } catch {
+      if (existing) return existing
+      throw new Error('Java занята другим процессом. Закройте Minecraft и попробуйте снова.')
+    }
   }
   mkdirSync(javaDir, { recursive: true })
 
