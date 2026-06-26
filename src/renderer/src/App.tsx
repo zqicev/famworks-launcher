@@ -4,6 +4,7 @@ import Sidebar from './components/Sidebar'
 import MainPanel from './components/MainPanel'
 import TitleBar from './components/TitleBar'
 import SetupModal from './components/SetupModal'
+import SettingsModal from './components/SettingsModal'
 import styles from './styles/App.module.css'
 
 export default function App() {
@@ -14,6 +15,7 @@ export default function App() {
   const [needsSetup, setNeedsSetup] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [settingsOpen, setSettingsOpen] = useState(false)
 
   useEffect(() => {
     const init = async () => {
@@ -76,6 +78,7 @@ export default function App() {
             index={modpackIndex}
             selectedId={selectedId}
             onSelect={setSelectedId}
+            onSettings={() => setSettingsOpen(true)}
           />
           <MainPanel
             modpack={modpack}
@@ -83,6 +86,13 @@ export default function App() {
             loading={loading}
             error={error}
           />
+          {settingsOpen && (
+            <SettingsModal
+              installPath={installPath}
+              onPathChange={setInstallPath}
+              onClose={() => setSettingsOpen(false)}
+            />
+          )}
         </div>
       )}
     </div>

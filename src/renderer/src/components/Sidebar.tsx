@@ -1,4 +1,3 @@
-import { useState } from 'react'
 import { ModpackIndex } from '../../../types/modpack'
 import AccountPanel from './AccountPanel'
 import styles from '../styles/Sidebar.module.css'
@@ -7,14 +6,20 @@ interface Props {
   index: ModpackIndex | null
   selectedId: string | null
   onSelect: (id: string) => void
+  onSettings: () => void
 }
 
-export default function Sidebar({ index, selectedId, onSelect }: Props) {
+export default function Sidebar({ index, selectedId, onSelect, onSettings }: Props) {
   return (
     <aside className={styles.sidebar}>
-      <div className={styles.logo}>
-        <span className={styles.logoF}>FAM</span>
-        <span className={styles.logoW}>WORKS</span>
+      <div className={styles.logoRow}>
+        <div className={styles.logo}>
+          <span className={styles.logoF}>FAM</span>
+          <span className={styles.logoW}>WORKS</span>
+        </div>
+        <button className={styles.settingsBtn} onClick={onSettings} title="Настройки">
+          ⚙
+        </button>
       </div>
 
       <div className={styles.section}>

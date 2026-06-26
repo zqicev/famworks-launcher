@@ -8,12 +8,31 @@
   overflow: hidden;
 }
 
+.logoRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 16px 16px 20px;
+}
+
 .logo {
-  padding: 20px 20px 16px;
   font-family: var(--font-display);
   font-size: 20px;
   font-weight: 700;
   letter-spacing: 1px;
+}
+
+.settingsBtn {
+  font-size: 16px;
+  color: var(--text-dim);
+  padding: 4px 6px;
+  border-radius: 6px;
+  transition: color 0.15s, background 0.15s;
+  line-height: 1;
+}
+.settingsBtn:hover {
+  color: var(--text);
+  background: var(--bg-hover);
 }
 
 .logoF { color: var(--text); }
