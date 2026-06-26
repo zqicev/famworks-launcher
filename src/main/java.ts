@@ -1,10 +1,11 @@
 import { join } from 'path'
-import { existsSync, mkdirSync, createWriteStream, readdirSync, statSync, rmSync } from 'fs'
+import { existsSync, mkdirSync, createWriteStream, readdirSync, statSync, rmSync, writeFileSync, renameSync } from 'fs'
 import axios from 'axios'
 import AdmZip from 'adm-zip'
 import { execSync } from 'child_process'
 import { BrowserWindow } from 'electron'
 import { ProgressEvent } from './installer'
+import { opSignal } from './abort'
 
 const JAVA_MAJOR = 21
 
@@ -62,10 +63,18 @@ function javaVersionOk(javaPath: string): boolean {
 export async function ensureJava(installPath: string, win: BrowserWindow): Promise<string> {
   const runtimeRoot = join(installPath, 'runtime')
   const javaDir = join(runtimeRoot, `jre-${JAVA_MAJOR}`)
+  const marker = join(javaDir, '.ready')
 
-  // Уже установлена и валидна?
+  // Быстрый путь: есть маркер успешной установки + бинарь на месте → доверяем без запуска java.
   const existing = findJavaBin(javaDir)
-  if (existing && javaVersionOk(existing)) return existing
+  if (existing && existsSync(marker)) return existing
+
+  // Маркера нет, но бинарь есть и версия ок (например, обновились с прошлой версии лаунчера) —
+  // ставим маркер и используем, без перекачивания.
+  if (existing && javaVersionOk(existing)) {
+    try { writeFileSync(marker, new Date().toISOString()) } catch {}
+    return existing
+  }
 
   // Битая/неполная распаковка — пробуем снести и переустановить.
   // Если файлы залочены (запущен Minecraft) — не падаем, а используем что есть.
@@ -115,6 +124,9 @@ export async function ensureJava(installPath: string, win: BrowserWindow): Promi
     try { execSync(`chmod +x "${javaBin}"`) } catch {}
   }
 
+  // Маркер успешной установки — больше не качаем при следующих запусках.
+  try { writeFileSync(marker, new Date().toISOString()) } catch {}
+
   return javaBin
 }
 
@@ -124,7 +136,7 @@ async function downloadFile(
   onProgress: (bytes: number, total: number, speed: number) => void
 ) {
   const tmp = dest + '.tmp'
-  const res = await axios.get(url, { responseType: 'stream', maxRedirects: 5 })
+  const res = await axios.get(url, { responseType: 'stream', maxRedirects: 5, signal: opSignal() })
   const total = parseInt(String(res.headers['content-length'] ?? '0'), 10)
 
   await new Promise<void>((resolve, reject) => {
@@ -151,6 +163,5 @@ async function downloadFile(
     res.data.on('error', (e: Error) => { try { rmSync(tmp, { force: true }) } catch {} reject(e) })
   })
 
-  const { renameSync } = await import('fs')
   renameSync(tmp, dest)
 }

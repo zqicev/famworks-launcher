@@ -79,6 +79,13 @@ export default function BottomBar({ modpack, installPath, extraModsCount = 0 }: 
         setStatus('ready')
         return
       }
+      if (d.phase === 'cancelled') {
+        if (clearTimer.current) clearTimeout(clearTimer.current)
+        setProgress({ ...EMPTY_PROGRESS, message: 'Отменено' })
+        clearTimer.current = setTimeout(() => setProgress(null), 2000)
+        checkStatus()
+        return
+      }
 
       // Сливаем поля: 'progress' даёт счётчик файлов, 'download-status' — байты.
       // Они приходят разными событиями и не должны перетирать друг друга.
@@ -136,6 +143,7 @@ export default function BottomBar({ modpack, installPath, extraModsCount = 0 }: 
       setProgress({ ...EMPTY_PROGRESS, message: 'Подготовка...' })
       try {
         await window.api.install.modpack(modpack.id)
+        // статус выставит событие 'done' или 'cancelled'
       } catch {
         setStatus('not_installed')
       }
@@ -143,16 +151,22 @@ export default function BottomBar({ modpack, installPath, extraModsCount = 0 }: 
       setStatus('launching')
       setProgress({ ...EMPTY_PROGRESS, message: 'Подготовка к запуску...' })
       try {
-        await window.api.launch.start(modpack.id)
-        setStatus('running')
+        const ok = await window.api.launch.start(modpack.id)
+        // ok === false при отмене — статус выставит 'cancelled'
+        if (ok) setStatus('running')
       } catch {
         setStatus('ready')
       }
     }
   }
 
+  const handleCancel = async () => {
+    await window.api.cancel()
+  }
+
   const isBusy = status === 'checking' || status === 'installing' || status === 'launching'
   const isRunning = status === 'running'
+  const canCancel = status === 'installing' || status === 'launching'
 
   const btnLabel = {
     checking: 'ПРОВЕРКА...',
@@ -233,6 +247,14 @@ export default function BottomBar({ modpack, installPath, extraModsCount = 0 }: 
             <div className={styles.statusMsg}>Проверка<span className={styles.dots} /></div>
           ) : null}
         </div>
+
+        {canCancel && (
+          <button className={styles.cancelBtn} onClick={handleCancel} title="Отменить">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <path d="M6 6l12 12M18 6L6 18" />
+            </svg>
+          </button>
+        )}
 
         <button
           className={`${styles.playBtn} ${btnAccent ? styles.playBtnAccent : styles.playBtnMuted}`}

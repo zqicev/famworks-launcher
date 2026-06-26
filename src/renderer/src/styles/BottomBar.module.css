@@ -149,6 +149,26 @@
   font-weight: 600;
 }
 
+/* Кнопка отмены (крестик слева от ИГРАТЬ) */
+.cancelBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
+  border-radius: 10px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.cancelBtn:hover {
+  background: rgba(255, 68, 68, 0.12);
+  border-color: var(--red);
+  color: var(--red);
+}
+
 /* Кнопка */
 .playBtn {
   display: flex;

@@ -3,6 +3,7 @@ import { createWriteStream, existsSync, mkdirSync, renameSync, unlinkSync, readd
 import axios from 'axios'
 import { BrowserWindow } from 'electron'
 import { Modpack, Mod } from '../types/modpack'
+import { opSignal, isCancelled } from './abort'
 
 export interface ProgressEvent {
   phase: 'check' | 'download' | 'done' | 'error'
@@ -44,6 +45,7 @@ export async function checkAndInstallModpack(
 
   let done = 0
   for (const mod of missing) {
+    if (isCancelled()) throw new DOMException('Aborted', 'AbortError')
     const url = await resolveModUrl(mod, modpack.mc_version, modpack.loader)
     if (!url) {
       emit(win, { phase: 'download', message: `Пропуск ${mod.name} — нет URL`, current: done, total: missing.length })
@@ -103,7 +105,8 @@ async function resolveModUrl(mod: Mod, mcVersion: string, loader: string): Promi
           params: {
             game_versions: JSON.stringify([mcVersion]),
             loaders: JSON.stringify([loader])
-          }
+          },
+          signal: opSignal()
         }
       )
       const versions: { files: { url: string; primary: boolean }[] }[] = res.data
@@ -121,7 +124,7 @@ async function downloadWithProgress(
   onProgress: (bytes: number, total: number, speed: number) => void
 ) {
   const tmp = dest + '.tmp'
-  const res = await axios.get(url, { responseType: 'stream' })
+  const res = await axios.get(url, { responseType: 'stream', signal: opSignal() })
   const total = parseInt(String(res.headers['content-length'] ?? '0'), 10)
 
   await new Promise<void>((resolve, reject) => {

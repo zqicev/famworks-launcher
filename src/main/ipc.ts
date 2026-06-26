@@ -6,6 +6,7 @@ import { fetchModpackIndex, fetchModpack } from './modpacks'
 import { checkAndInstallModpack, getModpackStatus, toggleMod, deleteMod, getInstalledMods, downloadModToDir, getModFileSizeBytes } from './installer'
 import { launchGame, installFabric } from './launcher'
 import { searchModrinth, getModVersions } from './modrinth'
+import { beginOperation, endOperation, cancelCurrent, isCancelError } from './abort'
 
 function getWindow(): BrowserWindow {
   return BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
@@ -45,22 +46,48 @@ export function setupIpcHandlers() {
 
   ipcMain.handle('install:modpack', async (_, modpackId: string) => {
     const win = getWindow()
-    const modpack = await fetchModpack(modpackId)
-    const installPath = store.get('installPath') as string
-    const gameRoot = pathJoin(installPath, modpack.id)
-    await installFabric(modpack, gameRoot, win)
-    await checkAndInstallModpack(modpack, installPath, win)
-    return true
+    beginOperation()
+    try {
+      const modpack = await fetchModpack(modpackId)
+      const installPath = store.get('installPath') as string
+      const gameRoot = pathJoin(installPath, modpack.id)
+      await installFabric(modpack, gameRoot, win)
+      await checkAndInstallModpack(modpack, installPath, win)
+      return true
+    } catch (e) {
+      if (isCancelError(e)) {
+        win.webContents.send('install:progress', { phase: 'cancelled', message: 'Отменено' })
+        return false
+      }
+      throw e
+    } finally {
+      endOperation()
+    }
   })
 
   ipcMain.handle('launch', async (_, modpackId: string) => {
     const win = getWindow()
-    const modpack = await fetchModpack(modpackId)
-    const username = store.get('activeAccount') as string ?? 'Player'
-    const installPath = store.get('installPath') as string
-    const memory = store.get('allocatedMemory') as number
-    await launchGame(modpack, username, installPath, memory, win)
-    return true
+    beginOperation()
+    try {
+      const modpack = await fetchModpack(modpackId)
+      const username = store.get('activeAccount') as string ?? 'Player'
+      const installPath = store.get('installPath') as string
+      const memory = store.get('allocatedMemory') as number
+      await launchGame(modpack, username, installPath, memory, win)
+      return true
+    } catch (e) {
+      if (isCancelError(e)) {
+        win.webContents.send('install:progress', { phase: 'cancelled', message: 'Отменено' })
+        return false
+      }
+      throw e
+    } finally {
+      endOperation()
+    }
+  })
+
+  ipcMain.handle('cancel', () => {
+    cancelCurrent()
   })
 
   ipcMain.handle('dialog:pick-folder', async () => {

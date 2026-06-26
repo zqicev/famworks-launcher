@@ -34,6 +34,7 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.on('install:progress', (_, d) => cb(d))
     }
   },
+  cancel: () => ipcRenderer.invoke('cancel'),
   launch: {
     start: (id: string) => ipcRenderer.invoke('launch', id),
     onLog: (cb: (msg: string) => void) => {

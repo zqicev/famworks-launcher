@@ -4,6 +4,7 @@ import { BrowserWindow } from 'electron'
 import { Modpack } from '../types/modpack'
 import { ProgressEvent } from './installer'
 import { ensureJava } from './java'
+import { opSignal } from './abort'
 import axios from 'axios'
 import { mkdirSync, writeFileSync, existsSync } from 'fs'
 import { createHash } from 'crypto'
@@ -31,7 +32,7 @@ export async function installFabric(modpack: Modpack, gameRoot: string, win: Bro
   if (!existsSync(versionFile)) {
     emit(win, { phase: 'download', message: 'Загрузка Fabric...' })
     const url = `https://meta.fabricmc.net/v2/versions/loader/${modpack.mc_version}/${modpack.loader_version}/profile/json`
-    const res = await axios.get(url, { timeout: 10000 })
+    const res = await axios.get(url, { timeout: 10000, signal: opSignal() })
     mkdirSync(versionDir, { recursive: true })
     writeFileSync(versionFile, JSON.stringify(res.data, null, 2))
   }

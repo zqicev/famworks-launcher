@@ -25,11 +25,12 @@ interface Window {
       download: (url: string, filename: string, modsDir: string) => Promise<string>
     }
     install: {
-      modpack: (id: string) => Promise<void>
+      modpack: (id: string) => Promise<boolean>
       onProgress: (cb: (data: unknown) => void) => void
     }
+    cancel: () => Promise<void>
     launch: {
-      start: (id: string) => Promise<void>
+      start: (id: string) => Promise<boolean>
       onLog: (cb: (msg: string) => void) => void
       onClose: (cb: (code: number) => void) => void
       onError: (cb: (msg: string) => void) => void
