@@ -23,6 +23,7 @@ export default function AddModModal({ modpack, modsDir, onClose }: Props) {
   const [results, setResults] = useState<SearchResult[]>([])
   const [loading, setLoading] = useState(false)
   const [installing, setInstalling] = useState<string | null>(null)
+  const [status, setStatus] = useState('')
 
   const search = async () => {
     if (!query.trim()) return
@@ -38,15 +39,19 @@ export default function AddModModal({ modpack, modsDir, onClose }: Props) {
   const installMod = async (mod: SearchResult) => {
     setInstalling(mod.project_id)
     try {
-      const versions = await window.api.modrinth.versions(mod.project_id, modpack.mc_version, modpack.loader)
+      const versions = await window.api.modrinth.versions(mod.project_id, modpack.mc_version, modpack.loader) as any[]
       if (!versions.length) {
-        alert('Нет совместимых версий')
+        setStatus(`Нет версий, совместимых с ${modpack.mc_version}`)
         return
       }
       const latest = versions[0]
       const file = latest.files.find((f: { primary: boolean }) => f.primary) ?? latest.files[0]
-      // скачивание через main process — просто закрываем, реализация в ipcMain
-      alert(`Мод ${mod.title} (${file.filename}) добавлен в очередь загрузки`)
+      setStatus(`Загрузка ${mod.title}...`)
+      await window.api.modrinth.download(file.url, file.filename, modsDir)
+      setStatus(`✓ ${mod.title} установлен`)
+      setTimeout(onClose, 1200)
+    } catch (e) {
+      setStatus(`Ошибка: ${String(e)}`)
     } finally {
       setInstalling(null)
     }
@@ -55,8 +60,8 @@ export default function AddModModal({ modpack, modsDir, onClose }: Props) {
   const addFromFile = async () => {
     const path = await window.api.mods.addFile()
     if (path) {
-      alert(`Мод добавлен: ${path}`)
-      onClose()
+      setStatus(`✓ Файл добавлен`)
+      setTimeout(onClose, 800)
     }
   }
 
@@ -82,6 +87,8 @@ export default function AddModModal({ modpack, modsDir, onClose }: Props) {
             .jar файл
           </button>
         </div>
+
+        {status && <div className={styles.status}>{status}</div>}
 
         <div className={styles.results}>
           {loading && <div className={styles.hint}>Поиск...</div>}

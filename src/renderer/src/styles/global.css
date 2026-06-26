@@ -43,6 +43,8 @@ input {
   font-family: var(--font-ui);
   outline: none;
   border: none;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 ::-webkit-scrollbar {

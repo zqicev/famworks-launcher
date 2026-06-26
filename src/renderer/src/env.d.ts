@@ -19,6 +19,7 @@ interface Window {
     modrinth: {
       search: (query: string, mcVersion: string, loader: string) => Promise<unknown[]>
       versions: (projectId: string, mcVersion: string, loader: string) => Promise<unknown[]>
+      download: (url: string, filename: string, modsDir: string) => Promise<string>
     }
     install: {
       modpack: (id: string) => Promise<void>

@@ -55,6 +55,11 @@ export async function resolveModUrl(mod: Mod): Promise<string | null> {
   return null
 }
 
+export async function downloadModToDir(url: string, filename: string, modsDir: string) {
+  mkdirSync(modsDir, { recursive: true })
+  await downloadFile(url, join(modsDir, filename))
+}
+
 async function downloadFile(url: string, dest: string) {
   const tmp = dest + '.tmp'
   const res = await axios.get(url, { responseType: 'stream' })

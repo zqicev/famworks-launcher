@@ -81,6 +81,13 @@
 }
 .fileBtn:hover { border-color: #555; color: var(--text); }
 
+.status {
+  padding: 8px 20px;
+  font-size: 12px;
+  color: var(--accent);
+  border-bottom: 1px solid var(--border);
+}
+
 .results {
   flex: 1;
   overflow-y: auto;

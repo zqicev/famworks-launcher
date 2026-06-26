@@ -1,7 +1,7 @@
 import { ipcMain, dialog, BrowserWindow } from 'electron'
 import { store } from './store'
 import { fetchModpackIndex, fetchModpack } from './modpacks'
-import { installModpack, toggleMod, deleteMod, getInstalledMods } from './installer'
+import { installModpack, toggleMod, deleteMod, getInstalledMods, downloadModToDir } from './installer'
 import { launchGame } from './launcher'
 import { searchModrinth, getModVersions } from './modrinth'
 import { join } from 'path'
@@ -31,6 +31,10 @@ export function setupIpcHandlers() {
     searchModrinth(query, mcVersion, loader))
   ipcMain.handle('modrinth:versions', (_, projectId: string, mcVersion: string, loader: string) =>
     getModVersions(projectId, mcVersion, loader))
+  ipcMain.handle('modrinth:download', async (_, url: string, filename: string, modsDir: string) => {
+    await downloadModToDir(url, filename, modsDir)
+    return filename
+  })
 
   // Install
   ipcMain.handle('install:modpack', async (_, modpackId: string) => {
