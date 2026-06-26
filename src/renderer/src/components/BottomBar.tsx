@@ -70,7 +70,7 @@ export default function BottomBar({ modpack, installPath }: Props) {
         </div>
       </div>
 
-      {log && <div className={styles.log}>{log}</div>}
+      {log ? <div className={styles.log}>{log}</div> : <div className={styles.spacer} />}
 
       <button
         className={`${styles.playBtn} ${isBusy ? styles.busy : ''} ${isRunning ? styles.running : ''}`}

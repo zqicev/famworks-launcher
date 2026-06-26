@@ -59,7 +59,10 @@
   text-overflow: ellipsis;
 }
 
+.spacer { flex: 1; }
+
 .playBtn {
+  margin-left: auto;
   display: flex;
   flex-direction: column;
   align-items: flex-start;
