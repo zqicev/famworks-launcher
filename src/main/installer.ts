@@ -1,5 +1,5 @@
 import { join } from 'path'
-import { createWriteStream, existsSync, mkdirSync, renameSync, unlinkSync, readdirSync } from 'fs'
+import { createWriteStream, existsSync, mkdirSync, renameSync, unlinkSync, readdirSync, statSync } from 'fs'
 import axios from 'axios'
 import { BrowserWindow } from 'electron'
 import { Modpack, Mod } from '../types/modpack'
@@ -144,8 +144,8 @@ async function downloadWithProgress(
 
     res.data.pipe(stream)
     stream.on('finish', resolve)
-    stream.on('error', reject)
-    res.data.on('error', reject)
+    stream.on('error', (e) => { try { unlinkSync(tmp) } catch {} reject(e) })
+    res.data.on('error', (e: Error) => { try { unlinkSync(tmp) } catch {} reject(e) })
   })
 
   renameSync(tmp, dest)
@@ -177,4 +177,12 @@ export function deleteMod(modsDir: string, filename: string) {
 export function getInstalledMods(modsDir: string): string[] {
   if (!existsSync(modsDir)) return []
   return readdirSync(modsDir)
+}
+
+export function getModFileSizeBytes(modsDir: string, filename: string): number {
+  const paths = [join(modsDir, filename), join(modsDir, filename + '.disabled')]
+  for (const p of paths) {
+    try { return statSync(p).size } catch {}
+  }
+  return 0
 }

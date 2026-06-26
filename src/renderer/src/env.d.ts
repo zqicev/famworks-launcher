@@ -16,6 +16,8 @@ interface Window {
       toggle: (modsDir: string, filename: string, enabled: boolean) => Promise<void>
       delete: (modsDir: string, filename: string) => Promise<void>
       addFile: () => Promise<string | null>
+      fileSize: (modsDir: string, filename: string) => Promise<number>
+      copyJar: (srcPath: string, modsDir: string) => Promise<string>
     }
     modrinth: {
       search: (query: string, mcVersion: string, loader: string) => Promise<unknown[]>
@@ -30,10 +32,13 @@ interface Window {
       start: (id: string) => Promise<void>
       onLog: (cb: (msg: string) => void) => void
       onClose: (cb: (code: number) => void) => void
-      onError?: (cb: (msg: string) => void) => void
+      onError: (cb: (msg: string) => void) => void
     }
     dialog: {
       pickFolder: () => Promise<string | null>
+    }
+    shell: {
+      openFolder: (path: string) => Promise<void>
     }
     window: {
       minimize: () => void

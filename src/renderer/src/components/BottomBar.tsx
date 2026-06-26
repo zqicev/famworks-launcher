@@ -57,11 +57,10 @@ export default function BottomBar({ modpack, installPath, extraModsCount = 0 }: 
         bytesDownloaded?: number; bytesTotal?: number; speedBps?: number
       }
       if (d.phase === 'done') {
-        setProgress(null)
-        setStatus('ready')
+        setTimeout(() => { setProgress(null); setStatus('ready') }, 1500)
       } else if (d.phase === 'error') {
-        setProgress(null)
-        setStatus('not_installed')
+        setTimeout(() => setProgress(null), 3000)
+        setStatus('ready')
       } else {
         setProgress({
           message: d.message,
@@ -97,6 +96,14 @@ export default function BottomBar({ modpack, installPath, extraModsCount = 0 }: 
   }
 
   const handleAction = async () => {
+    if (status === 'ready') {
+      const account = await window.api.store.get('activeAccount') as string | null
+      if (!account) {
+        setProgress({ message: 'Выберите аккаунт перед запуском', current: 0, total: 0, bytesDownloaded: 0, bytesTotal: 0, speedBps: 0 })
+        setTimeout(() => setProgress(null), 3000)
+        return
+      }
+    }
     if (status === 'not_installed' || status === 'outdated') {
       setStatus('installing')
       try {

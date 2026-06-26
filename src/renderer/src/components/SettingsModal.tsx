@@ -37,6 +37,9 @@ export default function SettingsModal({ installPath, onPathChange, onClose }: Pr
                 {path || <span className={styles.placeholder}>Не выбрана</span>}
               </div>
               <button className={styles.browseBtn} onClick={pickFolder}>Обзор</button>
+              {path && (
+                <button className={styles.browseBtn} onClick={() => window.api.shell.openFolder(path)} title="Открыть в проводнике">📁</button>
+              )}
             </div>
             <p className={styles.hint}>
               Сборки устанавливаются в отдельные подпапки внутри этой директории.

@@ -11,19 +11,23 @@ function emit(win: BrowserWindow, event: ProgressEvent) {
   win.webContents.send('install:progress', event)
 }
 
-function findJava(): string | null {
-  try {
-    const out = execSync('java -version 2>&1', { encoding: 'utf8', timeout: 3000 })
-    return 'java'
-  } catch {
-    // Попробуем JAVA_HOME
-    const javaHome = process.env.JAVA_HOME
-    if (javaHome) {
-      const bin = join(javaHome, 'bin', process.platform === 'win32' ? 'java.exe' : 'java')
-      if (existsSync(bin)) return bin
-    }
-    return null
+function findJava(): { path: string; version: number } | null {
+  const candidates = ['java']
+  const javaHome = process.env.JAVA_HOME
+  if (javaHome) candidates.unshift(join(javaHome, 'bin', process.platform === 'win32' ? 'java.exe' : 'java'))
+
+  for (const candidate of candidates) {
+    try {
+      const out = execSync(`"${candidate}" -version 2>&1`, { encoding: 'utf8', timeout: 3000 })
+      // "21.0.1" или "1.8.0_xxx"
+      const match = out.match(/version "(\d+)(?:\.(\d+))?/)
+      if (!match) continue
+      let major = parseInt(match[1], 10)
+      if (major === 1) major = parseInt(match[2] ?? '0', 10) // legacy 1.8 format
+      return { path: candidate, version: major }
+    } catch {}
   }
+  return null
 }
 
 export async function installFabric(modpack: Modpack, gameRoot: string, win: BrowserWindow): Promise<string> {
@@ -51,7 +55,12 @@ export async function launchGame(
 ): Promise<void> {
   const java = findJava()
   if (!java) {
-    win.webContents.send('launch:error', 'Java не найдена. Установите Java 17+ и перезапустите лаунчер.')
+    win.webContents.send('launch:error', 'Java не найдена. Установите Java 21 (adoptium.net) и перезапустите лаунчер.')
+    return
+  }
+  const requiredJava = 21
+  if (java.version < requiredJava) {
+    win.webContents.send('launch:error', `Нужна Java ${requiredJava}+, найдена Java ${java.version}. Обновите на adoptium.net`)
     return
   }
 
@@ -80,7 +89,7 @@ export async function launchGame(
       max: `${memoryMB}M`,
       min: '512M'
     },
-    javaPath: java,
+    javaPath: java.path,
     overrides: {
       detached: true
     }

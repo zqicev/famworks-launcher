@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { ModpackIndex, Modpack } from '../../types/modpack'
 import Sidebar from './components/Sidebar'
 import MainPanel from './components/MainPanel'
@@ -16,29 +16,39 @@ export default function App() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [seenUpdates, setSeenUpdates] = useState<Record<string, string>>({})
+
+  const loadIndex = useCallback(async () => {
+    setError(null)
+    try {
+      const index = await window.api.modpacks.index()
+      setModpackIndex(index)
+
+      // Запоминаем updated_at для индикатора обновлений
+      const stored = await window.api.store.get('seenUpdates') as Record<string, string> | null ?? {}
+      const next = { ...stored }
+      let changed = false
+      for (const pack of index.modpacks) {
+        if (!next[pack.id]) { next[pack.id] = pack.updated_at; changed = true }
+      }
+      if (changed) await window.api.store.set('seenUpdates', next)
+      setSeenUpdates(next)
+
+      if (!selectedId && index.modpacks.length > 0) {
+        setSelectedId(index.modpacks[0].id)
+      }
+    } catch {
+      setError('Не удалось загрузить список сборок. Проверьте интернет-соединение.')
+    }
+  }, [selectedId])
 
   useEffect(() => {
     const init = async () => {
-      try {
-        const path = await window.api.store.get('installPath')
-        if (!path) {
-          setNeedsSetup(true)
-          setLoading(false)
-          return
-        }
-        setInstallPath(path)
-
-        const index = await window.api.modpacks.index()
-        setModpackIndex(index)
-
-        if (index.modpacks.length > 0) {
-          setSelectedId(index.modpacks[0].id)
-        }
-      } catch (e) {
-        setError('Не удалось загрузить список сборок. Проверьте интернет-соединение.')
-      } finally {
-        setLoading(false)
-      }
+      const path = await window.api.store.get('installPath') as string
+      if (!path) { setNeedsSetup(true); setLoading(false); return }
+      setInstallPath(path)
+      await loadIndex()
+      setLoading(false)
     }
     init()
   }, [])
@@ -46,9 +56,16 @@ export default function App() {
   useEffect(() => {
     if (!selectedId) return
     setModpack(null)
-    window.api.modpacks.get(selectedId).then(setModpack).catch(() => {
-      setError('Не удалось загрузить сборку.')
-    })
+    window.api.modpacks.get(selectedId).then(mp => {
+      setModpack(mp)
+      // Обновляем seen после открытия сборки
+      window.api.store.get('seenUpdates').then(stored => {
+        const s = (stored as Record<string, string>) ?? {}
+        const next = { ...s, [mp.id]: mp.updated_at }
+        window.api.store.set('seenUpdates', next)
+        setSeenUpdates(next)
+      })
+    }).catch(() => setError('Не удалось загрузить сборку.'))
   }, [selectedId])
 
   const handleSetupComplete = async (path: string) => {
@@ -56,15 +73,18 @@ export default function App() {
     setInstallPath(path)
     setNeedsSetup(false)
     setLoading(true)
-    try {
-      const index = await window.api.modpacks.index()
-      setModpackIndex(index)
-      if (index.modpacks.length > 0) setSelectedId(index.modpacks[0].id)
-    } catch {
-      setError('Не удалось загрузить список сборок.')
-    } finally {
-      setLoading(false)
+    await loadIndex()
+    setLoading(false)
+  }
+
+  const handleRefresh = async () => {
+    setLoading(true)
+    await loadIndex()
+    if (selectedId) {
+      const mp = await window.api.modpacks.get(selectedId).catch(() => null)
+      if (mp) setModpack(mp)
     }
+    setLoading(false)
   }
 
   return (
@@ -77,8 +97,10 @@ export default function App() {
           <Sidebar
             index={modpackIndex}
             selectedId={selectedId}
+            seenUpdates={seenUpdates}
             onSelect={setSelectedId}
             onSettings={() => setSettingsOpen(true)}
+            onRefresh={handleRefresh}
           />
           <MainPanel
             modpack={modpack}

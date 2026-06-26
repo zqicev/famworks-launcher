@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { Modpack, Mod } from '../../../types/modpack'
 import ModRow from './ModRow'
 import AddModModal from './AddModModal'
@@ -19,6 +19,7 @@ export default function ModsTab({ modpack, modsDir, onExtraCountChange }: Props)
   const [disabled, setDisabled] = useState<Set<string>>(new Set())
   const [addOpen, setAddOpen] = useState(false)
   const [extraMods, setExtraMods] = useState<LocalMod[]>([])
+  const [dragging, setDragging] = useState(false)
   const scanRef = useRef(false)
 
   const scanMods = async () => {
@@ -49,13 +50,14 @@ export default function ModsTab({ modpack, modsDir, onExtraCountChange }: Props)
         const id = baseName
         if (isDisabled) newDisabled.add(id)
 
+        const sizeBytes = await window.api.mods.fileSize(modsDir, baseName) as number
         extra.push({
           id,
           name: baseName.replace(/\.jar$/, ''),
           filename: baseName,
           version: '',
           category: 'Локальный',
-          size_mb: 0,
+          size_mb: Math.round(sizeBytes / 1024 / 1024 * 10) / 10,
           required: false,
           _local: true
         })
@@ -111,8 +113,25 @@ export default function ModsTab({ modpack, modsDir, onExtraCountChange }: Props)
     setTimeout(scanMods, 600)
   }
 
+  const handleDrop = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault()
+    setDragging(false)
+    const files = Array.from(e.dataTransfer.files).filter(f => f.name.endsWith('.jar'))
+    for (const file of files) {
+      await window.api.mods.copyJar((file as any).path, modsDir)
+    }
+    if (files.length) setTimeout(scanMods, 300)
+  }, [modsDir])
+
+  const openFolder = () => window.api.shell.openFolder(modsDir)
+
   return (
-    <div className={styles.wrapper}>
+    <div
+      className={`${styles.wrapper} ${dragging ? styles.dragging : ''}`}
+      onDragOver={e => { e.preventDefault(); setDragging(true) }}
+      onDragLeave={() => setDragging(false)}
+      onDrop={handleDrop}
+    >
       <div className={styles.toolbar}>
         <div className={styles.searchWrap}>
           <span className={styles.searchIcon}>⌕</span>
@@ -128,6 +147,9 @@ export default function ModsTab({ modpack, modsDir, onExtraCountChange }: Props)
         </span>
         <button className={styles.addBtn} onClick={() => setAddOpen(true)}>
           + ДОБАВИТЬ МОД
+        </button>
+        <button className={styles.folderBtn} onClick={openFolder} title="Открыть папку модов">
+          📁
         </button>
       </div>
 

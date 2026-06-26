@@ -15,7 +15,9 @@ contextBridge.exposeInMainWorld('api', {
     toggle: (modsDir: string, filename: string, enabled: boolean) =>
       ipcRenderer.invoke('mods:toggle', modsDir, filename, enabled),
     delete: (modsDir: string, filename: string) => ipcRenderer.invoke('mods:delete', modsDir, filename),
-    addFile: () => ipcRenderer.invoke('mods:add-file')
+    addFile: () => ipcRenderer.invoke('mods:add-file'),
+    fileSize: (modsDir: string, filename: string) => ipcRenderer.invoke('mods:file-size', modsDir, filename),
+    copyJar: (srcPath: string, modsDir: string) => ipcRenderer.invoke('mods:copy-jar', srcPath, modsDir)
   },
   modrinth: {
     search: (query: string, mcVersion: string, loader: string) =>
@@ -49,6 +51,9 @@ contextBridge.exposeInMainWorld('api', {
   },
   dialog: {
     pickFolder: () => ipcRenderer.invoke('dialog:pick-folder')
+  },
+  shell: {
+    openFolder: (path: string) => ipcRenderer.invoke('shell:open-folder', path)
   },
   window: {
     minimize: () => ipcRenderer.send('window:minimize'),

@@ -22,17 +22,35 @@
   letter-spacing: 1px;
 }
 
-.settingsBtn {
-  font-size: 16px;
+.logoActions {
+  display: flex;
+  gap: 2px;
+}
+
+.iconBtn {
+  font-size: 15px;
   color: var(--text-dim);
   padding: 4px 6px;
   border-radius: 6px;
   transition: color 0.15s, background 0.15s;
   line-height: 1;
 }
-.settingsBtn:hover {
+.iconBtn:hover {
   color: var(--text);
   background: var(--bg-hover);
+}
+
+.updateBadge {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: var(--accent);
+  background: rgba(197,248,42,0.12);
+  border: 1px solid rgba(197,248,42,0.3);
+  border-radius: 3px;
+  padding: 1px 4px;
+  margin-left: 6px;
+  vertical-align: middle;
 }
 
 .logoF { color: var(--text); }

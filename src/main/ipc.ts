@@ -1,7 +1,9 @@
-import { ipcMain, dialog, BrowserWindow } from 'electron'
+import { ipcMain, dialog, BrowserWindow, shell } from 'electron'
+import { copyFileSync, mkdirSync } from 'fs'
+import { basename, join as pathJoin } from 'path'
 import { store } from './store'
 import { fetchModpackIndex, fetchModpack } from './modpacks'
-import { checkAndInstallModpack, getModpackStatus, toggleMod, deleteMod, getInstalledMods, downloadModToDir } from './installer'
+import { checkAndInstallModpack, getModpackStatus, toggleMod, deleteMod, getInstalledMods, downloadModToDir, getModFileSizeBytes } from './installer'
 import { launchGame, installFabric } from './launcher'
 import { searchModrinth, getModVersions } from './modrinth'
 
@@ -62,6 +64,18 @@ export function setupIpcHandlers() {
   ipcMain.handle('dialog:pick-folder', async () => {
     const result = await dialog.showOpenDialog({ properties: ['openDirectory'] })
     return result.filePaths[0] ?? null
+  })
+
+  ipcMain.handle('shell:open-folder', (_, folderPath: string) => shell.openPath(folderPath))
+
+  ipcMain.handle('mods:file-size', (_, modsDir: string, filename: string) =>
+    getModFileSizeBytes(modsDir, filename))
+
+  ipcMain.handle('mods:copy-jar', (_, srcPath: string, modsDir: string) => {
+    mkdirSync(modsDir, { recursive: true })
+    const name = basename(srcPath)
+    copyFileSync(srcPath, pathJoin(modsDir, name))
+    return name
   })
 
   ipcMain.on('window:minimize', () => BrowserWindow.getFocusedWindow()?.minimize())
