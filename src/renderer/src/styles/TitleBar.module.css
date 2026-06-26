@@ -1,0 +1,41 @@
+.bar {
+  height: 32px;
+  background: var(--bg);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.drag {
+  flex: 1;
+  height: 100%;
+  -webkit-app-region: drag;
+}
+
+.controls {
+  display: flex;
+  gap: 2px;
+  padding: 0 8px;
+  -webkit-app-region: no-drag;
+}
+
+.btn, .btnClose {
+  width: 28px;
+  height: 22px;
+  border-radius: 4px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  transition: background 0.15s, color 0.15s;
+}
+
+.btn:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.btnClose:hover {
+  background: var(--red);
+  color: #fff;
+}

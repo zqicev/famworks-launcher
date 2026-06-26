@@ -1,0 +1,78 @@
+.wrapper {
+  display: flex;
+  gap: 24px;
+}
+
+.left { flex: 1; display: flex; flex-direction: column; gap: 28px; }
+
+.section {}
+
+.label {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  color: var(--text-dim);
+  margin-bottom: 10px;
+}
+
+.text {
+  font-size: 13px;
+  color: var(--text-secondary);
+  line-height: 1.7;
+}
+
+.changelog { display: flex; flex-direction: column; gap: 10px; }
+
+.changelogRow { display: flex; gap: 16px; }
+
+.version {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent);
+  width: 60px;
+  flex-shrink: 0;
+}
+
+.changeDesc {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.params {
+  width: 280px;
+  flex-shrink: 0;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  align-self: flex-start;
+}
+
+.paramTitle {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  color: var(--text-dim);
+  margin-bottom: 2px;
+}
+
+.paramRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.paramKey {
+  font-size: 11px;
+  color: var(--text-dim);
+  letter-spacing: 0.5px;
+}
+
+.paramVal {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}

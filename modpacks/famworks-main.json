@@ -1,0 +1,57 @@
+{
+  "id": "famworks-main",
+  "name": "FamWorks",
+  "description": "Основная сборка команды FamWorks на Fabric.",
+  "long_description": "Основная сборка команды FamWorks. Включает моды для оптимизации, удобства интерфейса и геймплея. Регулярно обновляется командой.",
+  "mc_version": "1.21.1",
+  "loader": "fabric",
+  "loader_version": "0.16.5",
+  "fabric_api_version": "0.110.0+1.21.1",
+  "updated_at": "2025-06-01T00:00:00Z",
+  "changelog": [
+    { "version": "1.21.1", "description": "Обновление до 1.21.1, добавлены новые моды." },
+    { "version": "1.20.4", "description": "Оптимизация производительности, фикс вылетов." }
+  ],
+  "mods": [
+    {
+      "id": "sodium",
+      "name": "Sodium",
+      "modrinth_id": "AANobbMI",
+      "filename": "sodium-fabric-0.6.0+mc1.21.1.jar",
+      "version": "0.6.0",
+      "category": "Оптимизация",
+      "size_mb": 1.2,
+      "required": true
+    },
+    {
+      "id": "fabric-api",
+      "name": "Fabric API",
+      "modrinth_id": "P7dR8mSH",
+      "filename": "fabric-api-0.110.0+1.21.1.jar",
+      "version": "0.110.0",
+      "category": "API",
+      "size_mb": 2.5,
+      "required": true
+    },
+    {
+      "id": "iris",
+      "name": "Iris Shaders",
+      "modrinth_id": "YL57xq9U",
+      "filename": "iris-fabric-1.8.0+mc1.21.1.jar",
+      "version": "1.8.0",
+      "category": "Графика",
+      "size_mb": 3.4,
+      "required": false
+    },
+    {
+      "id": "journeymap",
+      "name": "JourneyMap",
+      "modrinth_id": "lfHFW1mp",
+      "filename": "journeymap-fabric-1.21.1-6.0.0.jar",
+      "version": "6.0.0",
+      "category": "Карта",
+      "size_mb": 6.1,
+      "required": false
+    }
+  ]
+}
