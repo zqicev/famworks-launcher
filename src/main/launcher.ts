@@ -2,8 +2,31 @@ import { Client, ILaunchOption } from 'minecraft-launcher-core'
 import { join } from 'path'
 import { BrowserWindow } from 'electron'
 import { Modpack } from '../types/modpack'
+import { ProgressEvent } from './installer'
+import axios from 'axios'
+import { mkdirSync, writeFileSync, existsSync } from 'fs'
 
 const client = new Client()
+
+function emit(win: BrowserWindow, event: ProgressEvent) {
+  win.webContents.send('install:progress', event)
+}
+
+export async function installFabric(modpack: Modpack, gameRoot: string, win: BrowserWindow): Promise<string> {
+  const versionId = `fabric-loader-${modpack.loader_version}-${modpack.mc_version}`
+  const versionDir = join(gameRoot, 'versions', versionId)
+  const versionFile = join(versionDir, `${versionId}.json`)
+
+  if (!existsSync(versionFile)) {
+    emit(win, { phase: 'download', message: 'Загрузка Fabric...' })
+    const url = `https://meta.fabricmc.net/v2/versions/loader/${modpack.mc_version}/${modpack.loader_version}/profile/json`
+    const res = await axios.get(url)
+    mkdirSync(versionDir, { recursive: true })
+    writeFileSync(versionFile, JSON.stringify(res.data, null, 2))
+  }
+
+  return versionId
+}
 
 export async function launchGame(
   modpack: Modpack,
@@ -13,6 +36,9 @@ export async function launchGame(
   win: BrowserWindow
 ) {
   const gameRoot = join(installPath, modpack.id)
+  const fabricVersionId = await installFabric(modpack, gameRoot, win)
+
+  emit(win, { phase: 'download', message: 'Загрузка файлов Minecraft...' })
 
   const options: ILaunchOption = {
     authorization: {
@@ -25,7 +51,8 @@ export async function launchGame(
     root: gameRoot,
     version: {
       number: modpack.mc_version,
-      type: 'release'
+      type: 'release',
+      custom: fabricVersionId
     },
     memory: {
       max: `${memoryMB}M`,
@@ -36,19 +63,32 @@ export async function launchGame(
     }
   }
 
-  client.on('debug', (e) => win.webContents.send('launch:log', e))
-  client.on('data', (e) => win.webContents.send('launch:log', e))
-  client.on('progress', (e) => win.webContents.send('launch:progress', e))
-  client.on('close', (code) => win.webContents.send('launch:close', code))
+  client.on('debug', (e) => emit(win, { phase: 'download', message: String(e) }))
+  client.on('data', (e) => emit(win, { phase: 'download', message: String(e) }))
+  client.on('progress', (e) => {
+    const p = e as { type: string; task: number; total: number }
+    emit(win, {
+      phase: 'download',
+      message: `${p.type}`,
+      current: p.task,
+      total: p.total
+    })
+  })
+  client.on('close', (code) => {
+    win.webContents.send('launch:close', code)
+    win.webContents.send('install:progress', { phase: 'done', message: '' })
+  })
 
   await client.launch(options)
+  emit(win, { phase: 'done', message: '' })
 }
 
 function generateOfflineUUID(username: string): string {
-  // Детерминированный UUID v3 на основе username (офлайн-совместимый)
-  const hash = Array.from(username).reduce((acc, c) => acc + c.charCodeAt(0), 0)
-  return `xxxxxxxx-xxxx-3xxx-yxxx-xxxxxxxxxxxx`.replace(/[xy]/g, (c, i) => {
-    const v = (hash * (i + 1) * 31337) % 16 | 0
-    return (c === 'x' ? v : (v & 0x3) | 0x8).toString(16)
-  })
+  let hash = 0
+  for (let i = 0; i < username.length; i++) {
+    hash = ((hash << 5) - hash) + username.charCodeAt(i)
+    hash |= 0
+  }
+  const h = Math.abs(hash).toString(16).padStart(8, '0')
+  return `${h.slice(0,8)}-${h.slice(0,4)}-3${h.slice(1,4)}-a${h.slice(2,5)}-${h.slice(0,12).padEnd(12,'0')}`
 }

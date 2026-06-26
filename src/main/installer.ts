@@ -71,16 +71,24 @@ export async function getModpackStatus(
   modpack: Modpack,
   installPath: string
 ): Promise<'not_installed' | 'outdated' | 'ready'> {
-  const modsDir = join(installPath, modpack.id, 'mods')
-  if (!existsSync(modsDir)) return 'not_installed'
+  const gameRoot = join(installPath, modpack.id)
+  const versionId = `fabric-loader-${modpack.loader_version}-${modpack.mc_version}`
+  const versionFile = join(gameRoot, 'versions', versionId, `${versionId}.json`)
 
+  // Если нет даже Fabric-профиля — не установлена
+  if (!existsSync(versionFile)) return 'not_installed'
+
+  // Если нет всех обязательных модов — нужно обновление
+  const modsDir = join(gameRoot, 'mods')
   for (const mod of modpack.mods) {
+    if (!mod.required) continue
     const enabled = join(modsDir, mod.filename)
     const disabled = join(modsDir, mod.filename + '.disabled')
     if (!existsSync(enabled) && !existsSync(disabled)) {
       return 'outdated'
     }
   }
+
   return 'ready'
 }
 

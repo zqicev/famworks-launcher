@@ -2,7 +2,7 @@ import { ipcMain, dialog, BrowserWindow } from 'electron'
 import { store } from './store'
 import { fetchModpackIndex, fetchModpack } from './modpacks'
 import { checkAndInstallModpack, getModpackStatus, toggleMod, deleteMod, getInstalledMods, downloadModToDir } from './installer'
-import { launchGame } from './launcher'
+import { launchGame, installFabric } from './launcher'
 import { searchModrinth, getModVersions } from './modrinth'
 
 export function setupIpcHandlers() {
@@ -42,6 +42,9 @@ export function setupIpcHandlers() {
     const win = BrowserWindow.getFocusedWindow()!
     const modpack = await fetchModpack(modpackId)
     const installPath = store.get('installPath') as string
+    const { join } = await import('path')
+    const gameRoot = join(installPath, modpack.id)
+    await installFabric(modpack, gameRoot, win)
     await checkAndInstallModpack(modpack, installPath, win)
     return true
   })
