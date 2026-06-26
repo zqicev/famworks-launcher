@@ -93,7 +93,7 @@ export default function MainPanel({ modpack, installPath, loading, error }: Prop
         )}
       </div>
 
-      <BottomBar modpack={modpack} installPath={installPath} />
+      <BottomBar modpack={modpack} installPath={installPath} extraModsCount={extraCount} />
     </main>
   )
 }

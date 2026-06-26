@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Modpack, Mod } from '../../../types/modpack'
 import ModRow from './ModRow'
 import AddModModal from './AddModModal'
@@ -19,37 +19,61 @@ export default function ModsTab({ modpack, modsDir, onExtraCountChange }: Props)
   const [disabled, setDisabled] = useState<Set<string>>(new Set())
   const [addOpen, setAddOpen] = useState(false)
   const [extraMods, setExtraMods] = useState<LocalMod[]>([])
+  const scanRef = useRef(false)
 
   const scanMods = async () => {
-    const files = await window.api.mods.installed(modsDir) as string[]
-    const knownFilenames = new Set(modpack.mods.map(m => m.filename))
+    if (scanRef.current) return
+    scanRef.current = true
+    try {
+      const files = await window.api.mods.installed(modsDir) as string[]
+      const knownFilenames = new Set(modpack.mods.map(m => m.filename))
+      const newDisabled = new Set<string>()
 
-    const extra: LocalMod[] = files
-      .filter(f => f.endsWith('.jar') || f.endsWith('.jar.disabled'))
-      .map(f => f.replace(/\.disabled$/, ''))
-      .filter(f => !knownFilenames.has(f))
-      .filter((f, i, arr) => arr.indexOf(f) === i) // dedupe
-      .map(f => ({
-        id: f,
-        name: f.replace(/\.jar$/, ''),
-        filename: f,
-        version: '',
-        category: 'Локальный',
-        size_mb: 0,
-        required: false,
-        _local: true
-      }))
+      // Инициализируем disabled из реальных .disabled файлов
+      for (const mod of modpack.mods) {
+        const disabledFile = mod.filename + '.disabled'
+        if (files.includes(disabledFile)) newDisabled.add(mod.id)
+      }
 
-    setExtraMods(extra)
-    onExtraCountChange?.(extra.length)
+      // Локальные моды (не в JSON)
+      const extra: LocalMod[] = []
+      const seen = new Set<string>()
+      for (const f of files) {
+        const isDisabled = f.endsWith('.jar.disabled')
+        const baseName = isDisabled ? f.replace(/\.disabled$/, '') : f
+        if (!baseName.endsWith('.jar')) continue
+        if (knownFilenames.has(baseName)) continue
+        if (seen.has(baseName)) continue
+        seen.add(baseName)
+
+        const id = baseName
+        if (isDisabled) newDisabled.add(id)
+
+        extra.push({
+          id,
+          name: baseName.replace(/\.jar$/, ''),
+          filename: baseName,
+          version: '',
+          category: 'Локальный',
+          size_mb: 0,
+          required: false,
+          _local: true
+        })
+      }
+
+      setDisabled(newDisabled)
+      setExtraMods(extra)
+      onExtraCountChange?.(extra.length)
+    } finally {
+      scanRef.current = false
+    }
   }
 
   useEffect(() => {
     scanMods()
-    // Обновляем список когда bottom bar сообщает о завершении загрузки
     window.api.install.onProgress((raw: unknown) => {
       const d = raw as { phase: string }
-      if (d.phase === 'done') scanMods()
+      if (d.phase === 'done') setTimeout(scanMods, 300)
     })
   }, [modsDir])
 
@@ -75,12 +99,16 @@ export default function ModsTab({ modpack, modsDir, onExtraCountChange }: Props)
   const handleDelete = async (mod: LocalMod) => {
     if (mod.required) return
     await window.api.mods.delete(modsDir, mod.filename)
-    setExtraMods(prev => prev.filter(m => m.id !== mod.id))
+    setExtraMods(prev => {
+      const next = prev.filter(m => m.id !== mod.id)
+      onExtraCountChange?.(next.length)
+      return next
+    })
   }
 
   const handleAddClose = () => {
     setAddOpen(false)
-    setTimeout(scanMods, 500)
+    setTimeout(scanMods, 600)
   }
 
   return (

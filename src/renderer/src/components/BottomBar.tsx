@@ -5,6 +5,7 @@ import styles from '../styles/BottomBar.module.css'
 interface Props {
   modpack: Modpack
   installPath: string
+  extraModsCount?: number
 }
 
 type ModpackStatus = 'checking' | 'not_installed' | 'outdated' | 'ready' | 'installing' | 'launching' | 'running'
@@ -30,7 +31,7 @@ function formatSpeed(bps: number) {
   return `${(bps / 1024 / 1024).toFixed(1)} МБ/с`
 }
 
-export default function BottomBar({ modpack, installPath }: Props) {
+export default function BottomBar({ modpack, installPath, extraModsCount = 0 }: Props) {
   const [status, setStatus] = useState<ModpackStatus>('checking')
   const [memory, setMemory] = useState(4096)
   const [progress, setProgress] = useState<ProgressState | null>(null)
@@ -76,6 +77,11 @@ export default function BottomBar({ modpack, installPath }: Props) {
     window.api.launch.onClose(() => {
       setStatus('ready')
       setProgress(null)
+    })
+
+    window.api.launch.onError?.((msg: string) => {
+      setProgress({ message: msg, current: 0, total: 0, bytesDownloaded: 0, bytesTotal: 0, speedBps: 0 })
+      setStatus('ready')
     })
   }, [modpack.id, checkStatus])
 
@@ -165,7 +171,7 @@ export default function BottomBar({ modpack, installPath }: Props) {
           <div className={styles.divider} />
           <div className={styles.stat}>
             <span className={styles.statLabel}>МОДОВ АКТИВНО</span>
-            <span className={styles.statVal}>{modpack.mods.length} из {modpack.mods.length}</span>
+            <span className={styles.statVal}>{modpack.mods.length + extraModsCount} из {modpack.mods.length + extraModsCount}</span>
           </div>
         </div>
 

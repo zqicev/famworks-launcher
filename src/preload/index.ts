@@ -41,6 +41,10 @@ contextBridge.exposeInMainWorld('api', {
     onClose: (cb: (code: number) => void) => {
       ipcRenderer.removeAllListeners('launch:close')
       ipcRenderer.on('launch:close', (_, c) => cb(c))
+    },
+    onError: (cb: (msg: string) => void) => {
+      ipcRenderer.removeAllListeners('launch:error')
+      ipcRenderer.on('launch:error', (_, m) => cb(m))
     }
   },
   dialog: {

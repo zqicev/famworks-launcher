@@ -30,6 +30,7 @@ interface Window {
       start: (id: string) => Promise<void>
       onLog: (cb: (msg: string) => void) => void
       onClose: (cb: (code: number) => void) => void
+      onError?: (cb: (msg: string) => void) => void
     }
     dialog: {
       pickFolder: () => Promise<string | null>
