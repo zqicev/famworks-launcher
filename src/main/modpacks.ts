@@ -1,11 +1,13 @@
 import axios from 'axios'
 import { ModpackIndex, Modpack } from '../types/modpack'
 
-const GITHUB_BASE = 'https://raw.githubusercontent.com/zqicev/famworks-launcher/main/modpacks'
+// Сборки хранятся в отдельном публичном репозитории famworks-builds.
+const GITHUB_BASE = 'https://raw.githubusercontent.com/zqicev/famworks-builds/main/modpacks'
 const FALLBACK_BASE = '' // TODO: добавить fallback URL (Cloudflare R2 и т.д.)
 
 async function fetchJson<T>(url: string): Promise<T> {
-  const res = await axios.get<T>(url, { timeout: 8000 })
+  // cache-busting: GitHub raw кэширует на ~5 мин, ?t= даёт свежие данные после обновления сборки
+  const res = await axios.get<T>(`${url}?t=${Date.now()}`, { timeout: 8000 })
   return res.data
 }
 
