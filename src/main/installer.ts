@@ -44,7 +44,7 @@ export async function checkAndInstallModpack(
 
   let done = 0
   for (const mod of missing) {
-    const url = await resolveModUrl(mod)
+    const url = await resolveModUrl(mod, modpack.mc_version, modpack.loader)
     if (!url) {
       emit(win, { phase: 'download', message: `Пропуск ${mod.name} — нет URL`, current: done, total: missing.length })
       done++
@@ -92,15 +92,23 @@ export async function getModpackStatus(
   return 'ready'
 }
 
-async function resolveModUrl(mod: Mod): Promise<string | null> {
+async function resolveModUrl(mod: Mod, mcVersion: string, loader: string): Promise<string | null> {
   if (mod.download_url) return mod.download_url
   if (mod.modrinth_id) {
     try {
       const res = await axios.get(
-        `https://api.modrinth.com/v2/version/${mod.modrinth_id}`,
-        { headers: { 'User-Agent': 'famworks-launcher/1.0' } }
+        `https://api.modrinth.com/v2/project/${mod.modrinth_id}/version`,
+        {
+          headers: { 'User-Agent': 'famworks-launcher/1.0' },
+          params: {
+            game_versions: JSON.stringify([mcVersion]),
+            loaders: JSON.stringify([loader])
+          }
+        }
       )
-      const file = res.data.files?.find((f: { primary: boolean }) => f.primary) ?? res.data.files?.[0]
+      const versions: { files: { url: string; primary: boolean }[] }[] = res.data
+      if (!versions.length) return null
+      const file = versions[0].files.find(f => f.primary) ?? versions[0].files[0]
       return file?.url ?? null
     } catch { return null }
   }

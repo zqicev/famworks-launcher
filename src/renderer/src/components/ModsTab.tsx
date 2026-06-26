@@ -7,13 +7,14 @@ import styles from '../styles/ModsTab.module.css'
 interface Props {
   modpack: Modpack
   modsDir: string
+  onExtraCountChange?: (count: number) => void
 }
 
 interface LocalMod extends Mod {
   _local?: boolean
 }
 
-export default function ModsTab({ modpack, modsDir }: Props) {
+export default function ModsTab({ modpack, modsDir, onExtraCountChange }: Props) {
   const [search, setSearch] = useState('')
   const [disabled, setDisabled] = useState<Set<string>>(new Set())
   const [addOpen, setAddOpen] = useState(false)
@@ -40,6 +41,7 @@ export default function ModsTab({ modpack, modsDir }: Props) {
       }))
 
     setExtraMods(extra)
+    onExtraCountChange?.(extra.length)
   }
 
   useEffect(() => {

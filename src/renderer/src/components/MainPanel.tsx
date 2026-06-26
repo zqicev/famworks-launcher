@@ -12,15 +12,19 @@ interface Props {
   error: string | null
 }
 
+function formatSize(mb: number) {
+  if (mb >= 1024) return `${(mb / 1024).toFixed(1)} ГБ`
+  return `${mb.toFixed(0)} МБ`
+}
+
 export default function MainPanel({ modpack, installPath, loading, error }: Props) {
   const [tab, setTab] = useState<'mods' | 'overview'>('mods')
+  const [extraCount, setExtraCount] = useState(0)
 
   if (loading) {
     return (
       <main className={styles.main}>
-        <div className={styles.center}>
-          <div className={styles.spinner} />
-        </div>
+        <div className={styles.center}><div className={styles.spinner} /></div>
       </main>
     )
   }
@@ -28,9 +32,7 @@ export default function MainPanel({ modpack, installPath, loading, error }: Prop
   if (error) {
     return (
       <main className={styles.main}>
-        <div className={styles.center}>
-          <p className={styles.error}>{error}</p>
-        </div>
+        <div className={styles.center}><p className={styles.error}>{error}</p></div>
       </main>
     )
   }
@@ -38,15 +40,14 @@ export default function MainPanel({ modpack, installPath, loading, error }: Prop
   if (!modpack) {
     return (
       <main className={styles.main}>
-        <div className={styles.center}>
-          <p className={styles.hint}>Выберите сборку</p>
-        </div>
+        <div className={styles.center}><p className={styles.hint}>Выберите сборку</p></div>
       </main>
     )
   }
 
   const modsDir = `${installPath}/${modpack.id}/mods`
-  const activeMods = modpack.mods.filter(m => m.required || true).length
+  const totalMods = modpack.mods.length + extraCount
+  const totalSizeMb = modpack.mods.reduce((s, m) => s + m.size_mb, 0)
 
   return (
     <main className={styles.main}>
@@ -73,13 +74,11 @@ export default function MainPanel({ modpack, installPath, loading, error }: Prop
 
           <div className={styles.stats}>
             <div className={styles.stat}>
-              <span className={styles.statVal}>{modpack.mods.length}</span>
+              <span className={styles.statVal}>{totalMods}</span>
               <span className={styles.statLabel}>МОДОВ ВСЕ</span>
             </div>
             <div className={styles.stat}>
-              <span className={styles.statVal}>
-                {modpack.mods.reduce((s, m) => s + m.size_mb, 0).toFixed(1)} ГБ
-              </span>
+              <span className={styles.statVal}>{formatSize(totalSizeMb)}</span>
               <span className={styles.statLabel}>РАЗМЕР</span>
             </div>
           </div>
@@ -88,7 +87,7 @@ export default function MainPanel({ modpack, installPath, loading, error }: Prop
 
       <div className={styles.content}>
         {tab === 'mods' ? (
-          <ModsTab modpack={modpack} modsDir={modsDir} />
+          <ModsTab modpack={modpack} modsDir={modsDir} onExtraCountChange={setExtraCount} />
         ) : (
           <OverviewTab modpack={modpack} />
         )}
