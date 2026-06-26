@@ -33,7 +33,8 @@ export function setupIpcHandlers() {
   ipcMain.handle('modrinth:versions', (_, projectId: string, mcVersion: string, loader: string) =>
     getModVersions(projectId, mcVersion, loader))
   ipcMain.handle('modrinth:download', async (_, url: string, filename: string, modsDir: string) => {
-    await downloadModToDir(url, filename, modsDir)
+    const win = BrowserWindow.getFocusedWindow()!
+    await downloadModToDir(url, filename, modsDir, win)
     return filename
   })
 

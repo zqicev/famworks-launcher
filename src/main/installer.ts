@@ -135,9 +135,13 @@ async function downloadWithProgress(
   renameSync(tmp, dest)
 }
 
-export async function downloadModToDir(url: string, filename: string, modsDir: string) {
+export async function downloadModToDir(url: string, filename: string, modsDir: string, win?: BrowserWindow) {
   mkdirSync(modsDir, { recursive: true })
-  await downloadWithProgress(url, join(modsDir, filename), () => {})
+  if (win) emit(win, { phase: 'download', message: `Загрузка ${filename}`, current: 0, total: 1, bytesDownloaded: 0, bytesTotal: 0, speedBps: 0 })
+  await downloadWithProgress(url, join(modsDir, filename), (bytes, total, speed) => {
+    if (win) emit(win, { phase: 'download', message: `Загрузка ${filename}`, current: 0, total: 1, bytesDownloaded: bytes, bytesTotal: total, speedBps: speed })
+  })
+  if (win) emit(win, { phase: 'done', message: '' })
 }
 
 export function toggleMod(modsDir: string, filename: string, enabled: boolean) {

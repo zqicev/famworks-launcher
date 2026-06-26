@@ -23,7 +23,6 @@ export default function AddModModal({ modpack, modsDir, onClose }: Props) {
   const [results, setResults] = useState<SearchResult[]>([])
   const [loading, setLoading] = useState(false)
   const [installing, setInstalling] = useState<string | null>(null)
-  const [status, setStatus] = useState('')
 
   const search = async () => {
     if (!query.trim()) return
@@ -41,28 +40,21 @@ export default function AddModModal({ modpack, modsDir, onClose }: Props) {
     try {
       const versions = await window.api.modrinth.versions(mod.project_id, modpack.mc_version, modpack.loader) as any[]
       if (!versions.length) {
-        setStatus(`Нет версий, совместимых с ${modpack.mc_version}`)
+        alert(`Нет версий, совместимых с ${modpack.mc_version}`)
         return
       }
       const latest = versions[0]
       const file = latest.files.find((f: { primary: boolean }) => f.primary) ?? latest.files[0]
-      setStatus(`Загрузка ${mod.title}...`)
-      await window.api.modrinth.download(file.url, file.filename, modsDir)
-      setStatus(`✓ ${mod.title} установлен`)
-      setTimeout(onClose, 1200)
-    } catch (e) {
-      setStatus(`Ошибка: ${String(e)}`)
-    } finally {
+      onClose() // закрываем сразу, прогресс идёт в bottom bar
+      window.api.modrinth.download(file.url, file.filename, modsDir)
+    } catch {
       setInstalling(null)
     }
   }
 
   const addFromFile = async () => {
     const path = await window.api.mods.addFile()
-    if (path) {
-      setStatus(`✓ Файл добавлен`)
-      setTimeout(onClose, 800)
-    }
+    if (path) onClose()
   }
 
   return (
@@ -87,8 +79,6 @@ export default function AddModModal({ modpack, modsDir, onClose }: Props) {
             .jar файл
           </button>
         </div>
-
-        {status && <div className={styles.status}>{status}</div>}
 
         <div className={styles.results}>
           {loading && <div className={styles.hint}>Поиск...</div>}

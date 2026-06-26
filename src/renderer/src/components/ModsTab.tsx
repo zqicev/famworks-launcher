@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Modpack, Mod } from '../../../types/modpack'
 import ModRow from './ModRow'
 import AddModModal from './AddModModal'
@@ -9,19 +9,58 @@ interface Props {
   modsDir: string
 }
 
+interface LocalMod extends Mod {
+  _local?: boolean
+}
+
 export default function ModsTab({ modpack, modsDir }: Props) {
   const [search, setSearch] = useState('')
   const [disabled, setDisabled] = useState<Set<string>>(new Set())
   const [addOpen, setAddOpen] = useState(false)
+  const [extraMods, setExtraMods] = useState<LocalMod[]>([])
 
-  const filtered = modpack.mods.filter(m =>
+  const scanMods = async () => {
+    const files = await window.api.mods.installed(modsDir) as string[]
+    const knownFilenames = new Set(modpack.mods.map(m => m.filename))
+
+    const extra: LocalMod[] = files
+      .filter(f => f.endsWith('.jar') || f.endsWith('.jar.disabled'))
+      .map(f => f.replace(/\.disabled$/, ''))
+      .filter(f => !knownFilenames.has(f))
+      .filter((f, i, arr) => arr.indexOf(f) === i) // dedupe
+      .map(f => ({
+        id: f,
+        name: f.replace(/\.jar$/, ''),
+        filename: f,
+        version: '',
+        category: 'Локальный',
+        size_mb: 0,
+        required: false,
+        _local: true
+      }))
+
+    setExtraMods(extra)
+  }
+
+  useEffect(() => {
+    scanMods()
+    // Обновляем список когда bottom bar сообщает о завершении загрузки
+    window.api.install.onProgress((raw: unknown) => {
+      const d = raw as { phase: string }
+      if (d.phase === 'done') scanMods()
+    })
+  }, [modsDir])
+
+  const allMods: LocalMod[] = [...modpack.mods, ...extraMods]
+
+  const filtered = allMods.filter(m =>
     m.name.toLowerCase().includes(search.toLowerCase()) ||
     m.category.toLowerCase().includes(search.toLowerCase())
   )
 
-  const enabledCount = modpack.mods.filter(m => !disabled.has(m.id)).length
+  const enabledCount = allMods.filter(m => !disabled.has(m.id)).length
 
-  const handleToggle = async (mod: Mod, enabled: boolean) => {
+  const handleToggle = async (mod: LocalMod, enabled: boolean) => {
     if (mod.required) return
     await window.api.mods.toggle(modsDir, mod.filename, enabled)
     setDisabled(prev => {
@@ -31,9 +70,15 @@ export default function ModsTab({ modpack, modsDir }: Props) {
     })
   }
 
-  const handleDelete = async (mod: Mod) => {
+  const handleDelete = async (mod: LocalMod) => {
     if (mod.required) return
     await window.api.mods.delete(modsDir, mod.filename)
+    setExtraMods(prev => prev.filter(m => m.id !== mod.id))
+  }
+
+  const handleAddClose = () => {
+    setAddOpen(false)
+    setTimeout(scanMods, 500)
   }
 
   return (
@@ -49,7 +94,7 @@ export default function ModsTab({ modpack, modsDir }: Props) {
           />
         </div>
         <span className={styles.activeCount}>
-          {enabledCount} / {modpack.mods.length} активны
+          {enabledCount} / {allMods.length} активны
         </span>
         <button className={styles.addBtn} onClick={() => setAddOpen(true)}>
           + ДОБАВИТЬ МОД
@@ -72,7 +117,7 @@ export default function ModsTab({ modpack, modsDir }: Props) {
         <AddModModal
           modpack={modpack}
           modsDir={modsDir}
-          onClose={() => setAddOpen(false)}
+          onClose={handleAddClose}
         />
       )}
     </div>
