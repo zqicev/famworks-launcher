@@ -7,7 +7,8 @@ contextBridge.exposeInMainWorld('api', {
   },
   modpacks: {
     index: () => ipcRenderer.invoke('modpacks:index'),
-    get: (id: string) => ipcRenderer.invoke('modpacks:get', id)
+    get: (id: string) => ipcRenderer.invoke('modpacks:get', id),
+    status: (id: string) => ipcRenderer.invoke('modpack:status', id)
   },
   mods: {
     installed: (modsDir: string) => ipcRenderer.invoke('mods:installed', modsDir),
@@ -26,14 +27,21 @@ contextBridge.exposeInMainWorld('api', {
   },
   install: {
     modpack: (id: string) => ipcRenderer.invoke('install:modpack', id),
-    onProgress: (cb: (data: unknown) => void) => ipcRenderer.on('install:progress', (_, d) => cb(d)),
-    onLog: (cb: (msg: string) => void) => ipcRenderer.on('install:log', (_, m) => cb(m))
+    onProgress: (cb: (data: unknown) => void) => {
+      ipcRenderer.removeAllListeners('install:progress')
+      ipcRenderer.on('install:progress', (_, d) => cb(d))
+    }
   },
   launch: {
     start: (id: string) => ipcRenderer.invoke('launch', id),
-    onProgress: (cb: (data: unknown) => void) => ipcRenderer.on('launch:progress', (_, d) => cb(d)),
-    onLog: (cb: (msg: string) => void) => ipcRenderer.on('launch:log', (_, m) => cb(m)),
-    onClose: (cb: (code: number) => void) => ipcRenderer.on('launch:close', (_, c) => cb(c))
+    onLog: (cb: (msg: string) => void) => {
+      ipcRenderer.removeAllListeners('launch:log')
+      ipcRenderer.on('launch:log', (_, m) => cb(m))
+    },
+    onClose: (cb: (code: number) => void) => {
+      ipcRenderer.removeAllListeners('launch:close')
+      ipcRenderer.on('launch:close', (_, c) => cb(c))
+    }
   },
   dialog: {
     pickFolder: () => ipcRenderer.invoke('dialog:pick-folder')

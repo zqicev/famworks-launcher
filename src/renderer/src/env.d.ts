@@ -9,6 +9,7 @@ interface Window {
     modpacks: {
       index: () => Promise<import('../../types/modpack').ModpackIndex>
       get: (id: string) => Promise<import('../../types/modpack').Modpack>
+      status: (id: string) => Promise<'not_installed' | 'outdated' | 'ready'>
     }
     mods: {
       installed: (modsDir: string) => Promise<string[]>
@@ -24,11 +25,9 @@ interface Window {
     install: {
       modpack: (id: string) => Promise<void>
       onProgress: (cb: (data: unknown) => void) => void
-      onLog: (cb: (msg: string) => void) => void
     }
     launch: {
       start: (id: string) => Promise<void>
-      onProgress: (cb: (data: unknown) => void) => void
       onLog: (cb: (msg: string) => void) => void
       onClose: (cb: (code: number) => void) => void
     }
