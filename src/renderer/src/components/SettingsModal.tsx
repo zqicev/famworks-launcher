@@ -38,7 +38,11 @@ export default function SettingsModal({ installPath, onPathChange, onClose }: Pr
               </div>
               <button className={styles.browseBtn} onClick={pickFolder}>Обзор</button>
               {path && (
-                <button className={styles.browseBtn} onClick={() => window.api.shell.openFolder(path)} title="Открыть в проводнике">📁</button>
+                <button className={styles.iconBtn} onClick={() => window.api.shell.openFolder(path)} title="Открыть в проводнике">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M4 5h5l2 2h9a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" />
+                  </svg>
+                </button>
               )}
             </div>
             <p className={styles.hint}>

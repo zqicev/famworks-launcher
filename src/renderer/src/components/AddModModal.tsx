@@ -29,7 +29,7 @@ export default function AddModModal({ modpack, modsDir, onClose }: Props) {
     setLoading(true)
     try {
       const hits = await window.api.modrinth.search(query, modpack.mc_version, modpack.loader)
-      setResults(hits)
+      setResults(hits as SearchResult[])
     } finally {
       setLoading(false)
     }

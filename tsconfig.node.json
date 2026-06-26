@@ -1,15 +1,15 @@
 {
   "compilerOptions": {
     "composite": true,
-    "module": "CommonJS",
+    "module": "ESNext",
     "moduleResolution": "bundler",
     "strict": true,
     "target": "ES2022",
-    "outDir": "dist/main",
-    "rootDir": "src/main",
+    "noEmit": true,
     "skipLibCheck": true,
+    "esModuleInterop": true,
     "resolveJsonModule": true,
     "types": ["node"]
   },
-  "include": ["src/main/**/*", "src/preload/**/*", "electron.vite.config.ts"]
+  "include": ["src/main/**/*", "src/preload/**/*", "src/types/**/*", "electron.vite.config.ts"]
 }

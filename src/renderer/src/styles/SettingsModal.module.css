@@ -90,6 +90,19 @@
 }
 .browseBtn:hover { border-color: #555; }
 
+.iconBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 12px;
+  background: var(--bg-active);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  border-radius: 8px;
+  transition: border-color 0.15s, color 0.15s;
+}
+.iconBtn:hover { border-color: #555; color: var(--text); }
+
 .hint {
   font-size: 11px;
   color: var(--text-dim);

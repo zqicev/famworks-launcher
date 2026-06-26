@@ -6,9 +6,10 @@
     "strict": true,
     "target": "ES2022",
     "jsx": "react-jsx",
+    "noEmit": true,
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "skipLibCheck": true,
     "resolveJsonModule": true
   },
-  "include": ["src/renderer/**/*"]
+  "include": ["src/renderer/**/*", "src/types/**/*"]
 }

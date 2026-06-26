@@ -7,6 +7,10 @@ import { checkAndInstallModpack, getModpackStatus, toggleMod, deleteMod, getInst
 import { launchGame, installFabric } from './launcher'
 import { searchModrinth, getModVersions } from './modrinth'
 
+function getWindow(): BrowserWindow {
+  return BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
+}
+
 export function setupIpcHandlers() {
   ipcMain.handle('store:get', (_, key) => store.get(key))
   ipcMain.handle('store:set', (_, key, value) => store.set(key, value))
@@ -35,24 +39,22 @@ export function setupIpcHandlers() {
   ipcMain.handle('modrinth:versions', (_, projectId: string, mcVersion: string, loader: string) =>
     getModVersions(projectId, mcVersion, loader))
   ipcMain.handle('modrinth:download', async (_, url: string, filename: string, modsDir: string) => {
-    const win = BrowserWindow.getFocusedWindow()!
-    await downloadModToDir(url, filename, modsDir, win)
+    await downloadModToDir(url, filename, modsDir, getWindow())
     return filename
   })
 
   ipcMain.handle('install:modpack', async (_, modpackId: string) => {
-    const win = BrowserWindow.getFocusedWindow()!
+    const win = getWindow()
     const modpack = await fetchModpack(modpackId)
     const installPath = store.get('installPath') as string
-    const { join } = await import('path')
-    const gameRoot = join(installPath, modpack.id)
+    const gameRoot = pathJoin(installPath, modpack.id)
     await installFabric(modpack, gameRoot, win)
     await checkAndInstallModpack(modpack, installPath, win)
     return true
   })
 
   ipcMain.handle('launch', async (_, modpackId: string) => {
-    const win = BrowserWindow.getFocusedWindow()!
+    const win = getWindow()
     const modpack = await fetchModpack(modpackId)
     const username = store.get('activeAccount') as string ?? 'Player'
     const installPath = store.get('installPath') as string

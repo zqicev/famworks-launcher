@@ -64,11 +64,18 @@
 }
 
 .folderBtn {
-  font-size: 16px;
-  padding: 6px 8px;
-  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 9px 10px;
+  border-radius: 8px;
   color: var(--text-secondary);
-  transition: background 0.15s;
-  line-height: 1;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
 }
-.folderBtn:hover { background: var(--bg-hover); }
+.folderBtn:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+  border-color: #383838;
+}

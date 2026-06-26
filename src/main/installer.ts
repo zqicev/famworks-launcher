@@ -122,7 +122,7 @@ async function downloadWithProgress(
 ) {
   const tmp = dest + '.tmp'
   const res = await axios.get(url, { responseType: 'stream' })
-  const total = parseInt(res.headers['content-length'] ?? '0', 10)
+  const total = parseInt(String(res.headers['content-length'] ?? '0'), 10)
 
   await new Promise<void>((resolve, reject) => {
     const stream = createWriteStream(tmp)

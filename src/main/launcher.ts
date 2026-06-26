@@ -1,4 +1,4 @@
-import { Client, ILaunchOption } from 'minecraft-launcher-core'
+import { Client, ILauncherOptions } from 'minecraft-launcher-core'
 import { join } from 'path'
 import { BrowserWindow } from 'electron'
 import { Modpack } from '../types/modpack'
@@ -6,6 +6,7 @@ import { ProgressEvent } from './installer'
 import axios from 'axios'
 import { mkdirSync, writeFileSync, existsSync } from 'fs'
 import { execSync } from 'child_process'
+import { createHash } from 'crypto'
 
 function emit(win: BrowserWindow, event: ProgressEvent) {
   win.webContents.send('install:progress', event)
@@ -71,13 +72,13 @@ export async function launchGame(
 
   const client = new Client()
 
-  const options: ILaunchOption = {
+  const options: ILauncherOptions = {
     authorization: {
       access_token: 'offline',
       client_token: 'famworks',
       uuid: generateOfflineUUID(username),
       name: username,
-      user_properties: '{}'
+      user_properties: {}
     },
     root: gameRoot,
     version: {
@@ -126,11 +127,11 @@ export async function launchGame(
 }
 
 function generateOfflineUUID(username: string): string {
-  let hash = 0
-  for (let i = 0; i < username.length; i++) {
-    hash = ((hash << 5) - hash) + username.charCodeAt(i)
-    hash |= 0
-  }
-  const h = Math.abs(hash).toString(16).padStart(12, '0')
-  return `${h.slice(0,8)}-${h.slice(0,4)}-3${h.slice(4,8)}-a${h.slice(4,8)}-${h.slice(0,12)}`
+  // Точная репликация Java UUID.nameUUIDFromBytes("OfflinePlayer:" + name) —
+  // именно так vanilla Minecraft вычисляет UUID офлайн-игрока.
+  const hash = createHash('md5').update(`OfflinePlayer:${username}`, 'utf8').digest()
+  hash[6] = (hash[6] & 0x0f) | 0x30 // версия 3
+  hash[8] = (hash[8] & 0x3f) | 0x80 // вариант IETF
+  const hex = hash.toString('hex')
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`
 }
