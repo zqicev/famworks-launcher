@@ -1,0 +1,155 @@
+import { join } from 'path'
+import { existsSync, mkdirSync, createWriteStream, readdirSync, statSync, rmSync } from 'fs'
+import axios from 'axios'
+import AdmZip from 'adm-zip'
+import { execSync, execFileSync } from 'child_process'
+import { BrowserWindow } from 'electron'
+import { ProgressEvent } from './installer'
+
+const JAVA_MAJOR = 21
+
+function emit(win: BrowserWindow, event: ProgressEvent) {
+  win.webContents.send('install:progress', event)
+}
+
+function platformInfo() {
+  const os = process.platform === 'win32' ? 'windows' : process.platform === 'darwin' ? 'mac' : 'linux'
+  const arch = process.arch === 'arm64' ? 'aarch64' : 'x64'
+  const isWin = process.platform === 'win32'
+  return { os, arch, isWin }
+}
+
+/** Рекурсивно ищет bin/java(.exe) внутри распакованной JRE. */
+function findJavaBin(dir: string): string | null {
+  if (!existsSync(dir)) return null
+  const exe = process.platform === 'win32' ? 'java.exe' : 'java'
+  const stack = [dir]
+  while (stack.length) {
+    const cur = stack.pop()!
+    let entries: string[]
+    try { entries = readdirSync(cur) } catch { continue }
+    for (const e of entries) {
+      const full = join(cur, e)
+      let st
+      try { st = statSync(full) } catch { continue }
+      if (st.isDirectory()) {
+        stack.push(full)
+      } else if (e === exe && cur.endsWith('bin')) {
+        return full
+      }
+    }
+  }
+  return null
+}
+
+/** Проверяет что java по пути реально мажорной версии JAVA_MAJOR. */
+function javaVersionOk(javaPath: string): boolean {
+  try {
+    const out = execFileSync(javaPath, ['-version'], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })
+    return checkVersionString(out)
+  } catch (e: any) {
+    // java печатает -version в stderr; execFileSync кидает, но stderr в e.stderr
+    const out = (e?.stderr ?? '') as string
+    return checkVersionString(out)
+  }
+}
+
+function checkVersionString(out: string): boolean {
+  const m = out.match(/version "(\d+)/)
+  return !!m && parseInt(m[1], 10) >= JAVA_MAJOR
+}
+
+/**
+ * Гарантирует наличие JRE нужной версии в {installPath}/runtime.
+ * Если нет — скачивает портативную сборку с Adoptium и распаковывает.
+ * Возвращает путь к java.
+ */
+export async function ensureJava(installPath: string, win: BrowserWindow): Promise<string> {
+  const runtimeRoot = join(installPath, 'runtime')
+  const javaDir = join(runtimeRoot, `jre-${JAVA_MAJOR}`)
+
+  // Уже установлена?
+  const existing = findJavaBin(javaDir)
+  if (existing && javaVersionOk(existing)) return existing
+
+  // Чистим если была битая распаковка
+  if (existsSync(javaDir)) {
+    try { rmSync(javaDir, { recursive: true, force: true }) } catch {}
+  }
+  mkdirSync(javaDir, { recursive: true })
+
+  const { os, arch, isWin } = platformInfo()
+  const url = `https://api.adoptium.net/v3/binary/latest/${JAVA_MAJOR}/ga/${os}/${arch}/jre/hotspot/normal/eclipse`
+
+  emit(win, { phase: 'download', message: `Загрузка Java ${JAVA_MAJOR}...`, bytesDownloaded: 0, bytesTotal: 0, speedBps: 0 })
+
+  const archivePath = join(runtimeRoot, isWin ? 'jre.zip' : 'jre.tar.gz')
+  await downloadFile(url, archivePath, (bytes, total, speed) => {
+    emit(win, {
+      phase: 'download',
+      message: `Загрузка Java ${JAVA_MAJOR}`,
+      bytesDownloaded: bytes,
+      bytesTotal: total,
+      speedBps: speed
+    })
+  })
+
+  emit(win, { phase: 'download', message: 'Распаковка Java...' })
+
+  if (isWin) {
+    const zip = new AdmZip(archivePath)
+    zip.extractAllTo(javaDir, true)
+  } else {
+    // tar доступен на macOS, Linux и Windows 10+; здесь — для unix
+    execSync(`tar -xzf "${archivePath}" -C "${javaDir}"`)
+  }
+
+  try { rmSync(archivePath, { force: true }) } catch {}
+
+  const javaBin = findJavaBin(javaDir)
+  if (!javaBin) throw new Error('Не удалось найти java после распаковки')
+
+  // На unix снимаем флаг исполняемости (tar обычно сохраняет, adm-zip — нет)
+  if (!isWin) {
+    try { execSync(`chmod +x "${javaBin}"`) } catch {}
+  }
+
+  return javaBin
+}
+
+async function downloadFile(
+  url: string,
+  dest: string,
+  onProgress: (bytes: number, total: number, speed: number) => void
+) {
+  const tmp = dest + '.tmp'
+  const res = await axios.get(url, { responseType: 'stream', maxRedirects: 5 })
+  const total = parseInt(String(res.headers['content-length'] ?? '0'), 10)
+
+  await new Promise<void>((resolve, reject) => {
+    const stream = createWriteStream(tmp)
+    let downloaded = 0
+    let lastTime = Date.now()
+    let lastBytes = 0
+
+    res.data.on('data', (chunk: Buffer) => {
+      downloaded += chunk.length
+      const now = Date.now()
+      const elapsed = (now - lastTime) / 1000
+      if (elapsed >= 0.3) {
+        const speed = (downloaded - lastBytes) / elapsed
+        lastTime = now
+        lastBytes = downloaded
+        onProgress(downloaded, total, speed)
+      }
+    })
+
+    res.data.pipe(stream)
+    stream.on('finish', resolve)
+    stream.on('error', (e) => { try { rmSync(tmp, { force: true }) } catch {} reject(e) })
+    res.data.on('error', (e: Error) => { try { rmSync(tmp, { force: true }) } catch {} reject(e) })
+  })
+
+  const { renameSync } = await import('fs')
+  renameSync(tmp, dest)
+}

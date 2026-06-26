@@ -3,32 +3,24 @@ import { join } from 'path'
 import { BrowserWindow } from 'electron'
 import { Modpack } from '../types/modpack'
 import { ProgressEvent } from './installer'
+import { ensureJava } from './java'
 import axios from 'axios'
 import { mkdirSync, writeFileSync, existsSync } from 'fs'
-import { execSync } from 'child_process'
 import { createHash } from 'crypto'
 
 function emit(win: BrowserWindow, event: ProgressEvent) {
   win.webContents.send('install:progress', event)
 }
 
-function findJava(): { path: string; version: number } | null {
-  const candidates = ['java']
-  const javaHome = process.env.JAVA_HOME
-  if (javaHome) candidates.unshift(join(javaHome, 'bin', process.platform === 'win32' ? 'java.exe' : 'java'))
-
-  for (const candidate of candidates) {
-    try {
-      const out = execSync(`"${candidate}" -version 2>&1`, { encoding: 'utf8', timeout: 3000 })
-      // "21.0.1" или "1.8.0_xxx"
-      const match = out.match(/version "(\d+)(?:\.(\d+))?/)
-      if (!match) continue
-      let major = parseInt(match[1], 10)
-      if (major === 1) major = parseInt(match[2] ?? '0', 10) // legacy 1.8 format
-      return { path: candidate, version: major }
-    } catch {}
-  }
-  return null
+// Человеческие подписи для типов прогресса mclc
+const PROGRESS_LABELS: Record<string, string> = {
+  assets: 'Скачивание ресурсов',
+  'assets-copy': 'Копирование ресурсов',
+  natives: 'Нативные библиотеки',
+  classes: 'Библиотеки',
+  'classes-custom': 'Библиотеки Fabric',
+  'classes-maven-custom': 'Библиотеки Fabric',
+  'version-jar': 'Клиент Minecraft'
 }
 
 export async function installFabric(modpack: Modpack, gameRoot: string, win: BrowserWindow): Promise<string> {
@@ -54,21 +46,20 @@ export async function launchGame(
   memoryMB: number,
   win: BrowserWindow
 ): Promise<void> {
-  const java = findJava()
-  if (!java) {
-    win.webContents.send('launch:error', 'Java не найдена. Установите Java 21 (adoptium.net) и перезапустите лаунчер.')
-    return
-  }
-  const requiredJava = 21
-  if (java.version < requiredJava) {
-    win.webContents.send('launch:error', `Нужна Java ${requiredJava}+, найдена Java ${java.version}. Обновите на adoptium.net`)
+  // 1. Гарантируем Java (скачиваем если надо)
+  let javaPath: string
+  try {
+    javaPath = await ensureJava(installPath, win)
+  } catch (e) {
+    win.webContents.send('launch:error', `Не удалось установить Java: ${String(e)}`)
     return
   }
 
+  // 2. Fabric-профиль
   const gameRoot = join(installPath, modpack.id)
   const fabricVersionId = await installFabric(modpack, gameRoot, win)
 
-  emit(win, { phase: 'download', message: 'Запуск Minecraft...' })
+  emit(win, { phase: 'download', message: 'Подготовка Minecraft...' })
 
   const client = new Client()
 
@@ -90,28 +81,51 @@ export async function launchGame(
       max: `${memoryMB}M`,
       min: '512M'
     },
-    javaPath: java.path,
+    javaPath,
     overrides: {
       detached: true
     }
   }
 
+  // Текущий этап (по типу из 'progress') + байты (из 'download-status')
+  let currentLabel = 'Загрузка файлов'
+  let lastBytesTime = Date.now()
+  let lastBytes = 0
+  let lastSpeed = 0
+
   client.on('progress', (e) => {
     const p = e as { type: string; task: number; total: number }
+    currentLabel = PROGRESS_LABELS[p.type] ?? p.type
     emit(win, {
       phase: 'download',
-      message: `${p.type}`,
+      message: currentLabel,
       current: p.task,
       total: p.total
     })
   })
 
+  client.on('download-status', (e) => {
+    const d = e as { name: string; type: string; current: number; total: number }
+    const now = Date.now()
+    const elapsed = (now - lastBytesTime) / 1000
+    if (elapsed >= 0.3) {
+      lastSpeed = (d.current - lastBytes) / elapsed
+      lastBytesTime = now
+      lastBytes = d.current
+    }
+    emit(win, {
+      phase: 'download',
+      message: currentLabel,
+      bytesDownloaded: d.current,
+      bytesTotal: d.total,
+      speedBps: lastSpeed > 0 ? lastSpeed : undefined
+    })
+  })
+
   client.on('data', (data) => {
-    // Логи JVM — шлём как лог, не как прогресс
     win.webContents.send('launch:log', String(data))
   })
 
-  // Ждём запуска процесса, потом сообщаем что игра запущена
   await new Promise<void>((resolve, reject) => {
     client.on('close', (code) => {
       win.webContents.send('launch:close', code)
@@ -119,7 +133,6 @@ export async function launchGame(
     })
 
     client.launch(options).then(() => {
-      // launch() резолвится когда процесс стартовал (не закрылся)
       emit(win, { phase: 'done', message: '' })
       resolve()
     }).catch(reject)

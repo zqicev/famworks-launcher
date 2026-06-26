@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Modpack } from '../../../types/modpack'
 import styles from '../styles/BottomBar.module.css'
 
@@ -12,17 +12,22 @@ type ModpackStatus = 'checking' | 'not_installed' | 'outdated' | 'ready' | 'inst
 
 interface ProgressState {
   message: string
-  current: number
-  total: number
+  countCurrent: number
+  countTotal: number
   bytesDownloaded: number
   bytesTotal: number
   speedBps: number
 }
 
+const EMPTY_PROGRESS: ProgressState = {
+  message: '', countCurrent: 0, countTotal: 0, bytesDownloaded: 0, bytesTotal: 0, speedBps: 0
+}
+
 function formatBytes(b: number) {
   if (b < 1024) return `${b} Б`
   if (b < 1024 * 1024) return `${(b / 1024).toFixed(0)} КБ`
-  return `${(b / 1024 / 1024).toFixed(1)} МБ`
+  if (b < 1024 * 1024 * 1024) return `${(b / 1024 / 1024).toFixed(1)} МБ`
+  return `${(b / 1024 / 1024 / 1024).toFixed(2)} ГБ`
 }
 
 function formatSpeed(bps: number) {
@@ -35,6 +40,7 @@ export default function BottomBar({ modpack, installPath, extraModsCount = 0 }: 
   const [status, setStatus] = useState<ModpackStatus>('checking')
   const [memory, setMemory] = useState(4096)
   const [progress, setProgress] = useState<ProgressState | null>(null)
+  const clearTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const checkStatus = useCallback(async () => {
     setStatus('checking')
@@ -52,25 +58,40 @@ export default function BottomBar({ modpack, installPath, extraModsCount = 0 }: 
 
     window.api.install.onProgress((raw: unknown) => {
       const d = raw as {
-        phase: string; message: string
+        phase: string; message?: string
         current?: number; total?: number
         bytesDownloaded?: number; bytesTotal?: number; speedBps?: number
       }
+
       if (d.phase === 'done') {
-        setTimeout(() => { setProgress(null); setStatus('ready') }, 1500)
-      } else if (d.phase === 'error') {
-        setTimeout(() => setProgress(null), 3000)
-        setStatus('ready')
-      } else {
-        setProgress({
-          message: d.message,
-          current: d.current ?? 0,
-          total: d.total ?? 0,
-          bytesDownloaded: d.bytesDownloaded ?? 0,
-          bytesTotal: d.bytesTotal ?? 0,
-          speedBps: d.speedBps ?? 0
-        })
+        if (clearTimer.current) clearTimeout(clearTimer.current)
+        clearTimer.current = setTimeout(() => { setProgress(null); setStatus('ready') }, 1200)
+        return
       }
+      if (d.phase === 'error') {
+        if (clearTimer.current) clearTimeout(clearTimer.current)
+        clearTimer.current = setTimeout(() => setProgress(null), 3000)
+        setStatus('ready')
+        return
+      }
+
+      // Сливаем поля: 'progress' даёт счётчик файлов, 'download-status' — байты.
+      // Они приходят разными событиями и не должны перетирать друг друга.
+      setProgress(prev => {
+        const base = prev ?? EMPTY_PROGRESS
+        const next: ProgressState = { ...base }
+        if (d.message !== undefined && d.message !== '') next.message = d.message
+        if (d.current !== undefined || d.total !== undefined) {
+          next.countCurrent = d.current ?? 0
+          next.countTotal = d.total ?? 0
+        }
+        if (d.bytesDownloaded !== undefined || d.bytesTotal !== undefined) {
+          next.bytesDownloaded = d.bytesDownloaded ?? 0
+          next.bytesTotal = d.bytesTotal ?? 0
+        }
+        next.speedBps = d.speedBps ?? (d.bytesDownloaded !== undefined ? 0 : base.speedBps)
+        return next
+      })
     })
 
     window.api.launch.onClose(() => {
@@ -79,15 +100,15 @@ export default function BottomBar({ modpack, installPath, extraModsCount = 0 }: 
     })
 
     window.api.launch.onError?.((msg: string) => {
-      setProgress({ message: msg, current: 0, total: 0, bytesDownloaded: 0, bytesTotal: 0, speedBps: 0 })
+      setProgress({ ...EMPTY_PROGRESS, message: msg })
+      if (clearTimer.current) clearTimeout(clearTimer.current)
+      clearTimer.current = setTimeout(() => setProgress(null), 4000)
       setStatus('ready')
     })
   }, [modpack.id, checkStatus])
 
   useEffect(() => {
-    window.api.store.get('allocatedMemory').then(v => {
-      if (v) setMemory(v as number)
-    })
+    window.api.store.get('allocatedMemory').then(v => { if (v) setMemory(v as number) })
   }, [])
 
   const handleMemoryChange = async (v: number) => {
@@ -99,13 +120,15 @@ export default function BottomBar({ modpack, installPath, extraModsCount = 0 }: 
     if (status === 'ready') {
       const account = await window.api.store.get('activeAccount') as string | null
       if (!account) {
-        setProgress({ message: 'Выберите аккаунт перед запуском', current: 0, total: 0, bytesDownloaded: 0, bytesTotal: 0, speedBps: 0 })
-        setTimeout(() => setProgress(null), 3000)
+        setProgress({ ...EMPTY_PROGRESS, message: 'Выберите аккаунт перед запуском' })
+        if (clearTimer.current) clearTimeout(clearTimer.current)
+        clearTimer.current = setTimeout(() => setProgress(null), 3000)
         return
       }
     }
     if (status === 'not_installed' || status === 'outdated') {
       setStatus('installing')
+      setProgress({ ...EMPTY_PROGRESS, message: 'Подготовка...' })
       try {
         await window.api.install.modpack(modpack.id)
       } catch {
@@ -113,6 +136,7 @@ export default function BottomBar({ modpack, installPath, extraModsCount = 0 }: 
       }
     } else if (status === 'ready') {
       setStatus('launching')
+      setProgress({ ...EMPTY_PROGRESS, message: 'Подготовка к запуску...' })
       try {
         await window.api.launch.start(modpack.id)
         setStatus('running')
@@ -137,21 +161,25 @@ export default function BottomBar({ modpack, installPath, extraModsCount = 0 }: 
 
   const btnAccent = status === 'not_installed' || status === 'outdated' || status === 'ready'
 
-  const progressPct = progress
-    ? progress.total > 0
-      ? ((progress.current + (progress.bytesTotal > 0 ? progress.bytesDownloaded / progress.bytesTotal : 0)) / progress.total) * 100
+  // Полоса: ведём по счётчику файлов, иначе по байтам, иначе индетерминантная
+  const hasCount = progress && progress.countTotal > 0
+  const hasBytes = progress && progress.bytesTotal > 0
+  const barPct = hasCount
+    ? (progress!.countCurrent / progress!.countTotal) * 100
+    : hasBytes
+      ? (progress!.bytesDownloaded / progress!.bytesTotal) * 100
       : 0
-    : status === 'checking' ? -1  // indeterminate
-    : 100
+  const indeterminate = isBusy && !hasCount && !hasBytes
 
   return (
     <div className={styles.bar}>
-      {/* Прогресс-бар сверху */}
       <div className={styles.progressTrack}>
-        {(isBusy) && (
-          progressPct < 0
+        {isBusy && (
+          indeterminate
             ? <div className={styles.progressIndeterminate} />
-            : <div className={styles.progressFill} style={{ width: `${Math.min(progressPct, 100)}%` }} />
+            : <div className={styles.progressFill} style={{ width: `${Math.min(barPct, 100)}%` }}>
+                <div className={styles.shimmer} />
+              </div>
         )}
       </div>
 
@@ -182,25 +210,22 @@ export default function BottomBar({ modpack, installPath, extraModsCount = 0 }: 
           </div>
         </div>
 
-        {/* Статус / прогресс по центру */}
         <div className={styles.statusArea}>
           {progress ? (
             <>
-              <div className={styles.statusMsg}>{progress.message}</div>
+              <div className={styles.statusMsg}>
+                {progress.message}
+                {isBusy && <span className={styles.dots} />}
+              </div>
               <div className={styles.statusSub}>
-                {progress.total > 0 && (
-                  <span>{progress.current + 1}/{progress.total}</span>
-                )}
-                {progress.bytesTotal > 0 && (
-                  <span>{formatBytes(progress.bytesDownloaded)} / {formatBytes(progress.bytesTotal)}</span>
-                )}
-                {progress.speedBps > 0 && (
-                  <span className={styles.speed}>{formatSpeed(progress.speedBps)}</span>
-                )}
+                {hasCount && <span>{progress.countCurrent}/{progress.countTotal} файлов</span>}
+                {hasBytes && <span>{formatBytes(progress.bytesDownloaded)} / {formatBytes(progress.bytesTotal)}</span>}
+                {progress.speedBps > 0 && <span className={styles.speed}>{formatSpeed(progress.speedBps)}</span>}
+                {isBusy && !hasCount && !hasBytes && <span className={styles.working}>идёт работа, не закрывайте окно</span>}
               </div>
             </>
           ) : status === 'checking' ? (
-            <div className={styles.statusMsg}>Проверка...</div>
+            <div className={styles.statusMsg}>Проверка<span className={styles.dots} /></div>
           ) : null}
         </div>
 
