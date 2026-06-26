@@ -1,0 +1,30 @@
+appId: com.famworks.launcher
+productName: FamWorks Launcher
+copyright: Copyright © 2025 FamWorks
+
+directories:
+  output: release
+  buildResources: build
+
+files:
+  - out/**/*
+  - package.json
+
+# Native deps отсутствуют — всё пакуется в asar
+asar: true
+
+win:
+  # Пропускаем подпись и rcedit — на этой машине нет Developer Mode,
+  # а winCodeSign-тулчейн падает на создании macOS-симлинков.
+  signAndEditExecutable: false
+  target:
+    - target: portable
+      arch:
+        - x64
+  artifactName: FamWorks-Launcher-${version}-portable.exe
+
+portable:
+  artifactName: FamWorks-Launcher-${version}-portable.exe
+
+# Снимаем требование code-signing (для теста)
+forceCodeSigning: false
