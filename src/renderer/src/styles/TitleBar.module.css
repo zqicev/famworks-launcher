@@ -1,0 +1,19 @@
+.bar {
+  height: 40px; background: var(--bg); display: flex; align-items: center;
+  border-bottom: 1px solid var(--border); flex-shrink: 0; padding-left: 16px;
+}
+.logo { font-family: var(--font-display); font-size: 16px; font-weight: 700; letter-spacing: 1px; display: flex; align-items: center; gap: 8px; }
+.f { color: var(--text); }
+.w { color: var(--accent); }
+.tag {
+  font-family: var(--font-ui); font-size: 9px; font-weight: 600; letter-spacing: 1px;
+  color: var(--text-dim); border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px;
+}
+.drag { flex: 1; height: 100%; -webkit-app-region: drag; }
+.controls { display: flex; gap: 2px; padding: 0 8px; -webkit-app-region: no-drag; }
+.btn, .btnClose {
+  width: 30px; height: 24px; border-radius: 4px; font-size: 11px;
+  color: var(--text-secondary); transition: background 0.15s, color 0.15s;
+}
+.btn:hover { background: var(--bg-hover); color: var(--text); }
+.btnClose:hover { background: var(--red); color: #fff; }
