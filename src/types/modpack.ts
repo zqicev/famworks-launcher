@@ -33,9 +33,24 @@ export interface ChangelogEntry {
   description: string
 }
 
+export interface ServerEntry {
+  name: string
+  ip: string        // хост (без порта)
+  port?: number     // по умолчанию 25565
+}
+
+export interface ConfigFile {
+  path: string          // путь назначения относительно папки игры, напр "config/sodium.json" или "options.txt"
+  download_url: string
+  sha512?: string
+  overwrite?: boolean   // true — всегда перезаписывать, иначе только если файла нет
+}
+
 export interface Modpack extends ModpackSummary {
   fabric_api_version: string
   long_description: string
   changelog: ChangelogEntry[]
   mods: Mod[]
+  servers?: ServerEntry[]
+  configs?: ConfigFile[]
 }

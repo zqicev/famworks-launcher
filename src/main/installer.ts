@@ -1,4 +1,4 @@
-import { join } from 'path'
+import { join, dirname, resolve, sep } from 'path'
 import { createWriteStream, createReadStream, existsSync, mkdirSync, renameSync, unlinkSync, readdirSync, statSync } from 'fs'
 import { createHash } from 'crypto'
 import axios from 'axios'
@@ -41,7 +41,8 @@ export async function checkAndInstallModpack(
   installPath: string,
   win: BrowserWindow
 ): Promise<void> {
-  const modsDir = join(installPath, modpack.id, 'mods')
+  const gameRoot = join(installPath, modpack.id)
+  const modsDir = join(gameRoot, 'mods')
   mkdirSync(modsDir, { recursive: true })
 
   emit(win, { phase: 'check', message: 'Проверка модов...' })
@@ -64,11 +65,6 @@ export async function checkAndInstallModpack(
     if (!existsSync(enabled) && !existsSync(disabled)) {
       missing.push(mod)
     }
-  }
-
-  if (missing.length === 0) {
-    emit(win, { phase: 'done', message: '' })
-    return
   }
 
   let done = 0
@@ -94,7 +90,51 @@ export async function checkAndInstallModpack(
     done++
   }
 
+  // Конфиги
+  await installConfigs(modpack, gameRoot, win)
+
   emit(win, { phase: 'done', message: '' })
+}
+
+/** Безопасно строит путь назначения внутри gameRoot (защита от ../). */
+function safeJoin(root: string, rel: string): string | null {
+  const base = resolve(root)
+  const dest = resolve(root, rel)
+  if (dest !== base && !dest.startsWith(base + sep)) return null
+  return dest
+}
+
+async function installConfigs(modpack: Modpack, gameRoot: string, win: BrowserWindow): Promise<void> {
+  const configs = modpack.configs ?? []
+  if (configs.length === 0) return
+
+  let done = 0
+  for (const cfg of configs) {
+    if (isCancelled()) throw new DOMException('Aborted', 'AbortError')
+    const dest = safeJoin(gameRoot, cfg.path)
+    if (!dest) {
+      emit(win, { phase: 'download', message: `Пропуск конфига ${cfg.path} — недопустимый путь` })
+      done++
+      continue
+    }
+    const exists = existsSync(dest)
+    // overwrite=false и файл есть → не трогаем (пользовательские настройки сохраняются)
+    if (exists && !cfg.overwrite) { done++; continue }
+
+    mkdirSync(dirname(dest), { recursive: true })
+    await downloadWithProgress(cfg.download_url, dest, (bytes, total, speed) => {
+      emit(win, {
+        phase: 'download',
+        message: `Конфиг ${cfg.path}`,
+        current: done,
+        total: configs.length,
+        bytesDownloaded: bytes,
+        bytesTotal: total,
+        speedBps: speed
+      })
+    }, cfg.sha512)
+    done++
+  }
 }
 
 export async function getModpackStatus(
@@ -117,6 +157,12 @@ export async function getModpackStatus(
     if (!existsSync(enabled) && !existsSync(disabled)) {
       return 'outdated'
     }
+  }
+
+  // Если какой-то конфиг сборки ещё не установлен — нужно обновление
+  for (const cfg of modpack.configs ?? []) {
+    const dest = safeJoin(gameRoot, cfg.path)
+    if (dest && !existsSync(dest)) return 'outdated'
   }
 
   return 'ready'

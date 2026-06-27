@@ -4,6 +4,7 @@ import { BrowserWindow } from 'electron'
 import { Modpack } from '../types/modpack'
 import { ProgressEvent } from './installer'
 import { ensureJava } from './java'
+import { writeServers } from './servers'
 import { opSignal } from './abort'
 import axios from 'axios'
 import { mkdirSync, writeFileSync, existsSync } from 'fs'
@@ -59,6 +60,13 @@ export async function launchGame(
   // 2. Fabric-профиль
   const gameRoot = join(installPath, modpack.id)
   const fabricVersionId = await installFabric(modpack, gameRoot, win)
+
+  // 3. Серверы сборки → servers.dat (мердж, не теряя серверы игрока)
+  if (modpack.servers?.length) {
+    try { await writeServers(gameRoot, modpack.servers) } catch (e) {
+      win.webContents.send('launch:log', `[servers] ${String(e)}`)
+    }
+  }
 
   emit(win, { phase: 'download', message: 'Подготовка Minecraft...' })
 
