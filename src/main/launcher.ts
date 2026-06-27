@@ -102,18 +102,23 @@ export async function launchGame(
   client.on('download-status', (e) => {
     const d = e as { name: string; type: string; current: number; total: number }
     const now = Date.now()
+    // Начался новый файл (счётчик сбросился) — обнуляем базу для скорости
+    if (d.current < lastBytes) { lastBytes = 0; lastBytesTime = now }
     const elapsed = (now - lastBytesTime) / 1000
-    if (elapsed >= 0.3) {
-      lastSpeed = (d.current - lastBytes) / elapsed
+    if (elapsed >= 0.4) {
+      lastSpeed = Math.max(0, (d.current - lastBytes) / elapsed)
       lastBytesTime = now
       lastBytes = d.current
     }
+    // Байты показываем только для крупных файлов (>1 МБ) — иначе мелькание
+    // на тысячах мелких ассетов; общий прогресс ведёт счётчик файлов.
+    const bigFile = d.total > 1024 * 1024
     emit(win, {
       phase: 'download',
       message: currentLabel,
-      bytesDownloaded: d.current,
-      bytesTotal: d.total,
-      speedBps: lastSpeed > 0 ? lastSpeed : undefined
+      bytesDownloaded: bigFile ? d.current : undefined,
+      bytesTotal: bigFile ? d.total : undefined,
+      speedBps: bigFile && lastSpeed > 0 ? lastSpeed : undefined
     })
   })
 

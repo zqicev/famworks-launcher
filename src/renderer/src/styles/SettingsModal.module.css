@@ -6,6 +6,7 @@
   align-items: center;
   justify-content: center;
   z-index: 300;
+  animation: fadeIn 0.15s ease;
 }
 
 .modal {
@@ -16,6 +17,7 @@
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  animation: scaleIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .header {

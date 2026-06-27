@@ -6,10 +6,14 @@
   border-radius: 10px;
   background: var(--bg-surface);
   border: 1px solid var(--border);
-  transition: border-color 0.15s;
+  transition: border-color 0.15s, transform 0.15s, background 0.15s;
 }
 
-.row:hover { border-color: #383838; }
+.row:hover {
+  border-color: #383838;
+  background: var(--bg-hover);
+  transform: translateY(-1px);
+}
 .disabled { opacity: 0.55; }
 
 .avatar {

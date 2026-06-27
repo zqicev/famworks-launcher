@@ -73,10 +73,11 @@ export default function ModsTab({ modpack, modsDir, onExtraCountChange }: Props)
 
   useEffect(() => {
     scanMods()
-    window.api.install.onProgress((raw: unknown) => {
+    const off = window.api.install.onProgress((raw: unknown) => {
       const d = raw as { phase: string }
       if (d.phase === 'done') setTimeout(scanMods, 300)
     })
+    return off
   }, [modsDir])
 
   const allMods: LocalMod[] = [...modpack.mods, ...extraMods]

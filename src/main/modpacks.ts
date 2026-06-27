@@ -23,9 +23,23 @@ async function fetchWithFallback<T>(path: string): Promise<T> {
 }
 
 export async function fetchModpackIndex(): Promise<ModpackIndex> {
-  return fetchWithFallback<ModpackIndex>('index.json')
+  const data = await fetchWithFallback<ModpackIndex>('index.json')
+  if (!data || !Array.isArray(data.modpacks)) {
+    throw new Error('Некорректный index.json: отсутствует список сборок')
+  }
+  return data
 }
 
 export async function fetchModpack(id: string): Promise<Modpack> {
-  return fetchWithFallback<Modpack>(`${id}.json`)
+  const data = await fetchWithFallback<Modpack>(`${id}.json`)
+  // Защита от битого/неполного JSON на GitHub — нормализуем обязательные поля.
+  if (!data || typeof data !== 'object') {
+    throw new Error(`Некорректные данные сборки ${id}`)
+  }
+  if (!Array.isArray(data.mods)) data.mods = []
+  if (!Array.isArray(data.changelog)) data.changelog = []
+  if (!data.mc_version || !data.loader || !data.loader_version) {
+    throw new Error(`В сборке ${id} не хватает обязательных полей (mc_version/loader/loader_version)`)
+  }
+  return data
 }

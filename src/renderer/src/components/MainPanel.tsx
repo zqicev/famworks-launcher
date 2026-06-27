@@ -51,7 +51,7 @@ export default function MainPanel({ modpack, installPath, loading, error }: Prop
 
   return (
     <main className={styles.main}>
-      <div className={styles.header}>
+      <div className={styles.header} key={modpack.id}>
         <div className={styles.badge}>
           ОБНОВЛЕНО · {modpack.loader.toUpperCase()} {modpack.mc_version}
         </div>
@@ -85,7 +85,7 @@ export default function MainPanel({ modpack, installPath, loading, error }: Prop
         </div>
       </div>
 
-      <div className={styles.content}>
+      <div className={styles.content} key={`${modpack.id}-${tab}`}>
         {tab === 'mods' ? (
           <ModsTab modpack={modpack} modsDir={modsDir} onExtraCountChange={setExtraCount} />
         ) : (

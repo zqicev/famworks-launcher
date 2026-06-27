@@ -178,7 +178,7 @@
   border-radius: 10px;
   min-width: 180px;
   flex-shrink: 0;
-  transition: background 0.15s, opacity 0.15s;
+  transition: background 0.15s, opacity 0.15s, transform 0.12s, box-shadow 0.15s;
 }
 
 .playBtnAccent {
@@ -187,6 +187,11 @@
 }
 .playBtnAccent:hover:not(:disabled) {
   background: var(--accent-dim);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(197, 248, 42, 0.25);
+}
+.playBtnAccent:active:not(:disabled) {
+  transform: translateY(0);
 }
 
 .playBtnMuted {

@@ -1,0 +1,8 @@
+<svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
+  <rect width="256" height="256" rx="56" fill="#141414"/>
+  <rect x="44" y="44" width="168" height="168" rx="36" fill="#c5f82a"/>
+  <!-- Буква F из прямоугольников (без шрифта) -->
+  <rect x="94" y="80" width="26" height="96" rx="4" fill="#0a0a0a"/>
+  <rect x="94" y="80" width="74" height="26" rx="4" fill="#0a0a0a"/>
+  <rect x="94" y="116" width="56" height="24" rx="4" fill="#0a0a0a"/>
+</svg>

@@ -61,7 +61,7 @@ export default function BottomBar({ modpack, installPath, extraModsCount = 0 }: 
   useEffect(() => {
     checkStatus()
 
-    window.api.install.onProgress((raw: unknown) => {
+    const offProgress = window.api.install.onProgress((raw: unknown) => {
       const d = raw as {
         phase: string; message?: string
         current?: number; total?: number
@@ -111,17 +111,19 @@ export default function BottomBar({ modpack, installPath, extraModsCount = 0 }: 
       })
     })
 
-    window.api.launch.onClose(() => {
+    const offClose = window.api.launch.onClose(() => {
       setStatus('ready')
       setProgress(null)
     })
 
-    window.api.launch.onError?.((msg: string) => {
+    const offError = window.api.launch.onError((msg: string) => {
       setProgress({ ...EMPTY_PROGRESS, message: msg })
       if (clearTimer.current) clearTimeout(clearTimer.current)
       clearTimer.current = setTimeout(() => setProgress(null), 4000)
       setStatus('ready')
     })
+
+    return () => { offProgress(); offClose(); offError() }
   }, [modpack.id, checkStatus])
 
   useEffect(() => {

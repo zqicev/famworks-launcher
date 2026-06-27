@@ -6,9 +6,16 @@ directories:
   output: release
   buildResources: build
 
+icon: build/icon.ico
+
 files:
   - out/**/*
   - package.json
+
+# Иконка окна/таскбара доступна в рантайме рядом с приложением
+extraResources:
+  - from: build/icon.png
+    to: icon.png
 
 # Native deps отсутствуют — всё пакуется в asar
 asar: true
@@ -18,8 +25,8 @@ asarUnpack:
   - "**/node_modules/msmc/**"
 
 win:
-  # Пропускаем подпись и rcedit — на этой машине нет Developer Mode,
-  # а winCodeSign-тулчейн падает на создании macOS-симлинков.
+  # Пропускаем rcedit/подпись на внутреннем exe (winCodeSign падает на macOS-симлинках
+  # без Developer Mode). Иконку финального portable-exe ставит NSIS из icon.ico напрямую.
   signAndEditExecutable: false
   target:
     - target: portable

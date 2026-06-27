@@ -26,7 +26,7 @@ interface Window {
     }
     install: {
       modpack: (id: string) => Promise<boolean>
-      onProgress: (cb: (data: unknown) => void) => void
+      onProgress: (cb: (data: unknown) => void) => () => void
     }
     cancel: () => Promise<void>
     auth: {
@@ -34,9 +34,9 @@ interface Window {
     }
     launch: {
       start: (id: string) => Promise<boolean>
-      onLog: (cb: (msg: string) => void) => void
-      onClose: (cb: (code: number) => void) => void
-      onError: (cb: (msg: string) => void) => void
+      onLog: (cb: (msg: string) => void) => () => void
+      onClose: (cb: (code: number) => void) => () => void
+      onError: (cb: (msg: string) => void) => () => void
     }
     dialog: {
       pickFolder: () => Promise<string | null>

@@ -38,6 +38,7 @@
   gap: 2px;
   z-index: 150;
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  animation: slideUp 0.14s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .option {

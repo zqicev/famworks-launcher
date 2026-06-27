@@ -23,6 +23,7 @@ export default function AddModModal({ modpack, modsDir, onClose }: Props) {
   const [results, setResults] = useState<SearchResult[]>([])
   const [loading, setLoading] = useState(false)
   const [installing, setInstalling] = useState<string | null>(null)
+  const [notice, setNotice] = useState('')
 
   const search = async () => {
     if (!query.trim()) return
@@ -37,19 +38,33 @@ export default function AddModModal({ modpack, modsDir, onClose }: Props) {
 
   const installMod = async (mod: SearchResult) => {
     setInstalling(mod.project_id)
+    setNotice('')
     try {
       const versions = await window.api.modrinth.versions(mod.project_id, modpack.mc_version, modpack.loader) as any[]
       if (!versions.length) {
-        alert(`Нет версий, совместимых с ${modpack.mc_version}`)
+        setNotice(`Нет версий «${mod.title}», совместимых с ${modpack.loader} ${modpack.mc_version}`)
+        setInstalling(null)
         return
       }
       const latest = versions[0]
-      const file = latest.files.find((f: { primary: boolean }) => f.primary) ?? latest.files[0]
+      const file = (latest.files ?? []).find((f: { primary: boolean }) => f.primary) ?? latest.files?.[0]
+      if (!file) {
+        setNotice('У версии нет файла для скачивания')
+        setInstalling(null)
+        return
+      }
       onClose() // закрываем сразу, прогресс идёт в bottom bar
       window.api.modrinth.download(file.url, file.filename, modsDir)
-    } catch {
+    } catch (e) {
+      setNotice('Ошибка установки мода')
       setInstalling(null)
     }
+  }
+
+  const formatDownloads = (n: number) => {
+    if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`
+    if (n >= 1_000) return `${(n / 1_000).toFixed(0)}K`
+    return String(n)
   }
 
   const addFromFile = async () => {
@@ -80,6 +95,8 @@ export default function AddModModal({ modpack, modsDir, onClose }: Props) {
           </button>
         </div>
 
+        {notice && <div className={styles.notice}>{notice}</div>}
+
         <div className={styles.results}>
           {loading && <div className={styles.hint}>Поиск...</div>}
           {!loading && results.length === 0 && query && (
@@ -89,7 +106,7 @@ export default function AddModModal({ modpack, modsDir, onClose }: Props) {
             <div key={r.project_id} className={styles.result}>
               <div className={styles.resultInfo}>
                 <div className={styles.resultName}>{r.title}</div>
-                <div className={styles.resultMeta}>{r.author} · {(r.downloads / 1000).toFixed(0)}k загрузок</div>
+                <div className={styles.resultMeta}>{r.author} · {formatDownloads(r.downloads)} загрузок</div>
                 <div className={styles.resultDesc}>{r.description}</div>
               </div>
               <button

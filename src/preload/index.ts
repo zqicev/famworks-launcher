@@ -1,4 +1,12 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron'
+
+// Подписка с поддержкой нескольких слушателей и корректной отпиской.
+// Возвращает функцию cleanup — компоненты вызывают её в useEffect cleanup.
+function subscribe<T>(channel: string, cb: (data: T) => void): () => void {
+  const handler = (_: IpcRendererEvent, data: T) => cb(data)
+  ipcRenderer.on(channel, handler)
+  return () => ipcRenderer.removeListener(channel, handler)
+}
 
 contextBridge.exposeInMainWorld('api', {
   store: {
@@ -29,10 +37,7 @@ contextBridge.exposeInMainWorld('api', {
   },
   install: {
     modpack: (id: string) => ipcRenderer.invoke('install:modpack', id),
-    onProgress: (cb: (data: unknown) => void) => {
-      ipcRenderer.removeAllListeners('install:progress')
-      ipcRenderer.on('install:progress', (_, d) => cb(d))
-    }
+    onProgress: (cb: (data: unknown) => void) => subscribe('install:progress', cb)
   },
   cancel: () => ipcRenderer.invoke('cancel'),
   auth: {
@@ -40,18 +45,9 @@ contextBridge.exposeInMainWorld('api', {
   },
   launch: {
     start: (id: string) => ipcRenderer.invoke('launch', id),
-    onLog: (cb: (msg: string) => void) => {
-      ipcRenderer.removeAllListeners('launch:log')
-      ipcRenderer.on('launch:log', (_, m) => cb(m))
-    },
-    onClose: (cb: (code: number) => void) => {
-      ipcRenderer.removeAllListeners('launch:close')
-      ipcRenderer.on('launch:close', (_, c) => cb(c))
-    },
-    onError: (cb: (msg: string) => void) => {
-      ipcRenderer.removeAllListeners('launch:error')
-      ipcRenderer.on('launch:error', (_, m) => cb(m))
-    }
+    onLog: (cb: (msg: string) => void) => subscribe('launch:log', cb),
+    onClose: (cb: (code: number) => void) => subscribe('launch:close', cb),
+    onError: (cb: (msg: string) => void) => subscribe('launch:error', cb)
   },
   dialog: {
     pickFolder: () => ipcRenderer.invoke('dialog:pick-folder')
