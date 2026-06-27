@@ -32,8 +32,8 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.invoke('modrinth:search', query, mcVersion, loader),
     versions: (projectId: string, mcVersion: string, loader: string) =>
       ipcRenderer.invoke('modrinth:versions', projectId, mcVersion, loader),
-    download: (url: string, filename: string, modsDir: string) =>
-      ipcRenderer.invoke('modrinth:download', url, filename, modsDir)
+    download: (url: string, filename: string, modsDir: string, sha512?: string) =>
+      ipcRenderer.invoke('modrinth:download', url, filename, modsDir, sha512)
   },
   install: {
     modpack: (id: string) => ipcRenderer.invoke('install:modpack', id),

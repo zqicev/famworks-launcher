@@ -22,6 +22,8 @@ export interface Mod {
   size_mb: number
   required: boolean
   download_url?: string
+  /** sha512 в hex (как у Modrinth и `Get-FileHash -Algorithm SHA512`). Для кастомных jar. */
+  sha512?: string
 }
 
 export interface ChangelogEntry {

@@ -54,7 +54,7 @@ export default function AddModModal({ modpack, modsDir, onClose }: Props) {
         return
       }
       onClose() // закрываем сразу, прогресс идёт в bottom bar
-      window.api.modrinth.download(file.url, file.filename, modsDir)
+      window.api.modrinth.download(file.url, file.filename, modsDir, file.hashes?.sha512)
     } catch (e) {
       setNotice('Ошибка установки мода')
       setInstalling(null)

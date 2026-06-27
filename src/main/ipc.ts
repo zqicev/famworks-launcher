@@ -41,8 +41,8 @@ export function setupIpcHandlers() {
     searchModrinth(query, mcVersion, loader))
   ipcMain.handle('modrinth:versions', (_, projectId: string, mcVersion: string, loader: string) =>
     getModVersions(projectId, mcVersion, loader))
-  ipcMain.handle('modrinth:download', async (_, url: string, filename: string, modsDir: string) => {
-    await downloadModToDir(url, filename, modsDir, getWindow())
+  ipcMain.handle('modrinth:download', async (_, url: string, filename: string, modsDir: string, sha512?: string) => {
+    await downloadModToDir(url, filename, modsDir, getWindow(), sha512)
     return filename
   })
 

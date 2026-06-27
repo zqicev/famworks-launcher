@@ -1,9 +1,26 @@
 import { join } from 'path'
-import { createWriteStream, existsSync, mkdirSync, renameSync, unlinkSync, readdirSync, statSync } from 'fs'
+import { createWriteStream, createReadStream, existsSync, mkdirSync, renameSync, unlinkSync, readdirSync, statSync } from 'fs'
+import { createHash } from 'crypto'
 import axios from 'axios'
 import { BrowserWindow } from 'electron'
 import { Modpack, Mod } from '../types/modpack'
 import { opSignal, isCancelled } from './abort'
+
+interface ResolvedMod {
+  url: string
+  sha512?: string
+}
+
+/** Считает sha512 файла (hex) потоково, без загрузки целиком в память. */
+function sha512File(path: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const hash = createHash('sha512')
+    const stream = createReadStream(path)
+    stream.on('data', (chunk) => hash.update(chunk))
+    stream.on('end', () => resolve(hash.digest('hex')))
+    stream.on('error', reject)
+  })
+}
 
 export interface ProgressEvent {
   phase: 'check' | 'download' | 'done' | 'error'
@@ -46,13 +63,13 @@ export async function checkAndInstallModpack(
   let done = 0
   for (const mod of missing) {
     if (isCancelled()) throw new DOMException('Aborted', 'AbortError')
-    const url = await resolveModUrl(mod, modpack.mc_version, modpack.loader)
-    if (!url) {
+    const resolved = await resolveModUrl(mod, modpack.mc_version, modpack.loader)
+    if (!resolved) {
       emit(win, { phase: 'download', message: `Пропуск ${mod.name} — нет URL`, current: done, total: missing.length })
       done++
       continue
     }
-    await downloadWithProgress(url, join(modsDir, mod.filename), (bytes, total, speed) => {
+    await downloadWithProgress(resolved.url, join(modsDir, mod.filename), (bytes, total, speed) => {
       emit(win, {
         phase: 'download',
         message: `Загрузка ${mod.name}`,
@@ -62,7 +79,7 @@ export async function checkAndInstallModpack(
         bytesTotal: total,
         speedBps: speed
       })
-    })
+    }, resolved.sha512)
     done++
   }
 
@@ -94,8 +111,10 @@ export async function getModpackStatus(
   return 'ready'
 }
 
-async function resolveModUrl(mod: Mod, mcVersion: string, loader: string): Promise<string | null> {
-  if (mod.download_url) return mod.download_url
+async function resolveModUrl(mod: Mod, mcVersion: string, loader: string): Promise<ResolvedMod | null> {
+  // Кастомный jar по прямой ссылке — хэш берём из JSON (если указан)
+  if (mod.download_url) return { url: mod.download_url, sha512: mod.sha512 }
+
   if (mod.modrinth_id) {
     try {
       const res = await axios.get(
@@ -109,10 +128,12 @@ async function resolveModUrl(mod: Mod, mcVersion: string, loader: string): Promi
           signal: opSignal()
         }
       )
-      const versions: { files: { url: string; primary: boolean }[] }[] = res.data
+      const versions: { files: { url: string; primary: boolean; hashes?: { sha512?: string } }[] }[] = res.data
       if (!versions.length) return null
       const file = versions[0].files.find(f => f.primary) ?? versions[0].files[0]
-      return file?.url ?? null
+      if (!file?.url) return null
+      // Modrinth отдаёт sha512 в hex — проверяем бесплатно
+      return { url: file.url, sha512: mod.sha512 ?? file.hashes?.sha512 }
     } catch { return null }
   }
   return null
@@ -121,7 +142,8 @@ async function resolveModUrl(mod: Mod, mcVersion: string, loader: string): Promi
 async function downloadWithProgress(
   url: string,
   dest: string,
-  onProgress: (bytes: number, total: number, speed: number) => void
+  onProgress: (bytes: number, total: number, speed: number) => void,
+  expectedSha512?: string
 ) {
   const tmp = dest + '.tmp'
   const res = await axios.get(url, { responseType: 'stream', signal: opSignal() })
@@ -151,15 +173,24 @@ async function downloadWithProgress(
     res.data.on('error', (e: Error) => { try { unlinkSync(tmp) } catch {} reject(e) })
   })
 
+  // Проверка целостности по sha512 (hex, регистр не важен)
+  if (expectedSha512) {
+    const actual = await sha512File(tmp)
+    if (actual.toLowerCase() !== expectedSha512.toLowerCase()) {
+      try { unlinkSync(tmp) } catch {}
+      throw new Error(`Контрольная сумма не совпала: ${dest.split(/[\\/]/).pop()}`)
+    }
+  }
+
   renameSync(tmp, dest)
 }
 
-export async function downloadModToDir(url: string, filename: string, modsDir: string, win?: BrowserWindow) {
+export async function downloadModToDir(url: string, filename: string, modsDir: string, win?: BrowserWindow, sha512?: string) {
   mkdirSync(modsDir, { recursive: true })
   if (win) emit(win, { phase: 'download', message: `Загрузка ${filename}`, current: 0, total: 1, bytesDownloaded: 0, bytesTotal: 0, speedBps: 0 })
   await downloadWithProgress(url, join(modsDir, filename), (bytes, total, speed) => {
     if (win) emit(win, { phase: 'download', message: `Загрузка ${filename}`, current: 0, total: 1, bytesDownloaded: bytes, bytesTotal: total, speedBps: speed })
-  })
+  }, sha512)
   if (win) emit(win, { phase: 'done', message: '' })
 }
 
