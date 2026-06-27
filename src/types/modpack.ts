@@ -16,6 +16,8 @@ export interface Mod {
   id: string
   name: string
   modrinth_id?: string
+  /** Если задано — берётся именно эта версия Modrinth (а не последняя). Иначе — последняя совместимая. */
+  modrinth_version_number?: string
   filename: string
   version: string
   category: string

@@ -46,6 +46,17 @@ export async function checkAndInstallModpack(
 
   emit(win, { phase: 'check', message: 'Проверка модов...' })
 
+  // Удаляем устаревшие версии Fabric API (оставляем только нужную) — иначе две версии = краш
+  if (modpack.loader === 'fabric' && modpack.fabric_api_version) {
+    const target = `fabric-api-${modpack.fabric_api_version}.jar`
+    for (const f of readdirSync(modsDir)) {
+      const base = f.replace(/\.disabled$/, '')
+      if (/^fabric-api-.*\.jar$/i.test(base) && base !== target) {
+        try { unlinkSync(join(modsDir, f)) } catch {}
+      }
+    }
+  }
+
   const missing: Mod[] = []
   for (const mod of modpack.mods) {
     const enabled = join(modsDir, mod.filename)
@@ -117,20 +128,23 @@ async function resolveModUrl(mod: Mod, mcVersion: string, loader: string): Promi
 
   if (mod.modrinth_id) {
     try {
+      // Если версия запинена — ищем без фильтра по mc (версия сама задаёт совместимость),
+      // иначе берём последнюю совместимую с mc/loader.
+      const params = mod.modrinth_version_number
+        ? { loaders: JSON.stringify([loader]) }
+        : { game_versions: JSON.stringify([mcVersion]), loaders: JSON.stringify([loader]) }
       const res = await axios.get(
         `https://api.modrinth.com/v2/project/${mod.modrinth_id}/version`,
-        {
-          headers: { 'User-Agent': 'famworks-launcher/1.0' },
-          params: {
-            game_versions: JSON.stringify([mcVersion]),
-            loaders: JSON.stringify([loader])
-          },
-          signal: opSignal()
-        }
+        { headers: { 'User-Agent': 'famworks-launcher/1.0' }, params, signal: opSignal() }
       )
-      const versions: { files: { url: string; primary: boolean; hashes?: { sha512?: string } }[] }[] = res.data
+      type V = { version_number: string; files: { url: string; primary: boolean; hashes?: { sha512?: string } }[] }
+      const versions: V[] = res.data
       if (!versions.length) return null
-      const file = versions[0].files.find(f => f.primary) ?? versions[0].files[0]
+      const chosen = mod.modrinth_version_number
+        ? versions.find(v => v.version_number === mod.modrinth_version_number)
+        : versions[0]
+      if (!chosen) return null
+      const file = chosen.files.find(f => f.primary) ?? chosen.files[0]
       if (!file?.url) return null
       // Modrinth отдаёт sha512 в hex — проверяем бесплатно
       return { url: file.url, sha512: mod.sha512 ?? file.hashes?.sha512 }

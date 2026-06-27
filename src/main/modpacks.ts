@@ -30,6 +30,27 @@ export async function fetchModpackIndex(): Promise<ModpackIndex> {
   return data
 }
 
+// Modrinth project id для Fabric API
+const FABRIC_API_PROJECT = 'P7dR8mSH'
+
+/** По полю fabric_api_version добавляет Fabric API нужной версии как обязательный мод. */
+function injectFabricApi(mp: Modpack): void {
+  if (mp.loader !== 'fabric' || !mp.fabric_api_version) return
+  const already = mp.mods.some(m => m.id === 'fabric-api' || m.modrinth_id === FABRIC_API_PROJECT)
+  if (already) return
+  mp.mods.unshift({
+    id: 'fabric-api',
+    name: 'Fabric API',
+    modrinth_id: FABRIC_API_PROJECT,
+    modrinth_version_number: mp.fabric_api_version,
+    filename: `fabric-api-${mp.fabric_api_version}.jar`,
+    version: mp.fabric_api_version,
+    category: 'API',
+    size_mb: 2.5,
+    required: true
+  })
+}
+
 export async function fetchModpack(id: string): Promise<Modpack> {
   const data = await fetchWithFallback<Modpack>(`${id}.json`)
   // Защита от битого/неполного JSON на GitHub — нормализуем обязательные поля.
@@ -41,5 +62,6 @@ export async function fetchModpack(id: string): Promise<Modpack> {
   if (!data.mc_version || !data.loader || !data.loader_version) {
     throw new Error(`В сборке ${id} не хватает обязательных полей (mc_version/loader/loader_version)`)
   }
+  injectFabricApi(data)
   return data
 }
