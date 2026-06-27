@@ -59,6 +59,9 @@ contextBridge.exposeInMainWorld('api', {
   shell: {
     openFolder: (path: string) => ipcRenderer.invoke('shell:open-folder', path)
   },
+  system: {
+    totalMemoryMb: () => ipcRenderer.invoke('system:total-memory-mb')
+  },
   window: {
     minimize: () => ipcRenderer.send('window:minimize'),
     close: () => ipcRenderer.send('window:close')

@@ -44,6 +44,9 @@ interface Window {
     shell: {
       openFolder: (path: string) => Promise<void>
     }
+    system: {
+      totalMemoryMb: () => Promise<number>
+    }
     window: {
       minimize: () => void
       close: () => void

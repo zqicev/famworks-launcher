@@ -1,6 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Modpack } from '../../../types/modpack'
+import MemorySelect from './MemorySelect'
 import styles from '../styles/BottomBar.module.css'
+
+// Базовые варианты ОЗУ (МБ); реальные опции фильтруются по объёму системы
+const MEMORY_OPTIONS = [2048, 4096, 6144, 8192, 12288, 16384, 24576, 32768]
 
 interface Props {
   modpack: Modpack
@@ -39,6 +43,7 @@ function formatSpeed(bps: number) {
 export default function BottomBar({ modpack, installPath, extraModsCount = 0 }: Props) {
   const [status, setStatus] = useState<ModpackStatus>('checking')
   const [memory, setMemory] = useState(4096)
+  const [totalRamMb, setTotalRamMb] = useState(16384)
   const [progress, setProgress] = useState<ProgressState | null>(null)
   const clearTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -121,7 +126,18 @@ export default function BottomBar({ modpack, installPath, extraModsCount = 0 }: 
 
   useEffect(() => {
     window.api.store.get('allocatedMemory').then(v => { if (v) setMemory(v as number) })
+    window.api.system.totalMemoryMb().then(mb => setTotalRamMb(mb)).catch(() => {})
   }, [])
+
+  // Не даём выбрать больше, чем есть в системе (оставляем запас под ОС).
+  const memoryOptions = MEMORY_OPTIONS.filter(mb => mb <= totalRamMb - 1024)
+  const safeOptions = memoryOptions.length ? memoryOptions : [2048]
+
+  // Если сохранённое значение больше доступного — подгоняем к максимуму.
+  useEffect(() => {
+    const max = safeOptions[safeOptions.length - 1]
+    if (memory > max) handleMemoryChange(max)
+  }, [totalRamMb])
 
   const handleMemoryChange = async (v: number) => {
     setMemory(v)
@@ -211,16 +227,12 @@ export default function BottomBar({ modpack, installPath, extraModsCount = 0 }: 
           <div className={styles.divider} />
           <div className={styles.stat}>
             <span className={styles.statLabel}>ПАМЯТЬ</span>
-            <select
-              className={styles.select}
+            <MemorySelect
               value={memory}
-              onChange={e => handleMemoryChange(Number(e.target.value))}
+              options={safeOptions}
               disabled={isBusy || isRunning}
-            >
-              {[2048, 4096, 6144, 8192, 12288, 16384].map(v => (
-                <option key={v} value={v}>{v / 1024} ГБ</option>
-              ))}
-            </select>
+              onChange={handleMemoryChange}
+            />
           </div>
           <div className={styles.divider} />
           <div className={styles.stat}>

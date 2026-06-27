@@ -132,6 +132,11 @@ export function setupIpcHandlers() {
 
   ipcMain.handle('shell:open-folder', (_, folderPath: string) => shell.openPath(folderPath))
 
+  ipcMain.handle('system:total-memory-mb', async () => {
+    const os = await import('os')
+    return Math.round(os.totalmem() / 1024 / 1024)
+  })
+
   ipcMain.handle('mods:file-size', (_, modsDir: string, filename: string) =>
     getModFileSizeBytes(modsDir, filename))
 

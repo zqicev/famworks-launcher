@@ -1,0 +1,69 @@
+.wrap {
+  position: relative;
+}
+
+.trigger {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+.trigger:disabled { cursor: default; opacity: 0.6; }
+
+.value {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.chevron {
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+.menu {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: -10px;
+  min-width: 110px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  z-index: 150;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+}
+
+.option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  border-radius: 7px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-align: left;
+  transition: background 0.12s, color 0.12s;
+}
+
+.option:hover {
+  background: var(--bg-hover);
+  color: var(--text);
+}
+
+.optionActive {
+  background: var(--bg-active);
+  color: var(--accent);
+}
+
+.tick {
+  font-size: 11px;
+  color: var(--accent);
+}
