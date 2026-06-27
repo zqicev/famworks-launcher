@@ -14,12 +14,15 @@
    ```
 
 2. **Создай токен GitHub** (один раз): [github.com/settings/tokens](https://github.com/settings/tokens)
-   - Classic token со scope **`repo`**, либо fine-grained с доступом
+   - Classic token со scope **`public_repo`**, либо fine-grained с доступом
      **Contents: Read and write** к репозиторию `famworks-builds`.
+   - Вставь токен в файл **`.env`** (он в `.gitignore`, в репозиторий не попадёт):
+     ```
+     GH_TOKEN=ghp_твой_токен
+     ```
 
-3. **Запусти публикацию** (токен передаётся через переменную окружения):
+3. **Запусти публикацию** — токен подхватится из `.env` автоматически:
    ```powershell
-   $env:GH_TOKEN = "ghp_твой_токен"
    npm run release
    ```
    Это соберёт установщик и зальёт в релиз **3 файла**:

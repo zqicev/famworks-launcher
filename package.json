@@ -10,7 +10,7 @@
     "build": "npm run typecheck && electron-vite build",
     "preview": "electron-vite preview",
     "dist": "npm run build && electron-builder",
-    "release": "npm run build && electron-builder --publish always"
+    "release": "npm run build && dotenv -e .env -- electron-builder --publish always"
   },
   "dependencies": {
     "adm-zip": "^0.5.16",
@@ -25,6 +25,7 @@
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.3",
+    "dotenv-cli": "^11.0.0",
     "electron": "^33.0.0",
     "electron-builder": "^25.1.8",
     "electron-vite": "^2.3.0",
