@@ -7,6 +7,7 @@ directories:
   buildResources: build
 
 icon: build/icon.ico
+afterPack: scripts/afterPack.js
 
 files:
   - out/**/*
