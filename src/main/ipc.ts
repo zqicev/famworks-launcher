@@ -4,8 +4,10 @@ import { basename, join as pathJoin } from 'path'
 import { store } from './store'
 import { fetchModpackIndex, fetchModpack } from './modpacks'
 import { checkAndInstallModpack, getModpackStatus, toggleMod, deleteMod, getInstalledMods, downloadModToDir, getModFileSizeBytes } from './installer'
-import { launchGame, installFabric } from './launcher'
+import { launchGame, installFabric, offlineAuthorization } from './launcher'
 import { searchModrinth, getModVersions } from './modrinth'
+import { microsoftLogin, microsoftRefresh } from './msAuth'
+import { Account } from './store'
 import { beginOperation, endOperation, cancelCurrent, isCancelError } from './abort'
 
 function getWindow(): BrowserWindow {
@@ -65,22 +67,55 @@ export function setupIpcHandlers() {
     }
   })
 
+  // Вход через Microsoft — открывает окно, возвращает данные аккаунта (рендерер их сохранит).
+  ipcMain.handle('auth:microsoft-login', async () => {
+    const res = await microsoftLogin()
+    return res
+  })
+
   ipcMain.handle('launch', async (_, modpackId: string) => {
     const win = getWindow()
     beginOperation()
     try {
       const modpack = await fetchModpack(modpackId)
-      const username = store.get('activeAccount') as string ?? 'Player'
       const installPath = store.get('installPath') as string
       const memory = store.get('allocatedMemory') as number
-      await launchGame(modpack, username, installPath, memory, win)
+
+      const accounts = store.get('accounts') as Account[]
+      const activeId = store.get('activeAccountId') as string | null
+      const account = accounts.find(a => a.id === activeId) ?? accounts[0]
+
+      let authorization
+      if (account?.type === 'microsoft' && account.refreshToken) {
+        // Обновляем токен перед запуском (Minecraft-токен живёт ~24ч)
+        const res = await microsoftRefresh(account.refreshToken)
+        // Сохраняем свежий refresh-токен
+        const updated = accounts.map(a => a.id === account.id
+          ? { ...a, username: res.username, uuid: res.uuid, refreshToken: res.refreshToken }
+          : a)
+        store.set('accounts', updated)
+        authorization = {
+          access_token: res.mclc.access_token,
+          client_token: res.mclc.client_token ?? 'famworks',
+          uuid: res.mclc.uuid,
+          name: res.mclc.name ?? res.username,
+          user_properties: res.mclc.user_properties ?? {},
+          meta: res.mclc.meta as { type: 'mojang' | 'msa'; demo?: boolean } | undefined
+        }
+      } else {
+        authorization = offlineAuthorization(account?.username ?? 'Player')
+      }
+
+      await launchGame(modpack, authorization, installPath, memory, win)
       return true
     } catch (e) {
       if (isCancelError(e)) {
         win.webContents.send('install:progress', { phase: 'cancelled', message: 'Отменено' })
         return false
       }
-      throw e
+      // Ошибка запуска (например, неодобренный MS-аккаунт) — показываем пользователю
+      win.webContents.send('launch:error', e instanceof Error ? e.message : String(e))
+      return false
     } finally {
       endOperation()
     }

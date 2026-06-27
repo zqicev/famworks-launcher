@@ -42,7 +42,7 @@ export async function installFabric(modpack: Modpack, gameRoot: string, win: Bro
 
 export async function launchGame(
   modpack: Modpack,
-  username: string,
+  authorization: ILauncherOptions['authorization'],
   installPath: string,
   memoryMB: number,
   win: BrowserWindow
@@ -65,13 +65,7 @@ export async function launchGame(
   const client = new Client()
 
   const options: ILauncherOptions = {
-    authorization: {
-      access_token: 'offline',
-      client_token: 'famworks',
-      uuid: generateOfflineUUID(username),
-      name: username,
-      user_properties: {}
-    },
+    authorization,
     root: gameRoot,
     version: {
       number: modpack.mc_version,
@@ -138,6 +132,16 @@ export async function launchGame(
       resolve()
     }).catch(reject)
   })
+}
+
+export function offlineAuthorization(username: string): ILauncherOptions['authorization'] {
+  return {
+    access_token: 'offline',
+    client_token: 'famworks',
+    uuid: generateOfflineUUID(username),
+    name: username,
+    user_properties: {}
+  }
 }
 
 function generateOfflineUUID(username: string): string {

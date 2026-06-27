@@ -15,7 +15,8 @@
     "adm-zip": "^0.5.16",
     "axios": "^1.7.9",
     "electron-store": "^7.0.3",
-    "minecraft-launcher-core": "^3.8.0"
+    "minecraft-launcher-core": "^3.8.0",
+    "msmc": "^5.0.5"
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.8",

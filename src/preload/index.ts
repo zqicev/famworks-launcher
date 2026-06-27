@@ -35,6 +35,9 @@ contextBridge.exposeInMainWorld('api', {
     }
   },
   cancel: () => ipcRenderer.invoke('cancel'),
+  auth: {
+    microsoftLogin: () => ipcRenderer.invoke('auth:microsoft-login')
+  },
   launch: {
     start: (id: string) => ipcRenderer.invoke('launch', id),
     onLog: (cb: (msg: string) => void) => {

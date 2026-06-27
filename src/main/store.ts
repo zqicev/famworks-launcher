@@ -1,14 +1,17 @@
 import Store from 'electron-store'
 
-interface Account {
+export interface Account {
+  id: string                    // 'offline:<ник>' или 'msa:<uuid>'
   username: string
-  type: 'minecraft'
+  type: 'offline' | 'microsoft'
+  uuid?: string                 // для microsoft
+  refreshToken?: string         // для microsoft
 }
 
 interface StoreSchema {
   installPath: string
   accounts: Account[]
-  activeAccount: string | null
+  activeAccountId: string | null
   allocatedMemory: number
 }
 
@@ -16,7 +19,7 @@ export const store = new Store<StoreSchema>({
   defaults: {
     installPath: '',
     accounts: [],
-    activeAccount: null,
+    activeAccountId: null,
     allocatedMemory: 4096
   }
 })

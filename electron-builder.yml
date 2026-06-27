@@ -12,6 +12,10 @@ files:
 
 # Native deps отсутствуют — всё пакуется в asar
 asar: true
+# msmc делает динамический import своих файлов — он должен лежать распакованным,
+# иначе вход через Microsoft падает внутри asar-архива.
+asarUnpack:
+  - "**/node_modules/msmc/**"
 
 win:
   # Пропускаем подпись и rcedit — на этой машине нет Developer Mode,

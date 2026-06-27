@@ -29,6 +29,9 @@ interface Window {
       onProgress: (cb: (data: unknown) => void) => void
     }
     cancel: () => Promise<void>
+    auth: {
+      microsoftLogin: () => Promise<{ username: string; uuid: string; refreshToken: string; mclc: unknown }>
+    }
     launch: {
       start: (id: string) => Promise<boolean>
       onLog: (cb: (msg: string) => void) => void
