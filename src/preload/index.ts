@@ -58,6 +58,17 @@ contextBridge.exposeInMainWorld('api', {
   system: {
     totalMemoryMb: () => ipcRenderer.invoke('system:total-memory-mb')
   },
+  update: {
+    install: () => ipcRenderer.invoke('update:install'),
+    check: () => ipcRenderer.invoke('update:check'),
+    onChecking: (cb: () => void) => subscribe('update:checking', cb),
+    onAvailable: (cb: (info: { version: string }) => void) => subscribe('update:available', cb),
+    onNone: (cb: () => void) => subscribe('update:none', cb),
+    onProgress: (cb: (p: { percent: number; bytesPerSecond: number; transferred: number; total: number }) => void) =>
+      subscribe('update:progress', cb),
+    onDownloaded: (cb: (info: { version: string }) => void) => subscribe('update:downloaded', cb),
+    onError: (cb: (msg: string) => void) => subscribe('update:error', cb)
+  },
   window: {
     minimize: () => ipcRenderer.send('window:minimize'),
     close: () => ipcRenderer.send('window:close')

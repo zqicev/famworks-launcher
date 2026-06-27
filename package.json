@@ -9,12 +9,14 @@
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "build": "npm run typecheck && electron-vite build",
     "preview": "electron-vite preview",
-    "dist": "npm run build && electron-builder"
+    "dist": "npm run build && electron-builder",
+    "release": "npm run build && electron-builder --publish always"
   },
   "dependencies": {
     "adm-zip": "^0.5.16",
     "axios": "^1.7.9",
     "electron-store": "^7.0.3",
+    "electron-updater": "^6.8.9",
     "minecraft-launcher-core": "^3.8.0",
     "msmc": "^5.0.5"
   },

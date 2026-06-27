@@ -2,6 +2,7 @@ import { app, BrowserWindow } from 'electron'
 import { join } from 'path'
 import { existsSync } from 'fs'
 import { setupIpcHandlers } from './ipc'
+import { setupUpdater } from './updater'
 
 function resolveIcon(): string | undefined {
   // В проде иконка лежит в resources (extraResources), в деве — в build/
@@ -53,6 +54,7 @@ if (!gotLock) {
   app.whenReady().then(() => {
     setupIpcHandlers()
     createWindow()
+    setupUpdater()
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow()

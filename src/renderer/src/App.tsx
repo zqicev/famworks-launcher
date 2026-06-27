@@ -5,6 +5,7 @@ import MainPanel from './components/MainPanel'
 import TitleBar from './components/TitleBar'
 import SetupModal from './components/SetupModal'
 import SettingsModal from './components/SettingsModal'
+import UpdateBanner from './components/UpdateBanner'
 import styles from './styles/App.module.css'
 
 export default function App() {
@@ -90,6 +91,7 @@ export default function App() {
   return (
     <div className={styles.root}>
       <TitleBar />
+      <UpdateBanner />
       {needsSetup ? (
         <SetupModal onComplete={handleSetupComplete} />
       ) : (

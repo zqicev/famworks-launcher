@@ -24,18 +24,34 @@ asar: true
 asarUnpack:
   - "**/node_modules/msmc/**"
 
+# Куда electron-updater ходит за обновлениями (публичный репо — токен в клиенте не нужен).
+# Сюда же electron-builder --publish заливает установщик + latest.yml + blockmap.
+publish:
+  provider: github
+  owner: zqicev
+  repo: famworks-builds
+  releaseType: release
+
 win:
   # Пропускаем rcedit/подпись на внутреннем exe (winCodeSign падает на macOS-симлинках
-  # без Developer Mode). Иконку финального portable-exe ставит NSIS из icon.ico напрямую.
+  # без Developer Mode). Иконку ярлыков и установщика NSIS берёт из icon.ico напрямую.
   signAndEditExecutable: false
   target:
-    - target: portable
+    - target: nsis
       arch:
         - x64
-  artifactName: FamWorks-Launcher-${version}-portable.exe
+  artifactName: FamWorks-Launcher-Setup-${version}.exe
 
-portable:
-  artifactName: FamWorks-Launcher-${version}-portable.exe
+nsis:
+  oneClick: false                          # обычный мастер установки
+  perMachine: false                        # установка в %LOCALAPPDATA% — без прав админа
+  allowToChangeInstallationDirectory: true # можно выбрать папку
+  allowElevation: false                    # не требуем UAC
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: FamWorks Launcher
+  deleteAppDataOnUninstall: false          # настройки/аккаунты не трём при удалении
+  artifactName: FamWorks-Launcher-Setup-${version}.exe
 
-# Снимаем требование code-signing (для теста)
+# Снимаем требование code-signing (нет сертификата — на Windows автообновление и так работает)
 forceCodeSigning: false

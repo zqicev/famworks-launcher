@@ -47,6 +47,16 @@ interface Window {
     system: {
       totalMemoryMb: () => Promise<number>
     }
+    update: {
+      install: () => Promise<void>
+      check: () => Promise<boolean>
+      onChecking: (cb: () => void) => () => void
+      onAvailable: (cb: (info: { version: string }) => void) => () => void
+      onNone: (cb: () => void) => () => void
+      onProgress: (cb: (p: { percent: number; bytesPerSecond: number; transferred: number; total: number }) => void) => () => void
+      onDownloaded: (cb: (info: { version: string }) => void) => () => void
+      onError: (cb: (msg: string) => void) => () => void
+    }
     window: {
       minimize: () => void
       close: () => void
