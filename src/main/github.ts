@@ -112,7 +112,8 @@ export async function ensureRelease(tag: string): Promise<Release> {
 export async function uploadAsset(
   release: Release,
   filename: string,
-  data: Buffer
+  data: Buffer,
+  contentType = 'application/octet-stream'
 ): Promise<string> {
   const { owner, repo } = repoPath()
   const token = store.get('token') as string
@@ -129,7 +130,7 @@ export async function uploadAsset(
     const res = await axios.post(`${uploadBase}?name=${encodeURIComponent(filename)}`, data, {
       headers: {
         Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/java-archive',
+        'Content-Type': contentType,
         'User-Agent': 'famworks-editor'
       },
       maxBodyLength: Infinity,

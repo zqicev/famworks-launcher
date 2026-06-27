@@ -1,7 +1,7 @@
 import { ipcMain, dialog, BrowserWindow } from 'electron'
 import { store } from './store'
 import { validateToken } from './github'
-import { loadWorkspace, saveModpack, deleteModpack, uploadCustomJar } from './service'
+import { loadWorkspace, saveModpack, deleteModpack, uploadCustomJar, uploadConfig } from './service'
 import { searchModrinth, getLatestVersion } from './modrinth'
 import { Modpack } from '../types/modpack'
 
@@ -36,6 +36,13 @@ export function setupIpc() {
     })
     if (!result.filePaths[0]) return null
     return uploadCustomJar(result.filePaths[0])
+  })
+
+  // Конфиг-файл (любой)
+  ipcMain.handle('config:pick-and-upload', async () => {
+    const result = await dialog.showOpenDialog({ properties: ['openFile'] })
+    if (!result.filePaths[0]) return null
+    return uploadConfig(result.filePaths[0])
   })
 
   // Окно

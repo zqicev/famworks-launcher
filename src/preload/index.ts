@@ -19,6 +19,9 @@ contextBridge.exposeInMainWorld('api', {
   jar: {
     pickAndUpload: () => ipcRenderer.invoke('jar:pick-and-upload')
   },
+  config: {
+    pickAndUpload: () => ipcRenderer.invoke('config:pick-and-upload')
+  },
   win: {
     minimize: () => ipcRenderer.send('win:minimize'),
     close: () => ipcRenderer.send('win:close')

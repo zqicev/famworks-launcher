@@ -18,6 +18,7 @@ interface ModrinthFile { url: string; filename: string; primary: boolean; size: 
 interface ModrinthVersion { id: string; name: string; version_number: string; files: ModrinthFile[] }
 
 interface JarUpload { filename: string; download_url: string; sha512: string; size_mb: number }
+interface ConfigUpload { filename: string; download_url: string; sha512: string; suggestedPath: string }
 
 declare global {
   interface Window {
@@ -37,6 +38,7 @@ declare global {
         latest: (projectId: string, mc: string, loader: string) => Promise<ModrinthVersion | null>
       }
       jar: { pickAndUpload: () => Promise<JarUpload | null> }
+      config: { pickAndUpload: () => Promise<ConfigUpload | null> }
       win: { minimize: () => void; close: () => void }
     }
   }

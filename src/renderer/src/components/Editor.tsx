@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { LoadedModpack, Modpack, Mod } from '../../../types/modpack'
+import { LoadedModpack, Modpack, Mod, ServerEntry, ConfigFile } from '../../../types/modpack'
 import AddModrinthModal from './AddModrinthModal'
 import styles from '../styles/Editor.module.css'
 
@@ -79,6 +79,32 @@ export default function Editor({ packKey, loaded, onSaved, onDeleted }: Props) {
     }
   }
 
+  // Серверы
+  const servers = draft.servers ?? []
+  const addServer = () => set('servers', [...servers, { name: '', ip: '', port: 25565 }])
+  const updateServer = (i: number, patch: Partial<ServerEntry>) =>
+    set('servers', servers.map((s, idx) => idx === i ? { ...s, ...patch } : s))
+  const removeServer = (i: number) => set('servers', servers.filter((_, idx) => idx !== i))
+
+  // Конфиги
+  const configs = draft.configs ?? []
+  const addConfig = async () => {
+    setStatus({ kind: 'uploading', msg: 'Загрузка конфига…' })
+    try {
+      const res = await window.api.config.pickAndUpload()
+      if (!res) { setStatus({ kind: 'idle' }); return }
+      const entry: ConfigFile = { path: res.suggestedPath, download_url: res.download_url, sha512: res.sha512, overwrite: false }
+      set('configs', [...configs, entry])
+      setStatus({ kind: 'ok', msg: 'Конфиг загружен в релиз' })
+      setTimeout(() => setStatus({ kind: 'idle' }), 2500)
+    } catch (e) {
+      setStatus({ kind: 'error', msg: e instanceof Error ? e.message : String(e) })
+    }
+  }
+  const updateConfig = (i: number, patch: Partial<ConfigFile>) =>
+    set('configs', configs.map((c, idx) => idx === i ? { ...c, ...patch } : c))
+  const removeConfig = (i: number) => set('configs', configs.filter((_, idx) => idx !== i))
+
   const addChangelog = () => set('changelog', [{ version: draft.mc_version, description: '' }, ...draft.changelog])
   const updateChangelog = (i: number, patch: Partial<{ version: string; description: string }>) =>
     set('changelog', draft.changelog.map((c, idx) => idx === i ? { ...c, ...patch } : c))
@@ -148,6 +174,51 @@ export default function Editor({ packKey, loaded, onSaved, onDeleted }: Props) {
                   {mod.required ? 'REQ' : 'OPT'}
                 </button>
                 <button className={styles.delMod} onClick={() => removeMod(mod.id)} title="Убрать">✕</button>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Серверы */}
+        <section className={styles.section}>
+          <div className={styles.sectionHead}>
+            <div className={styles.sectionTitle}>СЕРВЕРЫ · {servers.length}</div>
+            <button className={styles.addBtn} onClick={addServer}>+ Сервер</button>
+          </div>
+          <div className={styles.changelog}>
+            {servers.length === 0 && <div className={styles.modsEmpty}>Серверов нет — добавятся в мультиплеер игрока</div>}
+            {servers.map((s, i) => (
+              <div key={i} className={styles.srvRow}>
+                <input className={styles.srvName} value={s.name} placeholder="Название" onChange={e => updateServer(i, { name: e.target.value })} />
+                <input className={styles.srvIp} value={s.ip} placeholder="play.example.com" onChange={e => updateServer(i, { ip: e.target.value })} />
+                <input className={styles.srvPort} type="number" value={s.port ?? 25565} placeholder="25565"
+                  onChange={e => updateServer(i, { port: Number(e.target.value) || 25565 })} />
+                <button className={styles.delMod} onClick={() => removeServer(i)}>✕</button>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Конфиги */}
+        <section className={styles.section}>
+          <div className={styles.sectionHead}>
+            <div className={styles.sectionTitle}>КОНФИГИ · {configs.length}</div>
+            <button className={styles.jarBtn} onClick={addConfig} disabled={busy}>↑ Загрузить конфиг</button>
+          </div>
+          <div className={styles.changelog}>
+            {configs.length === 0 && <div className={styles.modsEmpty}>Конфигов нет</div>}
+            {configs.map((c, i) => (
+              <div key={i} className={styles.cfgRow}>
+                <input className={styles.cfgPath} value={c.path} placeholder="config/mod.json или options.txt"
+                  onChange={e => updateConfig(i, { path: e.target.value })} title="Путь относительно папки игры" />
+                <button
+                  className={`${styles.reqBtn} ${c.overwrite ? styles.reqOn : ''}`}
+                  onClick={() => updateConfig(i, { overwrite: !c.overwrite })}
+                  title={c.overwrite ? 'Всегда перезаписывать' : 'Только если файла нет'}
+                >
+                  {c.overwrite ? 'FORCE' : 'ONCE'}
+                </button>
+                <button className={styles.delMod} onClick={() => removeConfig(i)}>✕</button>
               </div>
             ))}
           </div>

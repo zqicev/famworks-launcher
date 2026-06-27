@@ -30,11 +30,26 @@ export interface ChangelogEntry {
   description: string
 }
 
+export interface ServerEntry {
+  name: string
+  ip: string
+  port?: number
+}
+
+export interface ConfigFile {
+  path: string
+  download_url: string
+  sha512?: string
+  overwrite?: boolean
+}
+
 export interface Modpack extends ModpackSummary {
   fabric_api_version: string
   long_description: string
   changelog: ChangelogEntry[]
   mods: Mod[]
+  servers?: ServerEntry[]
+  configs?: ConfigFile[]
 }
 
 // Загруженная сборка вместе с git-sha файла (нужен для обновления через GitHub API)

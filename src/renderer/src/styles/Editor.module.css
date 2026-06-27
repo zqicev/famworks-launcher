@@ -72,6 +72,16 @@
 .clDesc { flex: 1; background: var(--bg-surface); border: 1px solid var(--border); border-radius: 7px; padding: 8px 10px; color: var(--text); font-size: 12px; }
 .clVer:focus, .clDesc:focus { border-color: var(--accent); }
 
+.srvRow { display: flex; gap: 8px; align-items: center; }
+.srvName { width: 180px; flex-shrink: 0; background: var(--bg-surface); border: 1px solid var(--border); border-radius: 7px; padding: 8px 10px; color: var(--text); font-size: 12px; }
+.srvIp { flex: 1; background: var(--bg-surface); border: 1px solid var(--border); border-radius: 7px; padding: 8px 10px; color: var(--text); font-size: 12px; }
+.srvPort { width: 90px; flex-shrink: 0; background: var(--bg-surface); border: 1px solid var(--border); border-radius: 7px; padding: 8px 10px; color: var(--text); font-size: 12px; }
+.srvName:focus, .srvIp:focus, .srvPort:focus { border-color: var(--accent); }
+
+.cfgRow { display: flex; gap: 8px; align-items: center; }
+.cfgPath { flex: 1; background: var(--bg-surface); border: 1px solid var(--border); border-radius: 7px; padding: 8px 10px; color: var(--text); font-size: 12px; font-family: ui-monospace, monospace; }
+.cfgPath:focus { border-color: var(--accent); }
+
 .footer {
   display: flex; align-items: center; gap: 16px; padding: 14px 28px;
   border-top: 1px solid var(--border); background: var(--bg); flex-shrink: 0;

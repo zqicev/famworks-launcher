@@ -82,11 +82,30 @@ export async function uploadCustomJar(filePath: string): Promise<{
   const hash = sha512(data)
   const tag = store.get('modsReleaseTag') as string
   const release = await ensureRelease(tag)
-  const url = await uploadAsset(release, filename, data)
+  const url = await uploadAsset(release, filename, data, 'application/java-archive')
   return {
     filename,
     download_url: url,
     sha512: hash,
     size_mb: Math.round((data.length / 1024 / 1024) * 10) / 10
+  }
+}
+
+/** Заливает конфиг-файл в релиз. Имя ассета уникально по хэшу (нет коллизий одинаковых имён). */
+export async function uploadConfig(filePath: string): Promise<{
+  filename: string; download_url: string; sha512: string; suggestedPath: string
+}> {
+  const data = readFileSync(filePath)
+  const filename = basename(filePath)
+  const hash = sha512(data)
+  const assetName = `cfg-${hash.slice(0, 12)}-${filename}`
+  const tag = store.get('modsReleaseTag') as string
+  const release = await ensureRelease(tag)
+  const url = await uploadAsset(release, assetName, data, 'application/octet-stream')
+  return {
+    filename,
+    download_url: url,
+    sha512: hash,
+    suggestedPath: `config/${filename}`
   }
 }
