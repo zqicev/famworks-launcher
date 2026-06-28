@@ -19,6 +19,7 @@ export default function ModsTab({ modpack, modsDir, onExtraCountChange }: Props)
   const [disabled, setDisabled] = useState<Set<string>>(new Set())
   const [addOpen, setAddOpen] = useState(false)
   const [extraMods, setExtraMods] = useState<LocalMod[]>([])
+  const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set())
   const [dragging, setDragging] = useState(false)
   const scanRef = useRef(false)
 
@@ -80,7 +81,7 @@ export default function ModsTab({ modpack, modsDir, onExtraCountChange }: Props)
     return off
   }, [modsDir])
 
-  const allMods: LocalMod[] = [...modpack.mods, ...extraMods]
+  const allMods: LocalMod[] = [...modpack.mods, ...extraMods].filter(m => !deletedIds.has(m.id))
 
   const filtered = allMods.filter(m =>
     m.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -102,6 +103,7 @@ export default function ModsTab({ modpack, modsDir, onExtraCountChange }: Props)
   const handleDelete = async (mod: LocalMod) => {
     if (mod.required) return
     await window.api.mods.delete(modsDir, mod.filename)
+    setDeletedIds(prev => new Set(prev).add(mod.id))
     setExtraMods(prev => {
       const next = prev.filter(m => m.id !== mod.id)
       onExtraCountChange?.(next.length)
