@@ -5,6 +5,7 @@ import { Modpack } from '../types/modpack'
 import { ProgressEvent } from './installer'
 import { ensureJava } from './java'
 import { writeServers } from './servers'
+import { setPlaying, setIdle } from './discord'
 import { opSignal } from './abort'
 import axios from 'axios'
 import { mkdirSync, writeFileSync, existsSync } from 'fs'
@@ -138,10 +139,12 @@ export async function launchGame(
     client.on('close', (code) => {
       win.webContents.send('launch:close', code)
       win.webContents.send('install:progress', { phase: 'done', message: '' })
+      setIdle()
     })
 
     client.launch(options).then(() => {
       emit(win, { phase: 'done', message: '' })
+      setPlaying(modpack.name)
       resolve()
     }).catch(reject)
   })

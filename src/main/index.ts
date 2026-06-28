@@ -3,6 +3,7 @@ import { join } from 'path'
 import { existsSync } from 'fs'
 import { setupIpcHandlers } from './ipc'
 import { setupUpdater } from './updater'
+import { initDiscord } from './discord'
 
 function resolveIcon(): string | undefined {
   // В проде иконка лежит в resources (extraResources), в деве — в build/
@@ -55,6 +56,7 @@ if (!gotLock) {
     setupIpcHandlers()
     createWindow()
     setupUpdater()
+    initDiscord()
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow()

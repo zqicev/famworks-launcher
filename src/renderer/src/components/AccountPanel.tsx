@@ -151,8 +151,8 @@ export default function AccountPanel() {
             </div>
           ) : (
             <div className={styles.actions}>
-              <button className={styles.msBtn} onClick={loginMicrosoft} disabled={msLoading}>
-                {msLoading ? 'Вход...' : 'Войти через Microsoft'}
+              <button className={styles.msBtn} disabled title="Будет доступно после одобрения Microsoft">
+                Войти через Microsoft (скоро)
               </button>
               <button className={styles.offlineBtn} onClick={() => { setAdding(true); setError('') }}>
                 + Офлайн-аккаунт
