@@ -40,6 +40,7 @@ contextBridge.exposeInMainWorld('api', {
     onProgress: (cb: (data: unknown) => void) => subscribe('install:progress', cb)
   },
   cancel: () => ipcRenderer.invoke('cancel'),
+  gameRunning: () => ipcRenderer.invoke('game:running'),
   auth: {
     microsoftLogin: () => ipcRenderer.invoke('auth:microsoft-login')
   },

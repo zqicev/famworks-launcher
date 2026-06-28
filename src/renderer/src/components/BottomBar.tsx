@@ -50,6 +50,9 @@ export default function BottomBar({ modpack, installPath, extraModsCount = 0 }: 
   const checkStatus = useCallback(async () => {
     setStatus('checking')
     setProgress(null)
+    // Игра этой сборки уже запущена (например, лаунчер перезапустили)?
+    const runningId = await window.api.gameRunning().catch(() => null)
+    if (runningId === modpack.id) { setStatus('running'); return }
     try {
       const s = await window.api.modpacks.status(modpack.id) as 'not_installed' | 'outdated' | 'ready'
       setStatus(s)
@@ -130,6 +133,16 @@ export default function BottomBar({ modpack, installPath, extraModsCount = 0 }: 
     window.api.store.get('allocatedMemory').then(v => { if (v) setMemory(v as number) })
     window.api.system.totalMemoryMb().then(mb => setTotalRamMb(mb)).catch(() => {})
   }, [])
+
+  // Пока игра запущена — следим, не закрылась ли она (актуально после перезапуска лаунчера)
+  useEffect(() => {
+    if (status !== 'running') return
+    const t = setInterval(async () => {
+      const id = await window.api.gameRunning().catch(() => null)
+      if (id !== modpack.id) checkStatus()
+    }, 5000)
+    return () => clearInterval(t)
+  }, [status, modpack.id, checkStatus])
 
   // Не даём выбрать больше, чем есть в системе (оставляем запас под ОС).
   const memoryOptions = MEMORY_OPTIONS.filter(mb => mb <= totalRamMb - 1024)

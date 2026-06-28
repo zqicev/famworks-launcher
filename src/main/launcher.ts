@@ -6,6 +6,7 @@ import { ProgressEvent } from './installer'
 import { ensureJava } from './java'
 import { writeServers } from './servers'
 import { setPlaying, setIdle } from './discord'
+import { store } from './store'
 import { opSignal } from './abort'
 import axios from 'axios'
 import { mkdirSync, writeFileSync, existsSync } from 'fs'
@@ -137,12 +138,17 @@ export async function launchGame(
 
   await new Promise<void>((resolve, reject) => {
     client.on('close', (code) => {
+      store.set('runningPid', null)
+      store.set('runningModpackId', null)
       win.webContents.send('launch:close', code)
       win.webContents.send('install:progress', { phase: 'done', message: '' })
       setIdle()
     })
 
-    client.launch(options).then(() => {
+    client.launch(options).then((proc) => {
+      const pid = (proc as { pid?: number } | undefined)?.pid ?? null
+      store.set('runningPid', pid)
+      store.set('runningModpackId', modpack.id)
       emit(win, { phase: 'done', message: '' })
       setPlaying(modpack.name)
       resolve()

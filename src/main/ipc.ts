@@ -125,6 +125,21 @@ export function setupIpcHandlers() {
     cancelCurrent()
   })
 
+  // Какая сборка сейчас запущена (переживает перезапуск лаунчера через сохранённый PID)
+  ipcMain.handle('game:running', () => {
+    const pid = store.get('runningPid') as number | null
+    const id = store.get('runningModpackId') as string | null
+    if (!pid || !id) return null
+    try {
+      process.kill(pid, 0) // не убивает, только проверяет существование
+      return id
+    } catch {
+      store.set('runningPid', null)
+      store.set('runningModpackId', null)
+      return null
+    }
+  })
+
   ipcMain.handle('dialog:pick-folder', async () => {
     const result = await dialog.showOpenDialog({ properties: ['openDirectory'] })
     return result.filePaths[0] ?? null

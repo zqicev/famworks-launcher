@@ -2,7 +2,7 @@ import RPC from 'discord-rpc'
 
 // Client ID Discord-приложения (Developer Portal → New Application → Application ID).
 // Пустая строка = Rich Presence выключен.
-const CLIENT_ID = ''
+const CLIENT_ID = '1520764701703798944'
 
 let client: RPC.Client | null = null
 let ready = false

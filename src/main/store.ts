@@ -13,6 +13,8 @@ interface StoreSchema {
   accounts: Account[]
   activeAccountId: string | null
   allocatedMemory: number
+  runningPid: number | null
+  runningModpackId: string | null
 }
 
 export const store = new Store<StoreSchema>({
@@ -20,6 +22,8 @@ export const store = new Store<StoreSchema>({
     installPath: '',
     accounts: [],
     activeAccountId: null,
-    allocatedMemory: 4096
+    allocatedMemory: 4096,
+    runningPid: null,
+    runningModpackId: null
   }
 })

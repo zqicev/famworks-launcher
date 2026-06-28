@@ -29,6 +29,7 @@ interface Window {
       onProgress: (cb: (data: unknown) => void) => () => void
     }
     cancel: () => Promise<void>
+    gameRunning: () => Promise<string | null>
     auth: {
       microsoftLogin: () => Promise<{ username: string; uuid: string; refreshToken: string; mclc: unknown }>
     }
