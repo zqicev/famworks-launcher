@@ -148,7 +148,7 @@ export default function BottomBar({ modpack, installPath, extraModsCount = 0 }: 
 
   const handleAction = async () => {
     if (status === 'ready') {
-      const account = await window.api.store.get('activeAccount') as string | null
+      const account = await window.api.store.get('activeAccountId') as string | null
       if (!account) {
         setProgress({ ...EMPTY_PROGRESS, message: 'Выберите аккаунт перед запуском' })
         if (clearTimer.current) clearTimeout(clearTimer.current)
