@@ -24,6 +24,8 @@ export default function AddModModal({ modpack, modsDir, onClose }: Props) {
   const [loading, setLoading] = useState(false)
   const [installing, setInstalling] = useState<string | null>(null)
   const [notice, setNotice] = useState('')
+  const [picker, setPicker] = useState<{ id: string; versions: any[] } | null>(null)
+  const [chosen, setChosen] = useState('')
 
   const search = async () => {
     if (!query.trim()) return
@@ -36,29 +38,31 @@ export default function AddModModal({ modpack, modsDir, onClose }: Props) {
     }
   }
 
-  const installMod = async (mod: SearchResult) => {
+  const openPicker = async (mod: SearchResult) => {
     setInstalling(mod.project_id)
     setNotice('')
     try {
       const versions = await window.api.modrinth.versions(mod.project_id, modpack.mc_version, modpack.loader) as any[]
+      setInstalling(null)
       if (!versions.length) {
         setNotice(`Нет версий «${mod.title}», совместимых с ${modpack.loader} ${modpack.mc_version}`)
-        setInstalling(null)
         return
       }
-      const latest = versions[0]
-      const file = (latest.files ?? []).find((f: { primary: boolean }) => f.primary) ?? latest.files?.[0]
-      if (!file) {
-        setNotice('У версии нет файла для скачивания')
-        setInstalling(null)
-        return
-      }
-      onClose() // закрываем сразу, прогресс идёт в bottom bar
-      window.api.modrinth.download(file.url, file.filename, modsDir, file.hashes?.sha512)
-    } catch (e) {
-      setNotice('Ошибка установки мода')
+      setPicker({ id: mod.project_id, versions })
+      setChosen(versions[0].id) // по умолчанию последняя
+    } catch {
       setInstalling(null)
+      setNotice('Ошибка загрузки версий')
     }
+  }
+
+  const doInstall = () => {
+    if (!picker) return
+    const v = picker.versions.find(x => x.id === chosen) ?? picker.versions[0]
+    const file = (v.files ?? []).find((f: { primary: boolean }) => f.primary) ?? v.files?.[0]
+    if (!file) { setNotice('У версии нет файла для скачивания'); return }
+    onClose()
+    window.api.modrinth.download(file.url, file.filename, modsDir, file.hashes?.sha512)
   }
 
   const formatDownloads = (n: number) => {
@@ -109,13 +113,26 @@ export default function AddModModal({ modpack, modsDir, onClose }: Props) {
                 <div className={styles.resultMeta}>{r.author} · {formatDownloads(r.downloads)} загрузок</div>
                 <div className={styles.resultDesc}>{r.description}</div>
               </div>
-              <button
-                className={styles.installBtn}
-                onClick={() => installMod(r)}
-                disabled={installing === r.project_id}
-              >
-                {installing === r.project_id ? '...' : 'Установить'}
-              </button>
+              {picker?.id === r.project_id ? (
+                <div className={styles.picker}>
+                  <select className={styles.versionSelect} value={chosen} onChange={e => setChosen(e.target.value)}>
+                    {picker.versions.map((v, i) => (
+                      <option key={v.id} value={v.id}>
+                        {v.version_number}{i === 0 ? ' (последняя)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                  <button className={styles.installBtn} onClick={doInstall}>Скачать</button>
+                </div>
+              ) : (
+                <button
+                  className={styles.installBtn}
+                  onClick={() => openPicker(r)}
+                  disabled={installing === r.project_id}
+                >
+                  {installing === r.project_id ? '...' : 'Установить'}
+                </button>
+              )}
             </div>
           ))}
         </div>

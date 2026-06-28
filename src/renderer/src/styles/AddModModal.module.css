@@ -167,3 +167,10 @@
   color: #0a0a0a;
 }
 .installBtn:disabled { opacity: 0.5; }
+
+.picker { display: flex; gap: 6px; align-items: center; flex-shrink: 0; }
+.versionSelect {
+  background: var(--bg-active); border: 1px solid var(--border); border-radius: 7px;
+  padding: 7px 8px; color: var(--text); font-size: 12px; max-width: 150px;
+}
+.versionSelect:focus { border-color: var(--accent); }
