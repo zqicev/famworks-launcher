@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Modpack } from '../../../types/modpack'
 import styles from '../styles/AddModModal.module.css'
 
@@ -10,6 +10,7 @@ interface Props {
 
 interface SearchResult {
   project_id: string
+  slug: string
   title: string
   description: string
   author: string
@@ -26,6 +27,14 @@ export default function AddModModal({ modpack, modsDir, onClose }: Props) {
   const [notice, setNotice] = useState('')
   const [picker, setPicker] = useState<{ id: string; versions: any[] } | null>(null)
   const [chosen, setChosen] = useState('')
+  const [installed, setInstalled] = useState<string[]>([])
+
+  useEffect(() => {
+    window.api.mods.installed(modsDir).then(f => setInstalled(f as string[])).catch(() => {})
+  }, [modsDir])
+
+  const isInstalled = (slug: string) =>
+    installed.some(f => f.replace(/\.disabled$/, '').replace(/\.jar$/, '').toLowerCase().includes(slug.toLowerCase()))
 
   const search = async () => {
     if (!query.trim()) return
@@ -56,11 +65,21 @@ export default function AddModModal({ modpack, modsDir, onClose }: Props) {
     }
   }
 
-  const doInstall = () => {
+  const doInstall = async () => {
     if (!picker) return
     const v = picker.versions.find(x => x.id === chosen) ?? picker.versions[0]
     const file = (v.files ?? []).find((f: { primary: boolean }) => f.primary) ?? v.files?.[0]
     if (!file) { setNotice('У версии нет файла для скачивания'); return }
+    // Удаляем старые версии этого же мода (любой файл из версий проекта, кроме выбранного)
+    const projectFiles = new Set<string>(
+      picker.versions.flatMap((ver: any) => (ver.files ?? []).map((f: any) => f.filename))
+    )
+    for (const f of installed) {
+      const base = f.replace(/\.disabled$/, '')
+      if (base !== file.filename && projectFiles.has(base)) {
+        await window.api.mods.delete(modsDir, base).catch(() => {})
+      }
+    }
     onClose()
     window.api.modrinth.download(file.url, file.filename, modsDir, file.hashes?.sha512)
   }
@@ -130,7 +149,7 @@ export default function AddModModal({ modpack, modsDir, onClose }: Props) {
                   onClick={() => openPicker(r)}
                   disabled={installing === r.project_id}
                 >
-                  {installing === r.project_id ? '...' : 'Установить'}
+                  {installing === r.project_id ? '...' : isInstalled(r.slug) ? 'Изменить' : 'Установить'}
                 </button>
               )}
             </div>
