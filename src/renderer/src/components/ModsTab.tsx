@@ -20,6 +20,7 @@ export default function ModsTab({ modpack, modsDir, onExtraCountChange }: Props)
   const [addOpen, setAddOpen] = useState(false)
   const [extraMods, setExtraMods] = useState<LocalMod[]>([])
   const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set())
+  const [presentBases, setPresentBases] = useState<Set<string> | null>(null)
   const [dragging, setDragging] = useState(false)
   const scanRef = useRef(false)
 
@@ -64,6 +65,8 @@ export default function ModsTab({ modpack, modsDir, onExtraCountChange }: Props)
         })
       }
 
+      // Реально присутствующие на диске базовые имена .jar (для счёта по факту)
+      setPresentBases(new Set(files.map(f => f.replace(/\.disabled$/, ''))))
       setDisabled(newDisabled)
       setExtraMods(extra)
     } finally {
@@ -80,14 +83,16 @@ export default function ModsTab({ modpack, modsDir, onExtraCountChange }: Props)
     return off
   }, [modsDir])
 
-  const allMods: LocalMod[] = [...modpack.mods, ...extraMods].filter(m => !deletedIds.has(m.id))
+  // Показываем моды сборки только если их файл реально есть на диске (после первого скана).
+  const packMods = presentBases
+    ? modpack.mods.filter(m => presentBases.has(m.filename))
+    : modpack.mods
+  const allMods: LocalMod[] = [...packMods, ...extraMods].filter(m => !deletedIds.has(m.id))
 
-  // Сообщаем родителю скорректированную «добавку» к modpack.mods для счётчиков:
-  // плюс локальные, минус удалённые из самой сборки
+  // Родитель считает modpack.mods.length + extraCount → отдаём (фактический total − modpack.mods.length)
   useEffect(() => {
-    const deletedFromPack = modpack.mods.filter(m => deletedIds.has(m.id)).length
-    onExtraCountChange?.(extraMods.length - deletedFromPack)
-  }, [extraMods, deletedIds, modpack.mods])
+    onExtraCountChange?.(allMods.length - modpack.mods.length)
+  }, [allMods.length, modpack.mods.length])
 
   const filtered = allMods.filter(m =>
     m.name.toLowerCase().includes(search.toLowerCase()) ||
