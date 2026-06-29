@@ -20,6 +20,8 @@
   font-size: 20px;
   font-weight: 700;
   letter-spacing: 1px;
+  display: inline-flex;
+  align-items: baseline;
 }
 
 .logoActions {
@@ -55,6 +57,7 @@
 
 .logoF { color: var(--text); }
 .logoW { color: var(--accent); }
+.version { font-family: var(--font-ui); font-size: 9px; font-weight: 600; color: var(--text-dim); letter-spacing: 0.5px; align-self: flex-end; margin-bottom: 3px; margin-left: 2px; }
 
 .section {
   padding: 0 12px;

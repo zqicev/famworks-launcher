@@ -30,6 +30,7 @@ interface Window {
     }
     cancel: () => Promise<void>
     gameRunning: () => Promise<string | null>
+    appVersion: () => Promise<string>
     auth: {
       microsoftLogin: () => Promise<{ username: string; uuid: string; refreshToken: string; mclc: unknown }>
     }

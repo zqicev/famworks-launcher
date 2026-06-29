@@ -1,4 +1,4 @@
-import { ipcMain, dialog, BrowserWindow, shell } from 'electron'
+import { ipcMain, dialog, BrowserWindow, shell, app } from 'electron'
 import { copyFileSync, mkdirSync } from 'fs'
 import { basename, join as pathJoin } from 'path'
 import { store } from './store'
@@ -144,6 +144,8 @@ export function setupIpcHandlers() {
     const result = await dialog.showOpenDialog({ properties: ['openDirectory'] })
     return result.filePaths[0] ?? null
   })
+
+  ipcMain.handle('app:version', () => app.getVersion())
 
   ipcMain.handle('shell:open-folder', (_, folderPath: string) => shell.openPath(folderPath))
 

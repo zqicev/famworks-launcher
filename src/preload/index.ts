@@ -41,6 +41,7 @@ contextBridge.exposeInMainWorld('api', {
   },
   cancel: () => ipcRenderer.invoke('cancel'),
   gameRunning: () => ipcRenderer.invoke('game:running'),
+  appVersion: () => ipcRenderer.invoke('app:version'),
   auth: {
     microsoftLogin: () => ipcRenderer.invoke('auth:microsoft-login')
   },

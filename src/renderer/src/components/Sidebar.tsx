@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { ModpackIndex, ModpackSummary } from '../../../types/modpack'
 import AccountPanel from './AccountPanel'
 import styles from '../styles/Sidebar.module.css'
@@ -12,12 +13,16 @@ interface Props {
 }
 
 export default function Sidebar({ index, selectedId, seenUpdates, onSelect, onSettings, onRefresh }: Props) {
+  const [version, setVersion] = useState('')
+  useEffect(() => { window.api.appVersion().then(setVersion).catch(() => {}) }, [])
+
   return (
     <aside className={styles.sidebar}>
       <div className={styles.logoRow}>
         <div className={styles.logo}>
           <span className={styles.logoF}>FAM</span>
           <span className={styles.logoW}>WORKS</span>
+          {version && <span className={styles.version}>v{version}</span>}
         </div>
         <div className={styles.logoActions}>
           <button className={styles.iconBtn} onClick={onRefresh} title="Обновить список сборок">↻</button>
