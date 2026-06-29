@@ -66,7 +66,6 @@ export default function ModsTab({ modpack, modsDir, onExtraCountChange }: Props)
 
       setDisabled(newDisabled)
       setExtraMods(extra)
-      onExtraCountChange?.(extra.length)
     } finally {
       scanRef.current = false
     }
@@ -82,6 +81,13 @@ export default function ModsTab({ modpack, modsDir, onExtraCountChange }: Props)
   }, [modsDir])
 
   const allMods: LocalMod[] = [...modpack.mods, ...extraMods].filter(m => !deletedIds.has(m.id))
+
+  // Сообщаем родителю скорректированную «добавку» к modpack.mods для счётчиков:
+  // плюс локальные, минус удалённые из самой сборки
+  useEffect(() => {
+    const deletedFromPack = modpack.mods.filter(m => deletedIds.has(m.id)).length
+    onExtraCountChange?.(extraMods.length - deletedFromPack)
+  }, [extraMods, deletedIds, modpack.mods])
 
   const filtered = allMods.filter(m =>
     m.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -104,11 +110,7 @@ export default function ModsTab({ modpack, modsDir, onExtraCountChange }: Props)
     if (mod.required) return
     await window.api.mods.delete(modsDir, mod.filename)
     setDeletedIds(prev => new Set(prev).add(mod.id))
-    setExtraMods(prev => {
-      const next = prev.filter(m => m.id !== mod.id)
-      onExtraCountChange?.(next.length)
-      return next
-    })
+    setExtraMods(prev => prev.filter(m => m.id !== mod.id))
   }
 
   const handleAddClose = () => {
