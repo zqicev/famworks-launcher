@@ -47,7 +47,14 @@ export default function ResourcepacksTab({ modpack, dir }: Props) {
     setExtra(ex)
   }, [dir, modpack.resourcepacks])
 
-  useEffect(() => { scan() }, [scan])
+  useEffect(() => {
+    scan()
+    const off = window.api.install.onProgress((raw: unknown) => {
+      const d = raw as { phase: string }
+      if (d.phase === 'done') setTimeout(scan, 300)
+    })
+    return off
+  }, [scan])
 
   const packMods = (modpack.resourcepacks ?? []).filter(p => present.has(p.filename))
   const all = [...packMods, ...extra]
