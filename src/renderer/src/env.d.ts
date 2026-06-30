@@ -69,5 +69,6 @@ interface Window {
       minimize: () => void
       close: () => void
     }
+    taskbarProgress: (value: number, mode: 'none' | 'normal' | 'indeterminate') => void
   }
 }

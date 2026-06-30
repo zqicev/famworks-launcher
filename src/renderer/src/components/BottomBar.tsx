@@ -222,6 +222,15 @@ export default function BottomBar({ modpack, installPath, activeMods = 0, totalM
       : 0
   const indeterminate = isBusy && !hasCount && !hasBytes
 
+  // Прогресс на иконке в панели задач
+  useEffect(() => {
+    if (!isBusy) window.api.taskbarProgress(-1, 'none')
+    else if (indeterminate) window.api.taskbarProgress(0, 'indeterminate')
+    else window.api.taskbarProgress(Math.min(barPct, 100) / 100, 'normal')
+  }, [isBusy, indeterminate, barPct])
+
+  useEffect(() => () => { window.api.taskbarProgress(-1, 'none') }, [])
+
   return (
     <div className={styles.bar}>
       <div className={styles.progressTrack}>

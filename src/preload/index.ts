@@ -80,5 +80,7 @@ contextBridge.exposeInMainWorld('api', {
   window: {
     minimize: () => ipcRenderer.send('window:minimize'),
     close: () => ipcRenderer.send('window:close')
-  }
+  },
+  taskbarProgress: (value: number, mode: 'none' | 'normal' | 'indeterminate') =>
+    ipcRenderer.send('taskbar:progress', value, mode)
 })

@@ -148,6 +148,11 @@ export function setupIpcHandlers() {
 
   ipcMain.handle('app:version', () => app.getVersion())
 
+  // Прогресс на иконке в панели задач. mode: none|normal|indeterminate
+  ipcMain.on('taskbar:progress', (_, value: number, mode: 'none' | 'normal' | 'indeterminate') => {
+    getWindow()?.setProgressBar(value, { mode })
+  })
+
   // Последняя стабильная версия Fabric-загрузчика для версии MC (для создания кастомной сборки)
   ipcMain.handle('fabric:loader', async (_, mc: string) => {
     try {
