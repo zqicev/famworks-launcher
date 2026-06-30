@@ -17,6 +17,7 @@ export default function Editor({ packKey, loaded, onSaved, onDeleted }: Props) {
   const [status, setStatus] = useState<Status>({ kind: 'idle' })
   const [addOpen, setAddOpen] = useState(false)
   const [rpAddOpen, setRpAddOpen] = useState(false)
+  const [shAddOpen, setShAddOpen] = useState(false)
 
   const set = <K extends keyof Modpack>(key: K, value: Modpack[K]) =>
     setDraft(d => ({ ...d, [key]: value }))
@@ -101,6 +102,33 @@ export default function Editor({ packKey, loaded, onSaved, onDeleted }: Props) {
         download_url: res.download_url, sha512: res.sha512, version: '', category: 'Кастом', size_mb: res.size_mb, required: false
       })
       setStatus({ kind: 'ok', msg: 'Ресурспак загружен' })
+      setTimeout(() => setStatus({ kind: 'idle' }), 2500)
+    } catch (e) {
+      setStatus({ kind: 'error', msg: e instanceof Error ? e.message : String(e) })
+    }
+  }
+
+  // Шейдеры
+  const shaders = draft.shaders ?? []
+  const addShader = (m: Mod) => setDraft(d => {
+    const sh = d.shaders ?? []
+    if (sh.some(x => x.id === m.id || x.filename === m.filename)) return d
+    return { ...d, shaders: [...sh, m] }
+  })
+  const updateShader = (id: string, patch: Partial<Mod>) =>
+    set('shaders', shaders.map(x => x.id === id ? { ...x, ...patch } : x))
+  const removeShader = (id: string) => set('shaders', shaders.filter(x => x.id !== id))
+  const uploadShaderZip = async () => {
+    setStatus({ kind: 'uploading', msg: 'Загрузка шейдера…' })
+    try {
+      const res = await window.api.rp.pickAndUpload()
+      if (!res) { setStatus({ kind: 'idle' }); return }
+      addShader({
+        id: res.filename.replace(/\.zip$/i, '').toLowerCase().replace(/[^a-z0-9-]+/g, '-'),
+        name: res.filename.replace(/\.zip$/i, ''), filename: res.filename,
+        download_url: res.download_url, sha512: res.sha512, version: '', category: 'Кастом', size_mb: res.size_mb, required: false
+      })
+      setStatus({ kind: 'ok', msg: 'Шейдер загружен' })
       setTimeout(() => setStatus({ kind: 'idle' }), 2500)
     } catch (e) {
       setStatus({ kind: 'error', msg: e instanceof Error ? e.message : String(e) })
@@ -237,6 +265,36 @@ export default function Editor({ packKey, loaded, onSaved, onDeleted }: Props) {
           </div>
         </section>
 
+        {/* Шейдеры */}
+        <section className={styles.section}>
+          <div className={styles.sectionHead}>
+            <div className={styles.sectionTitle}>ШЕЙДЕРЫ · {shaders.length}</div>
+            <div className={styles.modActions}>
+              <button className={styles.addBtn} onClick={() => setShAddOpen(true)}>+ Из Modrinth</button>
+              <button className={styles.jarBtn} onClick={uploadShaderZip} disabled={busy}>↑ Загрузить .zip</button>
+            </div>
+          </div>
+          <div className={styles.modList}>
+            {shaders.length === 0 && <div className={styles.modsEmpty}>Шейдеров нет</div>}
+            {shaders.map(p => (
+              <div key={p.id} className={styles.modRow}>
+                <div className={styles.modAvatar}>{p.name[0]?.toUpperCase() ?? '?'}</div>
+                <div className={styles.modMain}>
+                  <div className={styles.modName}>
+                    {p.name}
+                    {p.modrinth_id ? <span className={styles.srcMod}>Modrinth</span> : <span className={styles.srcJar}>zip</span>}
+                  </div>
+                  <div className={styles.modMeta}>{p.filename} · {p.size_mb} МБ{p.version ? ` · ${p.version}` : ''}</div>
+                </div>
+                <button className={`${styles.reqBtn} ${p.required ? styles.reqOn : ''}`} onClick={() => updateShader(p.id, { required: !p.required })} title={p.required ? 'Обязательный' : 'Опциональный'}>
+                  {p.required ? 'REQ' : 'OPT'}
+                </button>
+                <button className={styles.delMod} onClick={() => removeShader(p.id)} title="Убрать">✕</button>
+              </div>
+            ))}
+          </div>
+        </section>
+
         {/* Серверы */}
         <section className={styles.section}>
           <div className={styles.sectionHead}>
@@ -332,6 +390,16 @@ export default function Editor({ packKey, loaded, onSaved, onDeleted }: Props) {
           existing={resourcepacks.map(m => m.id)}
           onAdd={addRp}
           onClose={() => setRpAddOpen(false)}
+        />
+      )}
+      {shAddOpen && (
+        <AddModrinthModal
+          kind="shader"
+          mcVersion={draft.mc_version}
+          loader={draft.loader}
+          existing={shaders.map(m => m.id)}
+          onAdd={addShader}
+          onClose={() => setShAddOpen(false)}
         />
       )}
     </div>

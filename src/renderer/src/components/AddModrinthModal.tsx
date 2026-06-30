@@ -16,7 +16,7 @@ interface Props {
   mcVersion: string
   loader: string
   existing: string[]
-  kind?: 'mod' | 'resourcepack'
+  kind?: 'mod' | 'resourcepack' | 'shader'
   onAdd: (mod: Mod) => void
   onClose: () => void
 }
