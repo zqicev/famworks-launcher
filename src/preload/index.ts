@@ -42,6 +42,12 @@ contextBridge.exposeInMainWorld('api', {
   cancel: () => ipcRenderer.invoke('cancel'),
   gameRunning: () => ipcRenderer.invoke('game:running'),
   appVersion: () => ipcRenderer.invoke('app:version'),
+  rp: {
+    installed: (gameRoot: string) => ipcRenderer.invoke('rp:installed', gameRoot),
+    enabled: (gameRoot: string) => ipcRenderer.invoke('rp:enabled', gameRoot),
+    toggle: (gameRoot: string, filename: string, enabled: boolean) => ipcRenderer.invoke('rp:toggle', gameRoot, filename, enabled),
+    delete: (gameRoot: string, filename: string) => ipcRenderer.invoke('rp:delete', gameRoot, filename)
+  },
   auth: {
     microsoftLogin: () => ipcRenderer.invoke('auth:microsoft-login')
   },

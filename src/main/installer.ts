@@ -90,10 +90,32 @@ export async function checkAndInstallModpack(
     done++
   }
 
+  // Ресурспаки
+  await installResourcepacks(modpack, gameRoot, win)
+
   // Конфиги
   await installConfigs(modpack, gameRoot, win)
 
   emit(win, { phase: 'done', message: '' })
+}
+
+async function installResourcepacks(modpack: Modpack, gameRoot: string, win: BrowserWindow): Promise<void> {
+  const packs = modpack.resourcepacks ?? []
+  if (!packs.length) return
+  const dir = join(gameRoot, 'resourcepacks')
+  mkdirSync(dir, { recursive: true })
+
+  const missing = packs.filter(p => !existsSync(join(dir, p.filename)))
+  let done = 0
+  for (const p of missing) {
+    if (isCancelled()) throw new DOMException('Aborted', 'AbortError')
+    const resolved = await resolveModUrl(p, modpack.mc_version, modpack.loader)
+    if (!resolved) { done++; continue }
+    await downloadWithProgress(resolved.url, join(dir, p.filename), (bytes, total, speed) => {
+      emit(win, { phase: 'download', message: `Ресурспак ${p.name}`, current: done, total: missing.length, bytesDownloaded: bytes, bytesTotal: total, speedBps: speed })
+    }, resolved.sha512)
+    done++
+  }
 }
 
 /** Безопасно строит путь назначения внутри gameRoot (защита от ../). */
@@ -163,6 +185,12 @@ export async function getModpackStatus(
   for (const cfg of modpack.configs ?? []) {
     const dest = safeJoin(gameRoot, cfg.path)
     if (dest && !existsSync(dest)) return 'outdated'
+  }
+
+  // Если какой-то ресурспак ещё не скачан — нужно обновление
+  const rpDir = join(gameRoot, 'resourcepacks')
+  for (const p of modpack.resourcepacks ?? []) {
+    if (!existsSync(join(rpDir, p.filename))) return 'outdated'
   }
 
   return 'ready'

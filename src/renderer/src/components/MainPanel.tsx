@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Modpack } from '../../../types/modpack'
 import ModsTab from './ModsTab'
+import ResourcepacksTab from './ResourcepacksTab'
 import OverviewTab from './OverviewTab'
 import BottomBar from './BottomBar'
 import styles from '../styles/MainPanel.module.css'
@@ -18,7 +19,7 @@ function formatSize(mb: number) {
 }
 
 export default function MainPanel({ modpack, installPath, loading, error }: Props) {
-  const [tab, setTab] = useState<'mods' | 'overview'>('mods')
+  const [tab, setTab] = useState<'mods' | 'resourcepacks' | 'overview'>('mods')
   const [extraCount, setExtraCount] = useState(0)
 
   if (loading) {
@@ -46,7 +47,9 @@ export default function MainPanel({ modpack, installPath, loading, error }: Prop
   }
 
   const modsDir = `${installPath}/${modpack.id}/mods`
+  const gameRoot = `${installPath}/${modpack.id}`
   const totalMods = modpack.mods.length + extraCount
+  const rpCount = modpack.resourcepacks?.length ?? 0
   const totalSizeMb = modpack.mods.reduce((s, m) => s + m.size_mb, 0)
 
   return (
@@ -64,6 +67,12 @@ export default function MainPanel({ modpack, installPath, loading, error }: Prop
             onClick={() => setTab('mods')}
           >
             МОДЫ
+          </button>
+          <button
+            className={`${styles.tab} ${tab === 'resourcepacks' ? styles.tabActive : ''}`}
+            onClick={() => setTab('resourcepacks')}
+          >
+            РЕСУРСПАКИ
           </button>
           <button
             className={`${styles.tab} ${tab === 'overview' ? styles.tabActive : ''}`}
@@ -86,11 +95,9 @@ export default function MainPanel({ modpack, installPath, loading, error }: Prop
       </div>
 
       <div className={styles.content} key={`${modpack.id}-${tab}`}>
-        {tab === 'mods' ? (
-          <ModsTab modpack={modpack} modsDir={modsDir} onExtraCountChange={setExtraCount} />
-        ) : (
-          <OverviewTab modpack={modpack} />
-        )}
+        {tab === 'mods' && <ModsTab modpack={modpack} modsDir={modsDir} onExtraCountChange={setExtraCount} />}
+        {tab === 'resourcepacks' && <ResourcepacksTab modpack={modpack} gameRoot={gameRoot} />}
+        {tab === 'overview' && <OverviewTab modpack={modpack} />}
       </div>
 
       <BottomBar modpack={modpack} installPath={installPath} extraModsCount={extraCount} />
