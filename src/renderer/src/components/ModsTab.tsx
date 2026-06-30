@@ -8,13 +8,14 @@ interface Props {
   modpack: Modpack
   modsDir: string
   onExtraCountChange?: (count: number) => void
+  onCount?: (total: number) => void
 }
 
 interface LocalMod extends Mod {
   _local?: boolean
 }
 
-export default function ModsTab({ modpack, modsDir, onExtraCountChange }: Props) {
+export default function ModsTab({ modpack, modsDir, onExtraCountChange, onCount }: Props) {
   const [search, setSearch] = useState('')
   const [disabled, setDisabled] = useState<Set<string>>(new Set())
   const [addOpen, setAddOpen] = useState(false)
@@ -92,6 +93,7 @@ export default function ModsTab({ modpack, modsDir, onExtraCountChange }: Props)
   // Родитель считает modpack.mods.length + extraCount → отдаём (фактический total − modpack.mods.length)
   useEffect(() => {
     onExtraCountChange?.(allMods.length - modpack.mods.length)
+    onCount?.(allMods.length)
   }, [allMods.length, modpack.mods.length])
 
   const filtered = allMods.filter(m =>

@@ -15,6 +15,7 @@ interface StoreSchema {
   allocatedMemory: number
   runningPid: number | null
   runningModpackId: string | null
+  runningModpackName: string | null
 }
 
 export const store = new Store<StoreSchema>({
@@ -24,6 +25,7 @@ export const store = new Store<StoreSchema>({
     activeAccountId: null,
     allocatedMemory: 4096,
     runningPid: null,
-    runningModpackId: null
+    runningModpackId: null,
+    runningModpackName: null
   }
 })

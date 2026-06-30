@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Modpack } from '../../../types/modpack'
 import ModsTab from './ModsTab'
 import PackTab from './PackTab'
@@ -18,16 +18,44 @@ function formatSize(mb: number) {
   return `${mb.toFixed(0)} МБ`
 }
 
+async function countDir(dir: string, ext: string): Promise<number> {
+  const files = await window.api.mods.installed(dir).catch(() => [] as string[])
+  const set = new Set(
+    files.map(f => f.replace(/\.disabled$/, '')).filter(f => f.toLowerCase().endsWith('.' + ext))
+  )
+  return set.size
+}
+
 export default function MainPanel({ modpack, installPath, loading, error }: Props) {
   const [tab, setTab] = useState<'mods' | 'resourcepacks' | 'shaders' | 'overview'>('mods')
   const [extraCount, setExtraCount] = useState(0)
-  const [rpCount, setRpCount] = useState(0)
-  const [shCount, setShCount] = useState(0)
+  const [counts, setCounts] = useState({ mods: 0, rp: 0, sh: 0 })
+
+  const mpId = modpack?.id
+  const refreshCounts = useCallback(async () => {
+    if (!mpId) return
+    const root = `${installPath}/${mpId}`
+    const [mods, rp, sh] = await Promise.all([
+      countDir(`${root}/mods`, 'jar'),
+      countDir(`${root}/resourcepacks`, 'zip'),
+      countDir(`${root}/shaderpacks`, 'zip')
+    ])
+    setCounts({ mods, rp, sh })
+  }, [mpId, installPath])
 
   useEffect(() => {
-    setRpCount(modpack?.resourcepacks?.length ?? 0)
-    setShCount(modpack?.shaders?.length ?? 0)
-  }, [modpack?.id])
+    // мгновенно показываем количество из сборки, затем уточняем по диску
+    setCounts({
+      mods: modpack?.mods?.length ?? 0,
+      rp: modpack?.resourcepacks?.length ?? 0,
+      sh: modpack?.shaders?.length ?? 0
+    })
+    refreshCounts()
+    const off = window.api.install.onProgress((raw: unknown) => {
+      if ((raw as { phase: string }).phase === 'done') setTimeout(refreshCounts, 300)
+    })
+    return off
+  }, [mpId, refreshCounts])
 
   if (loading) {
     return (
@@ -56,7 +84,6 @@ export default function MainPanel({ modpack, installPath, loading, error }: Prop
   const modsDir = `${installPath}/${modpack.id}/mods`
   const rpDir = `${installPath}/${modpack.id}/resourcepacks`
   const shDir = `${installPath}/${modpack.id}/shaderpacks`
-  const totalMods = modpack.mods.length + extraCount
   const totalSizeMb = modpack.mods.reduce((s, m) => s + m.size_mb, 0)
 
   return (
@@ -70,13 +97,13 @@ export default function MainPanel({ modpack, installPath, loading, error }: Prop
 
         <div className={styles.tabs}>
           <button className={`${styles.tab} ${tab === 'mods' ? styles.tabActive : ''}`} onClick={() => setTab('mods')}>
-            МОДЫ <span className={styles.tabCount}>{totalMods}</span>
+            МОДЫ <span className={styles.tabCount}>{counts.mods}</span>
           </button>
           <button className={`${styles.tab} ${tab === 'resourcepacks' ? styles.tabActive : ''}`} onClick={() => setTab('resourcepacks')}>
-            РЕСУРСПАКИ <span className={styles.tabCount}>{rpCount}</span>
+            РЕСУРСПАКИ <span className={styles.tabCount}>{counts.rp}</span>
           </button>
           <button className={`${styles.tab} ${tab === 'shaders' ? styles.tabActive : ''}`} onClick={() => setTab('shaders')}>
-            ШЕЙДЕРЫ <span className={styles.tabCount}>{shCount}</span>
+            ШЕЙДЕРЫ <span className={styles.tabCount}>{counts.sh}</span>
           </button>
           <button className={`${styles.tab} ${tab === 'overview' ? styles.tabActive : ''}`} onClick={() => setTab('overview')}>
             ОБЗОР
@@ -92,9 +119,9 @@ export default function MainPanel({ modpack, installPath, loading, error }: Prop
       </div>
 
       <div className={styles.content} key={`${modpack.id}-${tab}`}>
-        {tab === 'mods' && <ModsTab modpack={modpack} modsDir={modsDir} onExtraCountChange={setExtraCount} />}
-        {tab === 'resourcepacks' && <PackTab modpack={modpack} dir={rpDir} items={modpack.resourcepacks ?? []} kind="resourcepack" noun="ресурспаков" onCount={setRpCount} />}
-        {tab === 'shaders' && <PackTab modpack={modpack} dir={shDir} items={modpack.shaders ?? []} kind="shader" noun="шейдеров" onCount={setShCount} />}
+        {tab === 'mods' && <ModsTab modpack={modpack} modsDir={modsDir} onExtraCountChange={setExtraCount} onCount={n => setCounts(c => ({ ...c, mods: n }))} />}
+        {tab === 'resourcepacks' && <PackTab modpack={modpack} dir={rpDir} items={modpack.resourcepacks ?? []} kind="resourcepack" noun="ресурспаков" onCount={n => setCounts(c => ({ ...c, rp: n }))} />}
+        {tab === 'shaders' && <PackTab modpack={modpack} dir={shDir} items={modpack.shaders ?? []} kind="shader" noun="шейдеров" onCount={n => setCounts(c => ({ ...c, sh: n }))} />}
         {tab === 'overview' && <OverviewTab modpack={modpack} />}
       </div>
 

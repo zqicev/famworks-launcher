@@ -149,6 +149,7 @@ export async function launchGame(
     client.on('close', (code) => {
       store.set('runningPid', null)
       store.set('runningModpackId', null)
+      store.set('runningModpackName', null)
       win.webContents.send('launch:close', code)
       win.webContents.send('install:progress', { phase: 'done', message: '' })
       setIdle()
@@ -158,6 +159,7 @@ export async function launchGame(
       const pid = (proc as { pid?: number } | undefined)?.pid ?? null
       store.set('runningPid', pid)
       store.set('runningModpackId', modpack.id)
+      store.set('runningModpackName', modpack.name)
       emit(win, { phase: 'done', message: '' })
       setPlaying(modpack.name)
       resolve()
