@@ -9,12 +9,13 @@ import { opSignal, isCancelled } from './abort'
 interface ResolvedMod {
   url: string
   sha512?: string
+  sha1?: string
 }
 
-/** Считает sha512 файла (hex) потоково, без загрузки целиком в память. */
-function sha512File(path: string): Promise<string> {
+/** Считает хэш файла (hex) потоково, без загрузки целиком в память. */
+function hashFile(path: string, algo: 'sha512' | 'sha1'): Promise<string> {
   return new Promise((resolve, reject) => {
-    const hash = createHash('sha512')
+    const hash = createHash(algo)
     const stream = createReadStream(path)
     stream.on('data', (chunk) => hash.update(chunk))
     stream.on('end', () => resolve(hash.digest('hex')))
@@ -86,7 +87,7 @@ export async function checkAndInstallModpack(
         bytesTotal: total,
         speedBps: speed
       })
-    }, resolved.sha512)
+    }, resolved.sha512, resolved.sha1)
     done++
   }
 
@@ -111,7 +112,7 @@ async function installPacks(packs: Mod[], dir: string, label: string, modpack: M
     if (!resolved) { done++; continue }
     await downloadWithProgress(resolved.url, join(dir, p.filename), (bytes, total, speed) => {
       emit(win, { phase: 'download', message: `${label} ${p.name}`, current: done, total: missing.length, bytesDownloaded: bytes, bytesTotal: total, speedBps: speed })
-    }, resolved.sha512)
+    }, resolved.sha512, resolved.sha1)
     done++
   }
 }
@@ -197,8 +198,8 @@ export async function getModpackStatus(
 }
 
 async function resolveModUrl(mod: Mod, mcVersion: string, loader: string): Promise<ResolvedMod | null> {
-  // Кастомный jar по прямой ссылке — хэш берём из JSON (если указан)
-  if (mod.download_url) return { url: mod.download_url, sha512: mod.sha512 }
+  // Прямая ссылка (кастом / CurseForge) — хэш берём из JSON (если указан)
+  if (mod.download_url) return { url: mod.download_url, sha512: mod.sha512, sha1: mod.sha1 }
 
   if (mod.modrinth_id) {
     try {
@@ -231,7 +232,8 @@ async function downloadWithProgress(
   url: string,
   dest: string,
   onProgress: (bytes: number, total: number, speed: number) => void,
-  expectedSha512?: string
+  expectedSha512?: string,
+  expectedSha1?: string
 ) {
   const tmp = dest + '.tmp'
   const res = await axios.get(url, { responseType: 'stream', signal: opSignal() })
@@ -261,10 +263,12 @@ async function downloadWithProgress(
     res.data.on('error', (e: Error) => { try { unlinkSync(tmp) } catch {} reject(e) })
   })
 
-  // Проверка целостности по sha512 (hex, регистр не важен)
-  if (expectedSha512) {
-    const actual = await sha512File(tmp)
-    if (actual.toLowerCase() !== expectedSha512.toLowerCase()) {
+  // Проверка целостности: sha512 (Modrinth/кастом) либо sha1 (CurseForge)
+  const check = expectedSha512 ? { algo: 'sha512' as const, val: expectedSha512 }
+    : expectedSha1 ? { algo: 'sha1' as const, val: expectedSha1 } : null
+  if (check) {
+    const actual = await hashFile(tmp, check.algo)
+    if (actual.toLowerCase() !== check.val.toLowerCase()) {
       try { unlinkSync(tmp) } catch {}
       throw new Error(`Контрольная сумма не совпала: ${dest.split(/[\\/]/).pop()}`)
     }

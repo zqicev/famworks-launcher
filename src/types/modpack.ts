@@ -18,14 +18,17 @@ export interface Mod {
   modrinth_id?: string
   /** Если задано — берётся именно эта версия Modrinth (а не последняя). Иначе — последняя совместимая. */
   modrinth_version_number?: string
+  curseforge_id?: number
   filename: string
   version: string
   category: string
   size_mb: number
   required: boolean
   download_url?: string
-  /** sha512 в hex (как у Modrinth и `Get-FileHash -Algorithm SHA512`). Для кастомных jar. */
+  /** sha512 в hex (Modrinth / Get-FileHash). */
   sha512?: string
+  /** sha1 в hex (CurseForge). Проверяется если нет sha512. */
+  sha1?: string
 }
 
 export interface ChangelogEntry {
