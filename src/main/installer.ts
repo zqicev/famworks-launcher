@@ -236,7 +236,8 @@ async function downloadWithProgress(
   expectedSha1?: string
 ) {
   const tmp = dest + '.tmp'
-  const res = await axios.get(url, { responseType: 'stream', signal: opSignal() })
+  const signal = opSignal()
+  const res = await axios.get(url, { responseType: 'stream', signal })
   const total = parseInt(String(res.headers['content-length'] ?? '0'), 10)
 
   await new Promise<void>((resolve, reject) => {
@@ -244,6 +245,22 @@ async function downloadWithProgress(
     let downloaded = 0
     let lastTime = Date.now()
     let lastBytes = 0
+    let settled = false
+
+    const fail = (e: unknown) => {
+      if (settled) return
+      settled = true
+      try { res.data.destroy() } catch {}
+      try { stream.destroy() } catch {}
+      try { unlinkSync(tmp) } catch {}
+      reject(e)
+    }
+    // Явная реакция на отмену — иначе поток может «повиснуть» без error/finish
+    const onAbort = () => fail(new DOMException('Aborted', 'AbortError'))
+    if (signal) {
+      if (signal.aborted) return onAbort()
+      signal.addEventListener('abort', onAbort, { once: true })
+    }
 
     res.data.on('data', (chunk: Buffer) => {
       downloaded += chunk.length
@@ -258,9 +275,15 @@ async function downloadWithProgress(
     })
 
     res.data.pipe(stream)
-    stream.on('finish', resolve)
-    stream.on('error', (e) => { try { unlinkSync(tmp) } catch {} reject(e) })
-    res.data.on('error', (e: Error) => { try { unlinkSync(tmp) } catch {} reject(e) })
+    stream.on('finish', () => {
+      if (settled) return
+      settled = true
+      signal?.removeEventListener('abort', onAbort)
+      resolve()
+    })
+    stream.on('error', fail)
+    res.data.on('error', fail)
+    res.data.on('aborted', () => fail(new DOMException('Aborted', 'AbortError')))
   })
 
   // Проверка целостности: sha512 (Modrinth/кастом) либо sha1 (CurseForge)

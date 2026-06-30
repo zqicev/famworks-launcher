@@ -136,7 +136,8 @@ async function downloadFile(
   onProgress: (bytes: number, total: number, speed: number) => void
 ) {
   const tmp = dest + '.tmp'
-  const res = await axios.get(url, { responseType: 'stream', maxRedirects: 5, signal: opSignal() })
+  const signal = opSignal()
+  const res = await axios.get(url, { responseType: 'stream', maxRedirects: 5, signal })
   const total = parseInt(String(res.headers['content-length'] ?? '0'), 10)
 
   await new Promise<void>((resolve, reject) => {
@@ -144,6 +145,21 @@ async function downloadFile(
     let downloaded = 0
     let lastTime = Date.now()
     let lastBytes = 0
+    let settled = false
+
+    const fail = (e: unknown) => {
+      if (settled) return
+      settled = true
+      try { res.data.destroy() } catch {}
+      try { stream.destroy() } catch {}
+      try { rmSync(tmp, { force: true }) } catch {}
+      reject(e)
+    }
+    const onAbort = () => fail(new DOMException('Aborted', 'AbortError'))
+    if (signal) {
+      if (signal.aborted) return onAbort()
+      signal.addEventListener('abort', onAbort, { once: true })
+    }
 
     res.data.on('data', (chunk: Buffer) => {
       downloaded += chunk.length
@@ -158,9 +174,10 @@ async function downloadFile(
     })
 
     res.data.pipe(stream)
-    stream.on('finish', resolve)
-    stream.on('error', (e) => { try { rmSync(tmp, { force: true }) } catch {} reject(e) })
-    res.data.on('error', (e: Error) => { try { rmSync(tmp, { force: true }) } catch {} reject(e) })
+    stream.on('finish', () => { if (settled) return; settled = true; signal?.removeEventListener('abort', onAbort); resolve() })
+    stream.on('error', fail)
+    res.data.on('error', fail)
+    res.data.on('aborted', () => fail(new DOMException('Aborted', 'AbortError')))
   })
 
   renameSync(tmp, dest)
