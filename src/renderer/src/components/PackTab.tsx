@@ -6,10 +6,13 @@ import styles from '../styles/ModsTab.module.css'
 
 interface Props {
   modpack: Modpack
-  dir: string  // папка resourcepacks
+  dir: string                       // папка resourcepacks/ или shaderpacks/
+  items: Mod[]                      // modpack.resourcepacks / modpack.shaders
+  kind: 'resourcepack' | 'shader'
+  noun: string                      // "ресурспаков" / "шейдеров"
 }
 
-export default function ResourcepacksTab({ modpack, dir }: Props) {
+export default function PackTab({ modpack, dir, items, kind, noun }: Props) {
   const [search, setSearch] = useState('')
   const [present, setPresent] = useState<Set<string>>(new Set())
   const [sizes, setSizes] = useState<Record<string, number>>({})
@@ -23,7 +26,7 @@ export default function ResourcepacksTab({ modpack, dir }: Props) {
     const files = await window.api.mods.installed(dir).catch(() => [] as string[])
     setPresent(new Set(files.map(f => f.replace(/\.disabled$/, ''))))
     const dis = new Set<string>()
-    const known = new Set((modpack.resourcepacks ?? []).map(p => p.filename))
+    const known = new Set(items.map(p => p.filename))
     const seen = new Set<string>()
     const ex: Mod[] = []
     for (const f of files) {
@@ -35,7 +38,6 @@ export default function ResourcepacksTab({ modpack, dir }: Props) {
       seen.add(base)
       ex.push({ id: base, name: base.replace(/\.zip$/i, ''), filename: base, version: '', category: 'Локальный', size_mb: 0, required: false })
     }
-    // Реальный размер каждого пака с диска
     const sz: Record<string, number> = {}
     for (const base of new Set(files.map(f => f.replace(/\.disabled$/, '')))) {
       if (!base.toLowerCase().endsWith('.zip')) continue
@@ -45,7 +47,7 @@ export default function ResourcepacksTab({ modpack, dir }: Props) {
     setSizes(sz)
     setDisabled(dis)
     setExtra(ex)
-  }, [dir, modpack.resourcepacks])
+  }, [dir, items])
 
   useEffect(() => {
     scan()
@@ -56,8 +58,8 @@ export default function ResourcepacksTab({ modpack, dir }: Props) {
     return off
   }, [scan])
 
-  const packMods = (modpack.resourcepacks ?? []).filter(p => present.has(p.filename))
-  const all = [...packMods, ...extra]
+  const packItems = items.filter(p => present.has(p.filename))
+  const all = [...packItems, ...extra]
     .filter(p => !deleted.has(p.id))
     .map(p => ({ ...p, size_mb: sizes[p.filename] ?? p.size_mb }))
   const filtered = all.filter(m => m.name.toLowerCase().includes(search.toLowerCase()))
@@ -90,9 +92,9 @@ export default function ResourcepacksTab({ modpack, dir }: Props) {
       <div className={styles.toolbar}>
         <div className={styles.searchWrap}>
           <span className={styles.searchIcon}>⌕</span>
-          <input className={styles.search} placeholder="Поиск ресурспаков" value={search} onChange={e => setSearch(e.target.value)} />
+          <input className={styles.search} placeholder={`Поиск ${noun}`} value={search} onChange={e => setSearch(e.target.value)} />
         </div>
-        <span className={styles.activeCount}>{all.length} паков</span>
+        <span className={styles.activeCount}>{all.length}</span>
         <button className={styles.addBtn} onClick={() => setAddOpen(true)}>+ ДОБАВИТЬ</button>
         <button className={styles.folderBtn} onClick={() => window.api.shell.openFolder(dir)} title="Открыть папку">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -101,19 +103,14 @@ export default function ResourcepacksTab({ modpack, dir }: Props) {
         </button>
       </div>
       <div className={styles.list}>
-        {all.length === 0 && <div style={{ padding: 18, textAlign: 'center', color: 'var(--text-dim)', fontSize: 13 }}>Ресурспаков нет</div>}
+        {all.length === 0 && <div style={{ padding: 18, textAlign: 'center', color: 'var(--text-dim)', fontSize: 13 }}>Пусто</div>}
         {filtered.map(p => (
           <ModRow key={p.id} mod={p} enabled={!disabled.has(p.filename)} onToggle={v => handleToggle(p, v)} onDelete={() => handleDelete(p)} />
         ))}
       </div>
 
       {addOpen && (
-        <AddModModal
-          modpack={modpack}
-          modsDir={dir}
-          kind="resourcepack"
-          onClose={() => { setAddOpen(false); setTimeout(scan, 600) }}
-        />
+        <AddModModal modpack={modpack} modsDir={dir} kind={kind} onClose={() => { setAddOpen(false); setTimeout(scan, 600) }} />
       )}
     </div>
   )

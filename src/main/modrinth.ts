@@ -44,7 +44,7 @@ export interface ModrinthVersion {
 }
 
 export async function getModVersions(projectId: string, mcVersion: string, loader: string, type = 'mod'): Promise<ModrinthVersion[]> {
-  const loaders = type === 'mod' ? [loader] : ['minecraft']
+  const loaders = type === 'mod' ? [loader] : type === 'shader' ? ['iris'] : ['minecraft']
   const res = await axios.get(`${BASE}/project/${projectId}/version`, {
     headers: HEADERS,
     params: { game_versions: JSON.stringify([mcVersion]), loaders: JSON.stringify(loaders) }

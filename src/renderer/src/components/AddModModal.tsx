@@ -5,7 +5,7 @@ import styles from '../styles/AddModModal.module.css'
 interface Props {
   modpack: Modpack
   modsDir: string
-  kind?: 'mod' | 'resourcepack'
+  kind?: 'mod' | 'resourcepack' | 'shader'
   onClose: () => void
 }
 
@@ -92,7 +92,7 @@ export default function AddModModal({ modpack, modsDir, kind = 'mod', onClose }:
   }
 
   const addFromFile = async () => {
-    const ext = kind === 'resourcepack' ? 'zip' : 'jar'
+    const ext = kind === 'mod' ? 'jar' : 'zip'
     const path = await window.api.mods.addFile([ext])
     if (!path) return
     await window.api.mods.copyJar(path, modsDir)
@@ -103,7 +103,7 @@ export default function AddModModal({ modpack, modsDir, kind = 'mod', onClose }:
     <div className={styles.overlay} onClick={onClose}>
       <div className={styles.modal} onClick={e => e.stopPropagation()}>
         <div className={styles.header}>
-          <h2 className={styles.title}>{kind === 'resourcepack' ? 'Добавить ресурспак' : 'Добавить мод'}</h2>
+          <h2 className={styles.title}>{kind === 'resourcepack' ? 'Добавить ресурспак' : kind === 'shader' ? 'Добавить шейдер' : 'Добавить мод'}</h2>
           <button className={styles.close} onClick={onClose}>✕</button>
         </div>
 
@@ -118,7 +118,7 @@ export default function AddModModal({ modpack, modsDir, kind = 'mod', onClose }:
           />
           <button className={styles.searchBtn} onClick={search}>Найти</button>
           <button className={styles.fileBtn} onClick={addFromFile}>
-            {kind === 'resourcepack' ? '.zip файл' : '.jar файл'}
+            {kind === 'mod' ? '.jar файл' : '.zip файл'}
           </button>
         </div>
 

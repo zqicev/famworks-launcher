@@ -90,8 +90,9 @@ export async function checkAndInstallModpack(
     done++
   }
 
-  // Ресурспаки
-  await installResourcepacks(modpack, gameRoot, win)
+  // Ресурспаки и шейдеры (та же механика — папка + .disabled)
+  await installPacks(modpack.resourcepacks ?? [], join(gameRoot, 'resourcepacks'), 'Ресурспак', modpack, win)
+  await installPacks(modpack.shaders ?? [], join(gameRoot, 'shaderpacks'), 'Шейдер', modpack, win)
 
   // Конфиги
   await installConfigs(modpack, gameRoot, win)
@@ -99,12 +100,9 @@ export async function checkAndInstallModpack(
   emit(win, { phase: 'done', message: '' })
 }
 
-async function installResourcepacks(modpack: Modpack, gameRoot: string, win: BrowserWindow): Promise<void> {
-  const packs = modpack.resourcepacks ?? []
+async function installPacks(packs: Mod[], dir: string, label: string, modpack: Modpack, win: BrowserWindow): Promise<void> {
   if (!packs.length) return
-  const dir = join(gameRoot, 'resourcepacks')
   mkdirSync(dir, { recursive: true })
-
   const missing = packs.filter(p => !existsSync(join(dir, p.filename)) && !existsSync(join(dir, p.filename + '.disabled')))
   let done = 0
   for (const p of missing) {
@@ -112,7 +110,7 @@ async function installResourcepacks(modpack: Modpack, gameRoot: string, win: Bro
     const resolved = await resolveModUrl(p, modpack.mc_version, modpack.loader)
     if (!resolved) { done++; continue }
     await downloadWithProgress(resolved.url, join(dir, p.filename), (bytes, total, speed) => {
-      emit(win, { phase: 'download', message: `Ресурспак ${p.name}`, current: done, total: missing.length, bytesDownloaded: bytes, bytesTotal: total, speedBps: speed })
+      emit(win, { phase: 'download', message: `${label} ${p.name}`, current: done, total: missing.length, bytesDownloaded: bytes, bytesTotal: total, speedBps: speed })
     }, resolved.sha512)
     done++
   }
@@ -187,12 +185,13 @@ export async function getModpackStatus(
     if (dest && !existsSync(dest)) return 'outdated'
   }
 
-  // Если обязательный ресурспак ещё не скачан — нужно обновление
-  const rpDir = join(gameRoot, 'resourcepacks')
-  for (const p of modpack.resourcepacks ?? []) {
-    if (!p.required) continue
-    if (!existsSync(join(rpDir, p.filename)) && !existsSync(join(rpDir, p.filename + '.disabled'))) return 'outdated'
+  // Если обязательный ресурспак/шейдер ещё не скачан — нужно обновление
+  const missingPack = (list: Mod[], folder: string) => {
+    const d = join(gameRoot, folder)
+    return (list ?? []).some(p => p.required && !existsSync(join(d, p.filename)) && !existsSync(join(d, p.filename + '.disabled')))
   }
+  if (missingPack(modpack.resourcepacks ?? [], 'resourcepacks')) return 'outdated'
+  if (missingPack(modpack.shaders ?? [], 'shaderpacks')) return 'outdated'
 
   return 'ready'
 }

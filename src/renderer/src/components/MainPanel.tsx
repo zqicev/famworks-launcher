@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { Modpack } from '../../../types/modpack'
 import ModsTab from './ModsTab'
-import ResourcepacksTab from './ResourcepacksTab'
+import PackTab from './PackTab'
 import OverviewTab from './OverviewTab'
 import BottomBar from './BottomBar'
 import styles from '../styles/MainPanel.module.css'
@@ -19,7 +19,7 @@ function formatSize(mb: number) {
 }
 
 export default function MainPanel({ modpack, installPath, loading, error }: Props) {
-  const [tab, setTab] = useState<'mods' | 'resourcepacks' | 'overview'>('mods')
+  const [tab, setTab] = useState<'mods' | 'resourcepacks' | 'shaders' | 'overview'>('mods')
   const [extraCount, setExtraCount] = useState(0)
 
   if (loading) {
@@ -48,6 +48,7 @@ export default function MainPanel({ modpack, installPath, loading, error }: Prop
 
   const modsDir = `${installPath}/${modpack.id}/mods`
   const rpDir = `${installPath}/${modpack.id}/resourcepacks`
+  const shDir = `${installPath}/${modpack.id}/shaderpacks`
   const totalMods = modpack.mods.length + extraCount
   const totalSizeMb = modpack.mods.reduce((s, m) => s + m.size_mb, 0)
 
@@ -74,6 +75,12 @@ export default function MainPanel({ modpack, installPath, loading, error }: Prop
             РЕСУРСПАКИ
           </button>
           <button
+            className={`${styles.tab} ${tab === 'shaders' ? styles.tabActive : ''}`}
+            onClick={() => setTab('shaders')}
+          >
+            ШЕЙДЕРЫ
+          </button>
+          <button
             className={`${styles.tab} ${tab === 'overview' ? styles.tabActive : ''}`}
             onClick={() => setTab('overview')}
           >
@@ -95,7 +102,8 @@ export default function MainPanel({ modpack, installPath, loading, error }: Prop
 
       <div className={styles.content} key={`${modpack.id}-${tab}`}>
         {tab === 'mods' && <ModsTab modpack={modpack} modsDir={modsDir} onExtraCountChange={setExtraCount} />}
-        {tab === 'resourcepacks' && <ResourcepacksTab modpack={modpack} dir={rpDir} />}
+        {tab === 'resourcepacks' && <PackTab modpack={modpack} dir={rpDir} items={modpack.resourcepacks ?? []} kind="resourcepack" noun="ресурспаков" />}
+        {tab === 'shaders' && <PackTab modpack={modpack} dir={shDir} items={modpack.shaders ?? []} kind="shader" noun="шейдеров" />}
         {tab === 'overview' && <OverviewTab modpack={modpack} />}
       </div>
 
