@@ -12,6 +12,7 @@ interface Props {
 export default function ResourcepacksTab({ modpack, dir }: Props) {
   const [search, setSearch] = useState('')
   const [present, setPresent] = useState<Set<string>>(new Set())
+  const [sizes, setSizes] = useState<Record<string, number>>({})
   const [disabled, setDisabled] = useState<Set<string>>(new Set())
   const [extra, setExtra] = useState<Mod[]>([])
   const [deleted, setDeleted] = useState<Set<string>>(new Set())
@@ -34,6 +35,14 @@ export default function ResourcepacksTab({ modpack, dir }: Props) {
       seen.add(base)
       ex.push({ id: base, name: base.replace(/\.zip$/i, ''), filename: base, version: '', category: 'Локальный', size_mb: 0, required: false })
     }
+    // Реальный размер каждого пака с диска
+    const sz: Record<string, number> = {}
+    for (const base of new Set(files.map(f => f.replace(/\.disabled$/, '')))) {
+      if (!base.toLowerCase().endsWith('.zip')) continue
+      const bytes = await window.api.mods.fileSize(dir, base).catch(() => 0) as number
+      sz[base] = Math.round(bytes / 1024 / 1024 * 10) / 10
+    }
+    setSizes(sz)
     setDisabled(dis)
     setExtra(ex)
   }, [dir, modpack.resourcepacks])
@@ -41,7 +50,9 @@ export default function ResourcepacksTab({ modpack, dir }: Props) {
   useEffect(() => { scan() }, [scan])
 
   const packMods = (modpack.resourcepacks ?? []).filter(p => present.has(p.filename))
-  const all = [...packMods, ...extra].filter(p => !deleted.has(p.id))
+  const all = [...packMods, ...extra]
+    .filter(p => !deleted.has(p.id))
+    .map(p => ({ ...p, size_mb: sizes[p.filename] ?? p.size_mb }))
   const filtered = all.filter(m => m.name.toLowerCase().includes(search.toLowerCase()))
 
   const handleToggle = async (p: Mod, on: boolean) => {
