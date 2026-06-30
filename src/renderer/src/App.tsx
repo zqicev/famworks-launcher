@@ -7,6 +7,7 @@ import SetupModal from './components/SetupModal'
 import SettingsModal from './components/SettingsModal'
 import UpdateBanner from './components/UpdateBanner'
 import CreateModpackModal from './components/CreateModpackModal'
+import ConfirmModal from './components/ConfirmModal'
 import styles from './styles/App.module.css'
 
 export default function App() {
@@ -21,6 +22,7 @@ export default function App() {
   const [seenUpdates, setSeenUpdates] = useState<Record<string, string>>({})
   const [customPacks, setCustomPacks] = useState<Modpack[]>([])
   const [createOpen, setCreateOpen] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<Modpack | null>(null)
 
   const loadCustom = useCallback(async () => {
     setCustomPacks(await window.api.custom.list().catch(() => []))
@@ -102,11 +104,17 @@ export default function App() {
     setSelectedId(mp.id)
   }
 
-  const handleDeleteCustom = async (id: string) => {
-    if (!confirm('Удалить эту сборку? Файлы игры на диске останутся.')) return
-    await window.api.custom.delete(id)
+  const handleDeleteCustom = (id: string) => {
+    setDeleteTarget(customPacks.find(p => p.id === id) ?? null)
+  }
+
+  const confirmDeleteCustom = async () => {
+    if (!deleteTarget) return
+    const id = deleteTarget.id
+    await window.api.custom.delete(id, true)
     await loadCustom()
     if (selectedId === id) setSelectedId(modpackIndex?.modpacks[0]?.id ?? null)
+    setDeleteTarget(null)
   }
 
   return (
@@ -143,6 +151,15 @@ export default function App() {
           )}
           {createOpen && (
             <CreateModpackModal onCreate={handleCreated} onClose={() => setCreateOpen(false)} />
+          )}
+          {deleteTarget && (
+            <ConfirmModal
+              title="Удалить сборку?"
+              message={`«${deleteTarget.name}» и все её файлы (моды, ресурспаки, шейдеры, миры, настройки, Minecraft) будут удалены с диска без возможности восстановления.`}
+              danger
+              onConfirm={confirmDeleteCustom}
+              onClose={() => setDeleteTarget(null)}
+            />
           )}
         </div>
       )}

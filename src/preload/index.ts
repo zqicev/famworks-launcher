@@ -46,7 +46,7 @@ contextBridge.exposeInMainWorld('api', {
   custom: {
     list: () => ipcRenderer.invoke('custom:list'),
     save: (mp: unknown) => ipcRenderer.invoke('custom:save', mp),
-    delete: (id: string) => ipcRenderer.invoke('custom:delete', id)
+    delete: (id: string, deleteFiles: boolean) => ipcRenderer.invoke('custom:delete', id, deleteFiles)
   },
   auth: {
     microsoftLogin: () => ipcRenderer.invoke('auth:microsoft-login')

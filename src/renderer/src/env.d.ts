@@ -35,7 +35,7 @@ interface Window {
     custom: {
       list: () => Promise<import('../../types/modpack').Modpack[]>
       save: (mp: import('../../types/modpack').Modpack) => Promise<boolean>
-      delete: (id: string) => Promise<boolean>
+      delete: (id: string, deleteFiles: boolean) => Promise<boolean>
     }
     auth: {
       microsoftLogin: () => Promise<{ username: string; uuid: string; refreshToken: string; mclc: unknown }>

@@ -1,5 +1,5 @@
 import { ipcMain, dialog, BrowserWindow, shell, app } from 'electron'
-import { copyFileSync, mkdirSync } from 'fs'
+import { copyFileSync, mkdirSync, rmSync, existsSync } from 'fs'
 import { basename, join as pathJoin } from 'path'
 import { store } from './store'
 import { fetchModpackIndex, fetchModpack } from './modpacks'
@@ -171,8 +171,12 @@ export function setupIpcHandlers() {
     store.set('customModpacks', list)
     return true
   })
-  ipcMain.handle('custom:delete', (_, id: string) => {
+  ipcMain.handle('custom:delete', (_, id: string, deleteFiles: boolean) => {
     store.set('customModpacks', (store.get('customModpacks') as any[]).filter(m => m.id !== id))
+    if (deleteFiles) {
+      const dir = pathJoin(store.get('installPath') as string, id)
+      if (existsSync(dir)) { try { rmSync(dir, { recursive: true, force: true }) } catch {} }
+    }
     return true
   })
 
