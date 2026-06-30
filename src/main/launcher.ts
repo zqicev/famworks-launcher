@@ -1,6 +1,6 @@
-import { Client, ILauncherOptions } from 'minecraft-launcher-core'
+import { ILauncherOptions } from 'minecraft-launcher-core'
 import { join } from 'path'
-import { BrowserWindow } from 'electron'
+import { BrowserWindow, utilityProcess, UtilityProcess } from 'electron'
 import { Modpack } from '../types/modpack'
 import { ProgressEvent } from './installer'
 import { ensureJava } from './java'
@@ -16,16 +16,10 @@ function emit(win: BrowserWindow, event: ProgressEvent) {
   win.webContents.send('install:progress', event)
 }
 
-// Человеческие подписи для типов прогресса mclc
-const PROGRESS_LABELS: Record<string, string> = {
-  assets: 'Скачивание ресурсов',
-  'assets-copy': 'Копирование ресурсов',
-  natives: 'Нативные библиотеки',
-  classes: 'Библиотеки',
-  'classes-custom': 'Библиотеки Fabric',
-  'classes-maven-custom': 'Библиотеки Fabric',
-  'version-jar': 'Клиент Minecraft'
-}
+// Текущий процесс mclc (для отмены скачивания ассетов)
+let currentWorker: UtilityProcess | null = null
+let gameSpawned = false
+let launchAborted = false
 
 export async function installFabric(modpack: Modpack, gameRoot: string, win: BrowserWindow): Promise<string> {
   const versionId = `fabric-loader-${modpack.loader_version}-${modpack.mc_version}`
@@ -50,6 +44,9 @@ export async function launchGame(
   memoryMB: number,
   win: BrowserWindow
 ): Promise<void> {
+  gameSpawned = false
+  launchAborted = false
+
   // 1. Гарантируем Java (скачиваем если надо)
   let javaPath: string
   try {
@@ -81,90 +78,67 @@ export async function launchGame(
 
   emit(win, { phase: 'download', message: 'Подготовка Minecraft...' })
 
-  const client = new Client()
-
   const options: ILauncherOptions = {
     authorization,
     root: gameRoot,
-    version: {
-      number: modpack.mc_version,
-      type: 'release',
-      custom: fabricVersionId
-    },
-    memory: {
-      max: `${memoryMB}M`,
-      min: '512M'
-    },
+    version: { number: modpack.mc_version, type: 'release', custom: fabricVersionId },
+    memory: { max: `${memoryMB}M`, min: '512M' },
     javaPath,
-    overrides: {
-      detached: true
-    }
+    overrides: { detached: true }
   }
 
-  // Текущий этап (по типу из 'progress') + байты (из 'download-status')
-  let currentLabel = 'Загрузка файлов'
-  let lastBytesTime = Date.now()
-  let lastBytes = 0
-  let lastSpeed = 0
-
-  client.on('progress', (e) => {
-    const p = e as { type: string; task: number; total: number }
-    currentLabel = PROGRESS_LABELS[p.type] ?? p.type
-    emit(win, {
-      phase: 'download',
-      message: currentLabel,
-      current: p.task,
-      total: p.total
-    })
-  })
-
-  client.on('download-status', (e) => {
-    const d = e as { name: string; type: string; current: number; total: number }
-    const now = Date.now()
-    // Начался новый файл (счётчик сбросился) — обнуляем базу для скорости
-    if (d.current < lastBytes) { lastBytes = 0; lastBytesTime = now }
-    const elapsed = (now - lastBytesTime) / 1000
-    if (elapsed >= 0.4) {
-      lastSpeed = Math.max(0, (d.current - lastBytes) / elapsed)
-      lastBytesTime = now
-      lastBytes = d.current
-    }
-    // Байты показываем только для крупных файлов (>1 МБ) — иначе мелькание
-    // на тысячах мелких ассетов; общий прогресс ведёт счётчик файлов.
-    const bigFile = d.total > 1024 * 1024
-    emit(win, {
-      phase: 'download',
-      message: currentLabel,
-      bytesDownloaded: bigFile ? d.current : undefined,
-      bytesTotal: bigFile ? d.total : undefined,
-      speedBps: bigFile && lastSpeed > 0 ? lastSpeed : undefined
-    })
-  })
-
-  client.on('data', (data) => {
-    win.webContents.send('launch:log', String(data))
-  })
-
+  // mclc гоняем в отдельном процессе, чтобы можно было прервать скачивание ассетов
   await new Promise<void>((resolve, reject) => {
-    client.on('close', (code) => {
-      store.set('runningPid', null)
-      store.set('runningModpackId', null)
-      store.set('runningModpackName', null)
-      win.webContents.send('launch:close', code)
-      win.webContents.send('install:progress', { phase: 'done', message: '' })
-      setIdle()
+    const worker = utilityProcess.fork(join(__dirname, 'launchWorker.js'))
+    currentWorker = worker
+    let spawned = false
+
+    worker.on('message', (msg: any) => {
+      if (msg.t === 'win') {
+        win.webContents.send(msg.channel, msg.payload)
+      } else if (msg.t === 'spawned') {
+        spawned = true
+        gameSpawned = true
+        store.set('runningPid', msg.pid)
+        store.set('runningModpackId', modpack.id)
+        store.set('runningModpackName', modpack.name)
+        emit(win, { phase: 'done', message: '' })
+        setPlaying(modpack.name)
+        resolve()
+      } else if (msg.t === 'close') {
+        store.set('runningPid', null)
+        store.set('runningModpackId', null)
+        store.set('runningModpackName', null)
+        win.webContents.send('launch:close', msg.code)
+        win.webContents.send('install:progress', { phase: 'done', message: '' })
+        setIdle()
+      } else if (msg.t === 'error') {
+        reject(new Error(msg.message))
+      }
     })
 
-    client.launch(options).then((proc) => {
-      const pid = (proc as { pid?: number } | undefined)?.pid ?? null
-      store.set('runningPid', pid)
-      store.set('runningModpackId', modpack.id)
-      store.set('runningModpackName', modpack.name)
-      emit(win, { phase: 'done', message: '' })
-      setPlaying(modpack.name)
-      resolve()
-    }).catch(reject)
+    worker.on('exit', () => {
+      currentWorker = null
+      if (!spawned) {
+        // воркер умер до запуска игры — отмена или сбой
+        if (launchAborted) reject(new DOMException('Aborted', 'AbortError'))
+        else resolve()
+      }
+    })
+
+    worker.postMessage({ type: 'launch', options })
   })
+}
+
+/** Прерывает скачивание ассетов (убивает воркер), пока игра ещё не запущена. */
+export function abortLaunch(): boolean {
+  if (currentWorker && !gameSpawned) {
+    launchAborted = true
+    try { currentWorker.kill() } catch {}
+    currentWorker = null
+    return true
+  }
+  return false
 }
 
 export function offlineAuthorization(username: string): ILauncherOptions['authorization'] {

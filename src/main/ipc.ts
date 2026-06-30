@@ -6,7 +6,7 @@ import { setIdle } from './discord'
 import { store } from './store'
 import { fetchModpackIndex, fetchModpack } from './modpacks'
 import { checkAndInstallModpack, getModpackStatus, toggleMod, deleteMod, getInstalledMods, downloadModToDir, getModFileSizeBytes } from './installer'
-import { launchGame, installFabric, offlineAuthorization } from './launcher'
+import { launchGame, installFabric, offlineAuthorization, abortLaunch } from './launcher'
 import { searchModrinth, getModVersions } from './modrinth'
 import { microsoftLogin, microsoftRefresh } from './msAuth'
 import { Account } from './store'
@@ -125,12 +125,14 @@ export function setupIpcHandlers() {
   })
 
   ipcMain.handle('cancel', () => {
-    cancelCurrent()
+    cancelCurrent()   // наши axios-загрузки (моды/Java/Fabric)
+    abortLaunch()     // скачивание ассетов Minecraft (убиваем воркер mclc)
   })
 
   // Принудительно убить процесс запущенной игры
   ipcMain.handle('game:kill', () => {
     cancelCurrent() // на случай, если ещё идёт скачивание перед запуском
+    abortLaunch()
     const pid = store.get('runningPid') as number | null
     if (pid) {
       try {
