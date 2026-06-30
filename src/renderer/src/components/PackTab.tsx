@@ -10,9 +10,10 @@ interface Props {
   items: Mod[]                      // modpack.resourcepacks / modpack.shaders
   kind: 'resourcepack' | 'shader'
   noun: string                      // "ресурспаков" / "шейдеров"
+  onCount?: (n: number) => void
 }
 
-export default function PackTab({ modpack, dir, items, kind, noun }: Props) {
+export default function PackTab({ modpack, dir, items, kind, noun, onCount }: Props) {
   const [search, setSearch] = useState('')
   const [present, setPresent] = useState<Set<string>>(new Set())
   const [sizes, setSizes] = useState<Record<string, number>>({})
@@ -63,6 +64,9 @@ export default function PackTab({ modpack, dir, items, kind, noun }: Props) {
     .filter(p => !deleted.has(p.id))
     .map(p => ({ ...p, size_mb: sizes[p.filename] ?? p.size_mb }))
   const filtered = all.filter(m => m.name.toLowerCase().includes(search.toLowerCase()))
+  const enabledCount = all.filter(p => !disabled.has(p.filename)).length
+
+  useEffect(() => { onCount?.(all.length) }, [all.length])
 
   const handleToggle = async (p: Mod, on: boolean) => {
     if (p.required) return
@@ -94,7 +98,7 @@ export default function PackTab({ modpack, dir, items, kind, noun }: Props) {
           <span className={styles.searchIcon}>⌕</span>
           <input className={styles.search} placeholder={`Поиск ${noun}`} value={search} onChange={e => setSearch(e.target.value)} />
         </div>
-        <span className={styles.activeCount}>{all.length}</span>
+        <span className={styles.activeCount}>{enabledCount} / {all.length} активны</span>
         <button className={styles.addBtn} onClick={() => setAddOpen(true)}>+ ДОБАВИТЬ</button>
         <button className={styles.folderBtn} onClick={() => window.api.shell.openFolder(dir)} title="Открыть папку">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

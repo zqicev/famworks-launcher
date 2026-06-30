@@ -81,6 +81,8 @@
 
 .tab:hover { color: var(--text); }
 
+.tabCount { color: var(--accent); font-weight: 700; }
+
 .tabActive {
   color: var(--text) !important;
   background: var(--bg-surface);

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Modpack } from '../../../types/modpack'
 import ModsTab from './ModsTab'
 import PackTab from './PackTab'
@@ -21,6 +21,13 @@ function formatSize(mb: number) {
 export default function MainPanel({ modpack, installPath, loading, error }: Props) {
   const [tab, setTab] = useState<'mods' | 'resourcepacks' | 'shaders' | 'overview'>('mods')
   const [extraCount, setExtraCount] = useState(0)
+  const [rpCount, setRpCount] = useState(0)
+  const [shCount, setShCount] = useState(0)
+
+  useEffect(() => {
+    setRpCount(modpack?.resourcepacks?.length ?? 0)
+    setShCount(modpack?.shaders?.length ?? 0)
+  }, [modpack?.id])
 
   if (loading) {
     return (
@@ -62,36 +69,20 @@ export default function MainPanel({ modpack, installPath, loading, error }: Prop
         <p className={styles.desc}>{modpack.description}</p>
 
         <div className={styles.tabs}>
-          <button
-            className={`${styles.tab} ${tab === 'mods' ? styles.tabActive : ''}`}
-            onClick={() => setTab('mods')}
-          >
-            МОДЫ
+          <button className={`${styles.tab} ${tab === 'mods' ? styles.tabActive : ''}`} onClick={() => setTab('mods')}>
+            МОДЫ <span className={styles.tabCount}>{totalMods}</span>
           </button>
-          <button
-            className={`${styles.tab} ${tab === 'resourcepacks' ? styles.tabActive : ''}`}
-            onClick={() => setTab('resourcepacks')}
-          >
-            РЕСУРСПАКИ
+          <button className={`${styles.tab} ${tab === 'resourcepacks' ? styles.tabActive : ''}`} onClick={() => setTab('resourcepacks')}>
+            РЕСУРСПАКИ <span className={styles.tabCount}>{rpCount}</span>
           </button>
-          <button
-            className={`${styles.tab} ${tab === 'shaders' ? styles.tabActive : ''}`}
-            onClick={() => setTab('shaders')}
-          >
-            ШЕЙДЕРЫ
+          <button className={`${styles.tab} ${tab === 'shaders' ? styles.tabActive : ''}`} onClick={() => setTab('shaders')}>
+            ШЕЙДЕРЫ <span className={styles.tabCount}>{shCount}</span>
           </button>
-          <button
-            className={`${styles.tab} ${tab === 'overview' ? styles.tabActive : ''}`}
-            onClick={() => setTab('overview')}
-          >
+          <button className={`${styles.tab} ${tab === 'overview' ? styles.tabActive : ''}`} onClick={() => setTab('overview')}>
             ОБЗОР
           </button>
 
           <div className={styles.stats}>
-            <div className={styles.stat}>
-              <span className={styles.statVal}>{totalMods}</span>
-              <span className={styles.statLabel}>МОДОВ ВСЕ</span>
-            </div>
             <div className={styles.stat}>
               <span className={styles.statVal}>{formatSize(totalSizeMb)}</span>
               <span className={styles.statLabel}>РАЗМЕР</span>
@@ -102,8 +93,8 @@ export default function MainPanel({ modpack, installPath, loading, error }: Prop
 
       <div className={styles.content} key={`${modpack.id}-${tab}`}>
         {tab === 'mods' && <ModsTab modpack={modpack} modsDir={modsDir} onExtraCountChange={setExtraCount} />}
-        {tab === 'resourcepacks' && <PackTab modpack={modpack} dir={rpDir} items={modpack.resourcepacks ?? []} kind="resourcepack" noun="ресурспаков" />}
-        {tab === 'shaders' && <PackTab modpack={modpack} dir={shDir} items={modpack.shaders ?? []} kind="shader" noun="шейдеров" />}
+        {tab === 'resourcepacks' && <PackTab modpack={modpack} dir={rpDir} items={modpack.resourcepacks ?? []} kind="resourcepack" noun="ресурспаков" onCount={setRpCount} />}
+        {tab === 'shaders' && <PackTab modpack={modpack} dir={shDir} items={modpack.shaders ?? []} kind="shader" noun="шейдеров" onCount={setShCount} />}
         {tab === 'overview' && <OverviewTab modpack={modpack} />}
       </div>
 
