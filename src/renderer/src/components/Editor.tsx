@@ -16,6 +16,7 @@ export default function Editor({ packKey, loaded, onSaved, onDeleted }: Props) {
   const [draft, setDraft] = useState<Modpack>(structuredClone(loaded.data))
   const [status, setStatus] = useState<Status>({ kind: 'idle' })
   const [addOpen, setAddOpen] = useState(false)
+  const [rpAddOpen, setRpAddOpen] = useState(false)
 
   const set = <K extends keyof Modpack>(key: K, value: Modpack[K]) =>
     setDraft(d => ({ ...d, [key]: value }))
@@ -73,6 +74,33 @@ export default function Editor({ packKey, loaded, onSaved, onDeleted }: Props) {
         version: '', category: 'Кастом', size_mb: res.size_mb, required: false
       })
       setStatus({ kind: 'ok', msg: 'Jar загружен в релиз' })
+      setTimeout(() => setStatus({ kind: 'idle' }), 2500)
+    } catch (e) {
+      setStatus({ kind: 'error', msg: e instanceof Error ? e.message : String(e) })
+    }
+  }
+
+  // Ресурспаки
+  const resourcepacks = draft.resourcepacks ?? []
+  const addRp = (m: Mod) => setDraft(d => {
+    const rp = d.resourcepacks ?? []
+    if (rp.some(x => x.id === m.id || x.filename === m.filename)) return d
+    return { ...d, resourcepacks: [...rp, m] }
+  })
+  const updateRp = (id: string, patch: Partial<Mod>) =>
+    set('resourcepacks', resourcepacks.map(x => x.id === id ? { ...x, ...patch } : x))
+  const removeRp = (id: string) => set('resourcepacks', resourcepacks.filter(x => x.id !== id))
+  const uploadRpZip = async () => {
+    setStatus({ kind: 'uploading', msg: 'Загрузка ресурспака…' })
+    try {
+      const res = await window.api.rp.pickAndUpload()
+      if (!res) { setStatus({ kind: 'idle' }); return }
+      addRp({
+        id: res.filename.replace(/\.zip$/i, '').toLowerCase().replace(/[^a-z0-9-]+/g, '-'),
+        name: res.filename.replace(/\.zip$/i, ''), filename: res.filename,
+        download_url: res.download_url, sha512: res.sha512, version: '', category: 'Кастом', size_mb: res.size_mb, required: false
+      })
+      setStatus({ kind: 'ok', msg: 'Ресурспак загружен' })
       setTimeout(() => setStatus({ kind: 'idle' }), 2500)
     } catch (e) {
       setStatus({ kind: 'error', msg: e instanceof Error ? e.message : String(e) })
@@ -179,6 +207,36 @@ export default function Editor({ packKey, loaded, onSaved, onDeleted }: Props) {
           </div>
         </section>
 
+        {/* Ресурспаки */}
+        <section className={styles.section}>
+          <div className={styles.sectionHead}>
+            <div className={styles.sectionTitle}>РЕСУРСПАКИ · {resourcepacks.length}</div>
+            <div className={styles.modActions}>
+              <button className={styles.addBtn} onClick={() => setRpAddOpen(true)}>+ Из Modrinth</button>
+              <button className={styles.jarBtn} onClick={uploadRpZip} disabled={busy}>↑ Загрузить .zip</button>
+            </div>
+          </div>
+          <div className={styles.modList}>
+            {resourcepacks.length === 0 && <div className={styles.modsEmpty}>Ресурспаков нет</div>}
+            {resourcepacks.map(p => (
+              <div key={p.id} className={styles.modRow}>
+                <div className={styles.modAvatar}>{p.name[0]?.toUpperCase() ?? '?'}</div>
+                <div className={styles.modMain}>
+                  <div className={styles.modName}>
+                    {p.name}
+                    {p.modrinth_id ? <span className={styles.srcMod}>Modrinth</span> : <span className={styles.srcJar}>zip</span>}
+                  </div>
+                  <div className={styles.modMeta}>{p.filename} · {p.size_mb} МБ{p.version ? ` · ${p.version}` : ''}</div>
+                </div>
+                <button className={`${styles.reqBtn} ${p.required ? styles.reqOn : ''}`} onClick={() => updateRp(p.id, { required: !p.required })} title={p.required ? 'Обязательный' : 'Опциональный'}>
+                  {p.required ? 'REQ' : 'OPT'}
+                </button>
+                <button className={styles.delMod} onClick={() => removeRp(p.id)} title="Убрать">✕</button>
+              </div>
+            ))}
+          </div>
+        </section>
+
         {/* Серверы */}
         <section className={styles.section}>
           <div className={styles.sectionHead}>
@@ -264,6 +322,16 @@ export default function Editor({ packKey, loaded, onSaved, onDeleted }: Props) {
           existing={draft.mods.map(m => m.id)}
           onAdd={addMod}
           onClose={() => setAddOpen(false)}
+        />
+      )}
+      {rpAddOpen && (
+        <AddModrinthModal
+          kind="resourcepack"
+          mcVersion={draft.mc_version}
+          loader={draft.loader}
+          existing={resourcepacks.map(m => m.id)}
+          onAdd={addRp}
+          onClose={() => setRpAddOpen(false)}
         />
       )}
     </div>

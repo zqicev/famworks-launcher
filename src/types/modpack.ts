@@ -48,6 +48,7 @@ export interface Modpack extends ModpackSummary {
   long_description: string
   changelog: ChangelogEntry[]
   mods: Mod[]
+  resourcepacks?: Mod[]
   servers?: ServerEntry[]
   configs?: ConfigFile[]
 }

@@ -1,7 +1,7 @@
 import { ipcMain, dialog, BrowserWindow } from 'electron'
 import { store } from './store'
 import { validateToken } from './github'
-import { loadWorkspace, saveModpack, deleteModpack, uploadCustomJar, uploadConfig } from './service'
+import { loadWorkspace, saveModpack, deleteModpack, uploadCustomJar, uploadConfig, uploadResourcepack } from './service'
 import { searchModrinth, getLatestVersion } from './modrinth'
 import { Modpack } from '../types/modpack'
 
@@ -24,9 +24,9 @@ export function setupIpc() {
   ipcMain.handle('ws:delete', (_, id: string, fileSha: string) => deleteModpack(id, fileSha))
 
   // Modrinth
-  ipcMain.handle('modrinth:search', (_, q: string, mc: string, loader: string) => searchModrinth(q, mc, loader))
-  ipcMain.handle('modrinth:latest', (_, projectId: string, mc: string, loader: string) =>
-    getLatestVersion(projectId, mc, loader))
+  ipcMain.handle('modrinth:search', (_, q: string, mc: string, loader: string, type?: string) => searchModrinth(q, mc, loader, type))
+  ipcMain.handle('modrinth:latest', (_, projectId: string, mc: string, loader: string, type?: string) =>
+    getLatestVersion(projectId, mc, loader, type))
 
   // Кастомный jar
   ipcMain.handle('jar:pick-and-upload', async () => {
@@ -43,6 +43,13 @@ export function setupIpc() {
     const result = await dialog.showOpenDialog({ properties: ['openFile'] })
     if (!result.filePaths[0]) return null
     return uploadConfig(result.filePaths[0])
+  })
+
+  // Ресурспак (.zip)
+  ipcMain.handle('rp:pick-and-upload', async () => {
+    const result = await dialog.showOpenDialog({ filters: [{ name: 'Resource pack', extensions: ['zip'] }], properties: ['openFile'] })
+    if (!result.filePaths[0]) return null
+    return uploadResourcepack(result.filePaths[0])
   })
 
   // Окно

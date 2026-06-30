@@ -13,14 +13,17 @@ contextBridge.exposeInMainWorld('api', {
     delete: (id: string, fileSha: string) => ipcRenderer.invoke('ws:delete', id, fileSha)
   },
   modrinth: {
-    search: (q: string, mc: string, loader: string) => ipcRenderer.invoke('modrinth:search', q, mc, loader),
-    latest: (projectId: string, mc: string, loader: string) => ipcRenderer.invoke('modrinth:latest', projectId, mc, loader)
+    search: (q: string, mc: string, loader: string, type?: string) => ipcRenderer.invoke('modrinth:search', q, mc, loader, type),
+    latest: (projectId: string, mc: string, loader: string, type?: string) => ipcRenderer.invoke('modrinth:latest', projectId, mc, loader, type)
   },
   jar: {
     pickAndUpload: () => ipcRenderer.invoke('jar:pick-and-upload')
   },
   config: {
     pickAndUpload: () => ipcRenderer.invoke('config:pick-and-upload')
+  },
+  rp: {
+    pickAndUpload: () => ipcRenderer.invoke('rp:pick-and-upload')
   },
   win: {
     minimize: () => ipcRenderer.send('win:minimize'),

@@ -34,11 +34,12 @@ declare global {
         delete: (id: string, fileSha: string) => Promise<void>
       }
       modrinth: {
-        search: (q: string, mc: string, loader: string) => Promise<ModrinthHit[]>
-        latest: (projectId: string, mc: string, loader: string) => Promise<ModrinthVersion | null>
+        search: (q: string, mc: string, loader: string, type?: string) => Promise<ModrinthHit[]>
+        latest: (projectId: string, mc: string, loader: string, type?: string) => Promise<ModrinthVersion | null>
       }
       jar: { pickAndUpload: () => Promise<JarUpload | null> }
       config: { pickAndUpload: () => Promise<ConfigUpload | null> }
+      rp: { pickAndUpload: () => Promise<JarUpload | null> }
       win: { minimize: () => void; close: () => void }
     }
   }

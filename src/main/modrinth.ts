@@ -14,15 +14,16 @@ export interface ModrinthHit {
   categories: string[]
 }
 
-export async function searchModrinth(query: string, mcVersion: string, loader: string, limit = 20): Promise<ModrinthHit[]> {
-  const facets = JSON.stringify([
-    [`categories:${loader}`],
+export async function searchModrinth(query: string, mcVersion: string, loader: string, type = 'mod', limit = 20): Promise<ModrinthHit[]> {
+  // Ресурспаки/шейдеры не привязаны к загрузчику — фильтр по loader только для модов
+  const facets = [
     [`versions:${mcVersion}`],
-    ['project_type:mod']
-  ])
+    [`project_type:${type}`]
+  ]
+  if (type === 'mod') facets.unshift([`categories:${loader}`])
   const res = await axios.get(`${BASE}/search`, {
     headers: HEADERS,
-    params: { query, facets, limit }
+    params: { query, facets: JSON.stringify(facets), limit }
   })
   return res.data.hits
 }
@@ -42,10 +43,12 @@ export interface ModrinthVersion {
 }
 
 /** Берёт последнюю совместимую версию проекта под нужные mc/loader. */
-export async function getLatestVersion(projectId: string, mcVersion: string, loader: string): Promise<ModrinthVersion | null> {
+export async function getLatestVersion(projectId: string, mcVersion: string, loader: string, type = 'mod'): Promise<ModrinthVersion | null> {
+  // У ресурспаков/шейдеров loader на Modrinth — "minecraft"
+  const loaders = type === 'mod' ? [loader] : ['minecraft']
   const res = await axios.get(`${BASE}/project/${projectId}/version`, {
     headers: HEADERS,
-    params: { game_versions: JSON.stringify([mcVersion]), loaders: JSON.stringify([loader]) }
+    params: { game_versions: JSON.stringify([mcVersion]), loaders: JSON.stringify(loaders) }
   })
   const versions: ModrinthVersion[] = res.data
   return versions[0] ?? null

@@ -16,6 +16,7 @@ interface Props {
   mcVersion: string
   loader: string
   existing: string[]
+  kind?: 'mod' | 'resourcepack'
   onAdd: (mod: Mod) => void
   onClose: () => void
 }
@@ -26,7 +27,7 @@ function fmt(n: number) {
   return String(n)
 }
 
-export default function AddModrinthModal({ mcVersion, loader, existing, onAdd, onClose }: Props) {
+export default function AddModrinthModal({ mcVersion, loader, existing, kind = 'mod', onAdd, onClose }: Props) {
   const [query, setQuery] = useState('')
   const [hits, setHits] = useState<Hit[]>([])
   const [loading, setLoading] = useState(false)
@@ -37,7 +38,7 @@ export default function AddModrinthModal({ mcVersion, loader, existing, onAdd, o
     if (!query.trim()) return
     setLoading(true); setNotice('')
     try {
-      setHits(await window.api.modrinth.search(query, mcVersion, loader))
+      setHits(await window.api.modrinth.search(query, mcVersion, loader, kind))
     } catch {
       setNotice('Ошибка поиска Modrinth')
     } finally {
@@ -48,7 +49,7 @@ export default function AddModrinthModal({ mcVersion, loader, existing, onAdd, o
   const add = async (hit: Hit) => {
     setAdding(hit.project_id); setNotice('')
     try {
-      const version = await window.api.modrinth.latest(hit.project_id, mcVersion, loader)
+      const version = await window.api.modrinth.latest(hit.project_id, mcVersion, loader, kind)
       if (!version) { setNotice(`Нет версии «${hit.title}» под ${loader} ${mcVersion}`); setAdding(null); return }
       const file = version.files.find(f => f.primary) ?? version.files[0]
       if (!file) { setNotice('У версии нет файла'); setAdding(null); return }

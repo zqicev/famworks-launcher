@@ -73,8 +73,8 @@ export async function deleteModpack(id: string, fileSha: string): Promise<void> 
   }
 }
 
-/** Заливает локальный .jar в релиз модов, возвращает данные для записи в сборку. */
-export async function uploadCustomJar(filePath: string): Promise<{
+/** Заливает локальный файл в релиз, возвращает данные для записи в сборку. */
+export async function uploadFileAsset(filePath: string, contentType: string): Promise<{
   filename: string; download_url: string; sha512: string; size_mb: number
 }> {
   const data = readFileSync(filePath)
@@ -82,7 +82,7 @@ export async function uploadCustomJar(filePath: string): Promise<{
   const hash = sha512(data)
   const tag = store.get('modsReleaseTag') as string
   const release = await ensureRelease(tag)
-  const url = await uploadAsset(release, filename, data, 'application/java-archive')
+  const url = await uploadAsset(release, filename, data, contentType)
   return {
     filename,
     download_url: url,
@@ -90,6 +90,9 @@ export async function uploadCustomJar(filePath: string): Promise<{
     size_mb: Math.round((data.length / 1024 / 1024) * 10) / 10
   }
 }
+
+export const uploadCustomJar = (filePath: string) => uploadFileAsset(filePath, 'application/java-archive')
+export const uploadResourcepack = (filePath: string) => uploadFileAsset(filePath, 'application/zip')
 
 /** Заливает конфиг-файл в релиз. Имя ассета уникально по хэшу (нет коллизий одинаковых имён). */
 export async function uploadConfig(filePath: string): Promise<{
