@@ -64,13 +64,10 @@ export async function validateCfKey(): Promise<boolean> {
   }
 }
 
-/** Если downloadUrl null (автор закрыл API-раздачу) — собираем CDN-ссылку из fileId. */
-export function cfDownloadUrl(file: CfFile): string {
-  if (file.downloadUrl) return file.downloadUrl
-  const id = file.id.toString()
-  const a = id.slice(0, 4)
-  const b = String(Number(id.slice(4))) // без ведущих нулей
-  return `https://edge.forgecdn.net/files/${a}/${b}/${encodeURIComponent(file.fileName)}`
+/** Прямая ссылка CF. Если автор закрыл API-раздачу (downloadUrl null) — возвращаем null
+ *  (уважаем выбор автора, как требует ToS). */
+export function cfDownloadUrl(file: CfFile): string | null {
+  return file.downloadUrl ?? null
 }
 
 export function cfSha1(file: CfFile): string | undefined {

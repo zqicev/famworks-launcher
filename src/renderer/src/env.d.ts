@@ -43,7 +43,7 @@ declare global {
         validate: () => Promise<boolean>
         search: (q: string, mc: string, loader: string, type?: string) => Promise<CfHit[]>
         files: (modId: number, mc: string, loader: string, type?: string) => Promise<CfFile[]>
-        resolve: (file: CfFile) => Promise<{ url: string; sha1?: string }>
+        resolve: (file: CfFile) => Promise<{ url: string | null; sha1?: string }>
       }
       jar: { pickAndUpload: () => Promise<JarUpload | null> }
       config: { pickAndUpload: () => Promise<ConfigUpload | null> }

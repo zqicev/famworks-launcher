@@ -56,6 +56,7 @@ export default function AddCurseforgeModal({ mcVersion, loader, existing, kind =
     if (!picker) return
     const file = picker.files.find((f: any) => String(f.id) === chosen) ?? picker.files[0]
     const { url, sha1 } = await window.api.cf.resolve(file)
+    if (!url) { setNotice('Автор запретил раздачу этого файла через API — нельзя добавить'); return }
     const mod: Mod = {
       id: slug(hit.name),
       name: hit.name,
