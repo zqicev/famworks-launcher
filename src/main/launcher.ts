@@ -5,7 +5,6 @@ import { Modpack } from '../types/modpack'
 import { ProgressEvent } from './installer'
 import { ensureJava } from './java'
 import { writeServers } from './servers'
-import { ensureResourcepacksEnabled } from './options'
 import { setPlaying, setIdle } from './discord'
 import { store } from './store'
 import { opSignal } from './abort'
@@ -69,12 +68,6 @@ export async function launchGame(
     try { await writeServers(gameRoot, modpack.servers) } catch (e) {
       win.webContents.send('launch:log', `[servers] ${String(e)}`)
     }
-  }
-
-  // 4. Обязательные ресурспаки → включаем в options.txt
-  const requiredRp = (modpack.resourcepacks ?? []).filter(p => p.required).map(p => p.filename)
-  if (requiredRp.length) {
-    try { ensureResourcepacksEnabled(gameRoot, requiredRp) } catch { /* не критично */ }
   }
 
   emit(win, { phase: 'download', message: 'Подготовка Minecraft...' })

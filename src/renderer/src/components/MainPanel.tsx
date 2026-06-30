@@ -47,9 +47,8 @@ export default function MainPanel({ modpack, installPath, loading, error }: Prop
   }
 
   const modsDir = `${installPath}/${modpack.id}/mods`
-  const gameRoot = `${installPath}/${modpack.id}`
+  const rpDir = `${installPath}/${modpack.id}/resourcepacks`
   const totalMods = modpack.mods.length + extraCount
-  const rpCount = modpack.resourcepacks?.length ?? 0
   const totalSizeMb = modpack.mods.reduce((s, m) => s + m.size_mb, 0)
 
   return (
@@ -96,7 +95,7 @@ export default function MainPanel({ modpack, installPath, loading, error }: Prop
 
       <div className={styles.content} key={`${modpack.id}-${tab}`}>
         {tab === 'mods' && <ModsTab modpack={modpack} modsDir={modsDir} onExtraCountChange={setExtraCount} />}
-        {tab === 'resourcepacks' && <ResourcepacksTab modpack={modpack} gameRoot={gameRoot} />}
+        {tab === 'resourcepacks' && <ResourcepacksTab modpack={modpack} dir={rpDir} />}
         {tab === 'overview' && <OverviewTab modpack={modpack} />}
       </div>
 

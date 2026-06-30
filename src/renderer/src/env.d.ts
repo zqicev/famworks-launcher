@@ -31,12 +31,6 @@ interface Window {
     cancel: () => Promise<void>
     gameRunning: () => Promise<string | null>
     appVersion: () => Promise<string>
-    rp: {
-      installed: (gameRoot: string) => Promise<string[]>
-      enabled: (gameRoot: string) => Promise<string[]>
-      toggle: (gameRoot: string, filename: string, enabled: boolean) => Promise<void>
-      delete: (gameRoot: string, filename: string) => Promise<void>
-    }
     auth: {
       microsoftLogin: () => Promise<{ username: string; uuid: string; refreshToken: string; mclc: unknown }>
     }

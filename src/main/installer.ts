@@ -105,7 +105,7 @@ async function installResourcepacks(modpack: Modpack, gameRoot: string, win: Bro
   const dir = join(gameRoot, 'resourcepacks')
   mkdirSync(dir, { recursive: true })
 
-  const missing = packs.filter(p => !existsSync(join(dir, p.filename)))
+  const missing = packs.filter(p => !existsSync(join(dir, p.filename)) && !existsSync(join(dir, p.filename + '.disabled')))
   let done = 0
   for (const p of missing) {
     if (isCancelled()) throw new DOMException('Aborted', 'AbortError')
@@ -187,10 +187,11 @@ export async function getModpackStatus(
     if (dest && !existsSync(dest)) return 'outdated'
   }
 
-  // Если какой-то ресурспак ещё не скачан — нужно обновление
+  // Если обязательный ресурспак ещё не скачан — нужно обновление
   const rpDir = join(gameRoot, 'resourcepacks')
   for (const p of modpack.resourcepacks ?? []) {
-    if (!existsSync(join(rpDir, p.filename))) return 'outdated'
+    if (!p.required) continue
+    if (!existsSync(join(rpDir, p.filename)) && !existsSync(join(rpDir, p.filename + '.disabled'))) return 'outdated'
   }
 
   return 'ready'

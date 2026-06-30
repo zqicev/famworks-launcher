@@ -1,7 +1,6 @@
 import { ipcMain, dialog, BrowserWindow, shell, app } from 'electron'
-import { copyFileSync, mkdirSync, existsSync, readdirSync, unlinkSync } from 'fs'
+import { copyFileSync, mkdirSync } from 'fs'
 import { basename, join as pathJoin } from 'path'
-import { getEnabledResourcepacks, toggleResourcepack, removeResourcepackFromOptions } from './options'
 import { store } from './store'
 import { fetchModpackIndex, fetchModpack } from './modpacks'
 import { checkAndInstallModpack, getModpackStatus, toggleMod, deleteMod, getInstalledMods, downloadModToDir, getModFileSizeBytes } from './installer'
@@ -147,20 +146,6 @@ export function setupIpcHandlers() {
   })
 
   ipcMain.handle('app:version', () => app.getVersion())
-
-  // Ресурспаки (gameRoot = installPath/<id>)
-  ipcMain.handle('rp:installed', (_, gameRoot: string) => {
-    const d = pathJoin(gameRoot, 'resourcepacks')
-    return existsSync(d) ? readdirSync(d).filter(f => f.toLowerCase().endsWith('.zip')) : []
-  })
-  ipcMain.handle('rp:enabled', (_, gameRoot: string) => getEnabledResourcepacks(gameRoot))
-  ipcMain.handle('rp:toggle', (_, gameRoot: string, filename: string, enabled: boolean) =>
-    toggleResourcepack(gameRoot, filename, enabled))
-  ipcMain.handle('rp:delete', (_, gameRoot: string, filename: string) => {
-    const p = pathJoin(gameRoot, 'resourcepacks', filename)
-    if (existsSync(p)) unlinkSync(p)
-    removeResourcepackFromOptions(gameRoot, filename)
-  })
 
   ipcMain.handle('shell:open-folder', (_, folderPath: string) => shell.openPath(folderPath))
 
