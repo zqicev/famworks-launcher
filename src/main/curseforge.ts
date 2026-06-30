@@ -54,10 +54,10 @@ export async function getCurseforgeFiles(modId: number, mcVersion: string, loade
   return res.data.data
 }
 
-/** Проверка ключа CurseForge. */
+/** Проверка ключа CurseForge — минимальный поиск (тот же эндпоинт, что используем). */
 export async function validateCfKey(): Promise<boolean> {
   try {
-    await axios.get(`${BASE}/games`, { headers: headers(), timeout: 10000 })
+    await axios.get(`${BASE}/mods/search`, { headers: headers(), params: { gameId: GAME_ID, pageSize: 1 }, timeout: 10000 })
     return true
   } catch {
     return false
