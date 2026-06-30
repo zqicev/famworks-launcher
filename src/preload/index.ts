@@ -40,6 +40,7 @@ contextBridge.exposeInMainWorld('api', {
     onProgress: (cb: (data: unknown) => void) => subscribe('install:progress', cb)
   },
   cancel: () => ipcRenderer.invoke('cancel'),
+  killGame: () => ipcRenderer.invoke('game:kill'),
   gameRunning: () => ipcRenderer.invoke('game:running'),
   appVersion: () => ipcRenderer.invoke('app:version'),
   fabricLoader: (mc: string) => ipcRenderer.invoke('fabric:loader', mc),

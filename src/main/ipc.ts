@@ -1,6 +1,8 @@
 import { ipcMain, dialog, BrowserWindow, shell, app } from 'electron'
 import { copyFileSync, mkdirSync, rmSync, existsSync } from 'fs'
 import { basename, join as pathJoin } from 'path'
+import { spawn } from 'child_process'
+import { setIdle } from './discord'
 import { store } from './store'
 import { fetchModpackIndex, fetchModpack } from './modpacks'
 import { checkAndInstallModpack, getModpackStatus, toggleMod, deleteMod, getInstalledMods, downloadModToDir, getModFileSizeBytes } from './installer'
@@ -124,6 +126,28 @@ export function setupIpcHandlers() {
 
   ipcMain.handle('cancel', () => {
     cancelCurrent()
+  })
+
+  // Принудительно убить процесс запущенной игры
+  ipcMain.handle('game:kill', () => {
+    cancelCurrent() // на случай, если ещё идёт скачивание перед запуском
+    const pid = store.get('runningPid') as number | null
+    if (pid) {
+      try {
+        if (process.platform === 'win32') {
+          // убиваем всё дерево процессов (java + дочерние)
+          spawn('taskkill', ['/PID', String(pid), '/T', '/F'])
+        } else {
+          process.kill(pid, 'SIGKILL')
+        }
+      } catch { /* уже мёртв */ }
+    }
+    store.set('runningPid', null)
+    store.set('runningModpackId', null)
+    store.set('runningModpackName', null)
+    getWindow()?.webContents.send('launch:close', -1)
+    setIdle()
+    return true
   })
 
   // Какая сборка сейчас запущена (переживает перезапуск лаунчера через сохранённый PID)

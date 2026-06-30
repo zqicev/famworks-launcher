@@ -29,6 +29,7 @@ interface Window {
       onProgress: (cb: (data: unknown) => void) => () => void
     }
     cancel: () => Promise<void>
+    killGame: () => Promise<boolean>
     gameRunning: () => Promise<string | null>
     appVersion: () => Promise<string>
     fabricLoader: (mc: string) => Promise<string>
