@@ -3,6 +3,7 @@ import { store } from './store'
 import { validateToken } from './github'
 import { loadWorkspace, saveModpack, deleteModpack, uploadCustomJar, uploadConfig, uploadResourcepack } from './service'
 import { searchModrinth, getLatestVersion } from './modrinth'
+import { searchCurseforge, getCurseforgeFiles, validateCfKey, cfDownloadUrl, cfSha1, CfFile } from './curseforge'
 import { Modpack } from '../types/modpack'
 
 export function setupIpc() {
@@ -27,6 +28,12 @@ export function setupIpc() {
   ipcMain.handle('modrinth:search', (_, q: string, mc: string, loader: string, type?: string) => searchModrinth(q, mc, loader, type))
   ipcMain.handle('modrinth:latest', (_, projectId: string, mc: string, loader: string, type?: string) =>
     getLatestVersion(projectId, mc, loader, type))
+
+  // CurseForge
+  ipcMain.handle('cf:validate', () => validateCfKey())
+  ipcMain.handle('cf:search', (_, q: string, mc: string, loader: string, type?: string) => searchCurseforge(q, mc, loader, type))
+  ipcMain.handle('cf:files', (_, modId: number, mc: string, loader: string, type?: string) => getCurseforgeFiles(modId, mc, loader, type))
+  ipcMain.handle('cf:resolve', (_, file: CfFile) => ({ url: cfDownloadUrl(file), sha1: cfSha1(file) }))
 
   // Кастомный jar
   ipcMain.handle('jar:pick-and-upload', async () => {

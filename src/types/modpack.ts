@@ -16,6 +16,7 @@ export interface Mod {
   id: string
   name: string
   modrinth_id?: string
+  curseforge_id?: number
   filename: string
   version: string
   category: string
@@ -23,6 +24,7 @@ export interface Mod {
   required: boolean
   download_url?: string
   sha512?: string
+  sha1?: string
 }
 
 export interface ChangelogEntry {

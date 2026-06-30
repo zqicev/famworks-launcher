@@ -1,4 +1,6 @@
+import { useState } from 'react'
 import { LoadedModpack } from '../../../types/modpack'
+import CfKeyModal from './CfKeyModal'
 import styles from '../styles/Sidebar.module.css'
 
 interface Props {
@@ -12,12 +14,15 @@ interface Props {
 
 export default function Sidebar({ packs, selectedId, login, onSelect, onNew, onRefresh }: Props) {
   const keys = Object.keys(packs)
+  const [cfOpen, setCfOpen] = useState(false)
 
   return (
     <aside className={styles.sidebar}>
+      {cfOpen && <CfKeyModal onClose={() => setCfOpen(false)} />}
       <div className={styles.header}>
         <span className={styles.title}>СБОРКИ</span>
         <div className={styles.headerBtns}>
+          <button className={styles.iconBtn} onClick={() => setCfOpen(true)} title="Ключ CurseForge">⚙</button>
           <button className={styles.iconBtn} onClick={onRefresh} title="Перезагрузить из GitHub">↻</button>
           <button className={styles.newBtn} onClick={onNew}>+ Новая</button>
         </div>

@@ -16,6 +16,12 @@ contextBridge.exposeInMainWorld('api', {
     search: (q: string, mc: string, loader: string, type?: string) => ipcRenderer.invoke('modrinth:search', q, mc, loader, type),
     latest: (projectId: string, mc: string, loader: string, type?: string) => ipcRenderer.invoke('modrinth:latest', projectId, mc, loader, type)
   },
+  cf: {
+    validate: () => ipcRenderer.invoke('cf:validate'),
+    search: (q: string, mc: string, loader: string, type?: string) => ipcRenderer.invoke('cf:search', q, mc, loader, type),
+    files: (modId: number, mc: string, loader: string, type?: string) => ipcRenderer.invoke('cf:files', modId, mc, loader, type),
+    resolve: (file: unknown) => ipcRenderer.invoke('cf:resolve', file)
+  },
   jar: {
     pickAndUpload: () => ipcRenderer.invoke('jar:pick-and-upload')
   },

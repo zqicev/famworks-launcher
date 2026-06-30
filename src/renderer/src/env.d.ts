@@ -18,6 +18,8 @@ interface ModrinthFile { url: string; filename: string; primary: boolean; size: 
 interface ModrinthVersion { id: string; name: string; version_number: string; files: ModrinthFile[] }
 
 interface JarUpload { filename: string; download_url: string; sha512: string; size_mb: number }
+interface CfHit { id: number; name: string; summary: string; downloadCount: number; authors: { name: string }[] }
+interface CfFile { id: number; fileName: string; displayName: string; downloadUrl: string | null; fileLength: number; hashes: { value: string; algo: number }[]; gameVersions: string[] }
 interface ConfigUpload { filename: string; download_url: string; sha512: string; suggestedPath: string }
 
 declare global {
@@ -36,6 +38,12 @@ declare global {
       modrinth: {
         search: (q: string, mc: string, loader: string, type?: string) => Promise<ModrinthHit[]>
         latest: (projectId: string, mc: string, loader: string, type?: string) => Promise<ModrinthVersion | null>
+      }
+      cf: {
+        validate: () => Promise<boolean>
+        search: (q: string, mc: string, loader: string, type?: string) => Promise<CfHit[]>
+        files: (modId: number, mc: string, loader: string, type?: string) => Promise<CfFile[]>
+        resolve: (file: CfFile) => Promise<{ url: string; sha1?: string }>
       }
       jar: { pickAndUpload: () => Promise<JarUpload | null> }
       config: { pickAndUpload: () => Promise<ConfigUpload | null> }

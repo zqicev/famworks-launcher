@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { LoadedModpack, Modpack, Mod, ServerEntry, ConfigFile } from '../../../types/modpack'
 import AddModrinthModal from './AddModrinthModal'
+import AddCurseforgeModal from './AddCurseforgeModal'
 import styles from '../styles/Editor.module.css'
 
 interface Props {
@@ -18,6 +19,9 @@ export default function Editor({ packKey, loaded, onSaved, onDeleted }: Props) {
   const [addOpen, setAddOpen] = useState(false)
   const [rpAddOpen, setRpAddOpen] = useState(false)
   const [shAddOpen, setShAddOpen] = useState(false)
+  const [cfMod, setCfMod] = useState(false)
+  const [cfRp, setCfRp] = useState(false)
+  const [cfSh, setCfSh] = useState(false)
 
   const set = <K extends keyof Modpack>(key: K, value: Modpack[K]) =>
     setDraft(d => ({ ...d, [key]: value }))
@@ -204,8 +208,9 @@ export default function Editor({ packKey, loaded, onSaved, onDeleted }: Props) {
           <div className={styles.sectionHead}>
             <div className={styles.sectionTitle}>МОДЫ · {draft.mods.length}</div>
             <div className={styles.modActions}>
-              <button className={styles.addBtn} onClick={() => setAddOpen(true)}>+ Из Modrinth</button>
-              <button className={styles.jarBtn} onClick={uploadJar} disabled={busy}>↑ Загрузить .jar</button>
+              <button className={styles.addBtn} onClick={() => setAddOpen(true)}>+ Modrinth</button>
+              <button className={styles.addBtn} onClick={() => setCfMod(true)}>+ CurseForge</button>
+              <button className={styles.jarBtn} onClick={uploadJar} disabled={busy}>↑ .jar</button>
             </div>
           </div>
           <div className={styles.modList}>
@@ -240,8 +245,9 @@ export default function Editor({ packKey, loaded, onSaved, onDeleted }: Props) {
           <div className={styles.sectionHead}>
             <div className={styles.sectionTitle}>РЕСУРСПАКИ · {resourcepacks.length}</div>
             <div className={styles.modActions}>
-              <button className={styles.addBtn} onClick={() => setRpAddOpen(true)}>+ Из Modrinth</button>
-              <button className={styles.jarBtn} onClick={uploadRpZip} disabled={busy}>↑ Загрузить .zip</button>
+              <button className={styles.addBtn} onClick={() => setRpAddOpen(true)}>+ Modrinth</button>
+              <button className={styles.addBtn} onClick={() => setCfRp(true)}>+ CurseForge</button>
+              <button className={styles.jarBtn} onClick={uploadRpZip} disabled={busy}>↑ .zip</button>
             </div>
           </div>
           <div className={styles.modList}>
@@ -270,8 +276,9 @@ export default function Editor({ packKey, loaded, onSaved, onDeleted }: Props) {
           <div className={styles.sectionHead}>
             <div className={styles.sectionTitle}>ШЕЙДЕРЫ · {shaders.length}</div>
             <div className={styles.modActions}>
-              <button className={styles.addBtn} onClick={() => setShAddOpen(true)}>+ Из Modrinth</button>
-              <button className={styles.jarBtn} onClick={uploadShaderZip} disabled={busy}>↑ Загрузить .zip</button>
+              <button className={styles.addBtn} onClick={() => setShAddOpen(true)}>+ Modrinth</button>
+              <button className={styles.addBtn} onClick={() => setCfSh(true)}>+ CurseForge</button>
+              <button className={styles.jarBtn} onClick={uploadShaderZip} disabled={busy}>↑ .zip</button>
             </div>
           </div>
           <div className={styles.modList}>
@@ -402,6 +409,9 @@ export default function Editor({ packKey, loaded, onSaved, onDeleted }: Props) {
           onClose={() => setShAddOpen(false)}
         />
       )}
+      {cfMod && <AddCurseforgeModal kind="mod" mcVersion={draft.mc_version} loader={draft.loader} existing={draft.mods.map(m => m.id)} onAdd={addMod} onClose={() => setCfMod(false)} />}
+      {cfRp && <AddCurseforgeModal kind="resourcepack" mcVersion={draft.mc_version} loader={draft.loader} existing={resourcepacks.map(m => m.id)} onAdd={addRp} onClose={() => setCfRp(false)} />}
+      {cfSh && <AddCurseforgeModal kind="shader" mcVersion={draft.mc_version} loader={draft.loader} existing={shaders.map(m => m.id)} onAdd={addShader} onClose={() => setCfSh(false)} />}
     </div>
   )
 }

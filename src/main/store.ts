@@ -2,6 +2,7 @@ import Store from 'electron-store'
 
 interface StoreSchema {
   token: string
+  cfKey: string
   owner: string
   repo: string
   branch: string
@@ -11,6 +12,7 @@ interface StoreSchema {
 export const store = new Store<StoreSchema>({
   defaults: {
     token: '',
+    cfKey: '',
     owner: 'zqicev',
     repo: 'famworks-builds',
     branch: 'main',
