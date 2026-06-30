@@ -45,6 +45,7 @@ export default function BottomBar({ modpack, installPath, activeMods = 0, totalM
   const [status, setStatus] = useState<ModpackStatus>('checking')
   const [memory, setMemory] = useState(4096)
   const [totalRamMb, setTotalRamMb] = useState(16384)
+  const [busyId, setBusyId] = useState<string | null>(null)
   const [progress, setProgress] = useState<ProgressState | null>(null)
   const clearTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -133,6 +134,8 @@ export default function BottomBar({ modpack, installPath, activeMods = 0, totalM
   useEffect(() => {
     window.api.store.get('allocatedMemory').then(v => { if (v) setMemory(v as number) })
     window.api.system.totalMemoryMb().then(mb => setTotalRamMb(mb)).catch(() => {})
+    window.api.busyGet().then(setBusyId).catch(() => {})
+    return window.api.onBusyChanged(setBusyId)
   }, [])
 
   // Пока игра запущена — следим, не закрылась ли она (актуально после перезапуска лаунчера)
@@ -161,6 +164,7 @@ export default function BottomBar({ modpack, installPath, activeMods = 0, totalM
   }
 
   const handleAction = async () => {
+    if (busyId && busyId !== modpack.id) return
     if (status === 'ready') {
       const account = await window.api.store.get('activeAccountId') as string | null
       if (!account) {
@@ -200,6 +204,8 @@ export default function BottomBar({ modpack, installPath, activeMods = 0, totalM
   const isBusy = status === 'checking' || status === 'installing' || status === 'launching'
   const isRunning = status === 'running'
   const canCancel = status === 'installing' || status === 'launching' || status === 'running'
+  // Занята ДРУГАЯ сборка — блокируем действия с этой
+  const lockedByOther = !!busyId && busyId !== modpack.id
 
   const btnLabel = {
     checking: 'ПРОВЕРКА...',
@@ -281,6 +287,8 @@ export default function BottomBar({ modpack, installPath, activeMods = 0, totalM
                 {isBusy && !hasCount && !hasBytes && <span className={styles.working}>идёт работа, не закрывайте окно</span>}
               </div>
             </>
+          ) : lockedByOther ? (
+            <div className={styles.statusMsg}>Дождитесь завершения работы с другой сборкой</div>
           ) : status === 'checking' ? (
             <div className={styles.statusMsg}>Проверка<span className={styles.dots} /></div>
           ) : null}
@@ -299,9 +307,9 @@ export default function BottomBar({ modpack, installPath, activeMods = 0, totalM
         )}
 
         <button
-          className={`${styles.playBtn} ${btnAccent ? styles.playBtnAccent : styles.playBtnMuted}`}
+          className={`${styles.playBtn} ${btnAccent && !lockedByOther ? styles.playBtnAccent : styles.playBtnMuted}`}
           onClick={handleAction}
-          disabled={isBusy || isRunning}
+          disabled={isBusy || isRunning || lockedByOther}
         >
           <span className={styles.playLabel}>
             {!isBusy && !isRunning && status === 'ready' && <span className={styles.playIcon}>▶ </span>}

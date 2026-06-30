@@ -42,6 +42,8 @@ contextBridge.exposeInMainWorld('api', {
   cancel: () => ipcRenderer.invoke('cancel'),
   killGame: () => ipcRenderer.invoke('game:kill'),
   gameRunning: () => ipcRenderer.invoke('game:running'),
+  busyGet: () => ipcRenderer.invoke('busy:get'),
+  onBusyChanged: (cb: (id: string | null) => void) => subscribe('busy:changed', cb),
   appVersion: () => ipcRenderer.invoke('app:version'),
   fabricLoader: (mc: string) => ipcRenderer.invoke('fabric:loader', mc),
   custom: {

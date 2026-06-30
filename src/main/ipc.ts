@@ -11,12 +11,16 @@ import { searchModrinth, getModVersions } from './modrinth'
 import { microsoftLogin, microsoftRefresh } from './msAuth'
 import { Account } from './store'
 import { beginOperation, endOperation, cancelCurrent, isCancelError } from './abort'
+import { setBusy, getBusyId, onBusyChange } from './busy'
 
 function getWindow(): BrowserWindow {
   return BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
 }
 
 export function setupIpcHandlers() {
+  onBusyChange((id) => getWindow()?.webContents.send('busy:changed', id))
+  ipcMain.handle('busy:get', () => getBusyId())
+
   ipcMain.handle('store:get', (_, key) => store.get(key))
   ipcMain.handle('store:set', (_, key, value) => store.set(key, value))
 
@@ -51,7 +55,9 @@ export function setupIpcHandlers() {
 
   ipcMain.handle('install:modpack', async (_, modpackId: string) => {
     const win = getWindow()
+    if (getBusyId() && getBusyId() !== modpackId) return false // занята другая сборка
     beginOperation()
+    setBusy(modpackId)
     try {
       const modpack = await fetchModpack(modpackId)
       const installPath = store.get('installPath') as string
@@ -67,6 +73,7 @@ export function setupIpcHandlers() {
       throw e
     } finally {
       endOperation()
+      setBusy(null)
     }
   })
 
@@ -78,7 +85,9 @@ export function setupIpcHandlers() {
 
   ipcMain.handle('launch', async (_, modpackId: string) => {
     const win = getWindow()
+    if (getBusyId() && getBusyId() !== modpackId) return false // занята другая сборка
     beginOperation()
+    setBusy(modpackId)
     try {
       const modpack = await fetchModpack(modpackId)
       const installPath = store.get('installPath') as string
@@ -114,10 +123,12 @@ export function setupIpcHandlers() {
     } catch (e) {
       if (isCancelError(e)) {
         win.webContents.send('install:progress', { phase: 'cancelled', message: 'Отменено' })
+        setBusy(null)
         return false
       }
       // Ошибка запуска (например, неодобренный MS-аккаунт) — показываем пользователю
       win.webContents.send('launch:error', e instanceof Error ? e.message : String(e))
+      setBusy(null)
       return false
     } finally {
       endOperation()
@@ -147,6 +158,7 @@ export function setupIpcHandlers() {
     store.set('runningPid', null)
     store.set('runningModpackId', null)
     store.set('runningModpackName', null)
+    setBusy(null)
     getWindow()?.webContents.send('launch:close', -1)
     setIdle()
     return true

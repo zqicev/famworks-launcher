@@ -31,6 +31,8 @@ interface Window {
     cancel: () => Promise<void>
     killGame: () => Promise<boolean>
     gameRunning: () => Promise<string | null>
+    busyGet: () => Promise<string | null>
+    onBusyChanged: (cb: (id: string | null) => void) => () => void
     appVersion: () => Promise<string>
     fabricLoader: (mc: string) => Promise<string>
     custom: {

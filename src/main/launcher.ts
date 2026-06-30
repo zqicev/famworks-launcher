@@ -6,6 +6,7 @@ import { ProgressEvent } from './installer'
 import { ensureJava } from './java'
 import { writeServers } from './servers'
 import { setPlaying, setIdle } from './discord'
+import { setBusy } from './busy'
 import { store } from './store'
 import { opSignal } from './abort'
 import axios from 'axios'
@@ -109,6 +110,7 @@ export async function launchGame(
         store.set('runningPid', null)
         store.set('runningModpackId', null)
         store.set('runningModpackName', null)
+        setBusy(null)
         win.webContents.send('launch:close', msg.code)
         win.webContents.send('install:progress', { phase: 'done', message: '' })
         setIdle()
@@ -136,6 +138,7 @@ export function abortLaunch(): boolean {
     launchAborted = true
     try { currentWorker.kill() } catch {}
     currentWorker = null
+    setBusy(null)
     return true
   }
   return false
