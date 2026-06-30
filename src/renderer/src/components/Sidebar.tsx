@@ -69,7 +69,15 @@ export default function Sidebar({ index, customPacks, selectedId, seenUpdates, o
             <button className={styles.addMini} onClick={onCreate} title="Создать сборку">+</button>
           </div>
           <div className={styles.list}>
-            {customPacks.length === 0 && <div className={styles.emptyHint}>Создай свою сборку →</div>}
+            {customPacks.length === 0 && (
+              <button className={styles.createCard} onClick={onCreate}>
+                <span className={styles.createPlus}>+</span>
+                <div className={styles.createText}>
+                  <div className={styles.createTitle}>Создать сборку</div>
+                  <div className={styles.createSub}>Свои моды, паки и шейдеры</div>
+                </div>
+              </button>
+            )}
             {customPacks.map((pack) => {
               const active = selectedId === pack.id
               return (
