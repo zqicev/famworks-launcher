@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { ModpackIndex, Modpack } from '../types/modpack'
+import { store } from './store'
 
 // Сборки хранятся в отдельном публичном репозитории famworks-builds.
 const GITHUB_BASE = 'https://raw.githubusercontent.com/zqicev/famworks-builds/main/modpacks'
@@ -64,6 +65,13 @@ function injectFabricApi(mp: Modpack): void {
 }
 
 export async function fetchModpack(id: string): Promise<Modpack> {
+  // Кастомная (локальная) сборка — берём из store, в GitHub не ходим
+  const custom = (store.get('customModpacks') as Modpack[]).find(m => m.id === id)
+  if (custom) {
+    if (!Array.isArray(custom.mods)) custom.mods = []
+    injectFabricApi(custom)
+    return custom
+  }
   const data = await fetchWithFallback<Modpack>(`${id}.json`)
   // Защита от битого/неполного JSON на GitHub — нормализуем обязательные поля.
   if (!data || typeof data !== 'object') {

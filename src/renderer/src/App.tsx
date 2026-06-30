@@ -6,6 +6,7 @@ import TitleBar from './components/TitleBar'
 import SetupModal from './components/SetupModal'
 import SettingsModal from './components/SettingsModal'
 import UpdateBanner from './components/UpdateBanner'
+import CreateModpackModal from './components/CreateModpackModal'
 import styles from './styles/App.module.css'
 
 export default function App() {
@@ -18,6 +19,12 @@ export default function App() {
   const [error, setError] = useState<string | null>(null)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [seenUpdates, setSeenUpdates] = useState<Record<string, string>>({})
+  const [customPacks, setCustomPacks] = useState<Modpack[]>([])
+  const [createOpen, setCreateOpen] = useState(false)
+
+  const loadCustom = useCallback(async () => {
+    setCustomPacks(await window.api.custom.list().catch(() => []))
+  }, [])
 
   const loadIndex = useCallback(async () => {
     setError(null)
@@ -48,7 +55,7 @@ export default function App() {
       const path = await window.api.store.get('installPath') as string
       if (!path) { setNeedsSetup(true); setLoading(false); return }
       setInstallPath(path)
-      await loadIndex()
+      await Promise.all([loadIndex(), loadCustom()])
       setLoading(false)
     }
     init()
@@ -80,12 +87,26 @@ export default function App() {
 
   const handleRefresh = async () => {
     setLoading(true)
-    await loadIndex()
+    await Promise.all([loadIndex(), loadCustom()])
     if (selectedId) {
       const mp = await window.api.modpacks.get(selectedId).catch(() => null)
       if (mp) setModpack(mp)
     }
     setLoading(false)
+  }
+
+  const handleCreated = async (mp: Modpack) => {
+    await window.api.custom.save(mp)
+    await loadCustom()
+    setCreateOpen(false)
+    setSelectedId(mp.id)
+  }
+
+  const handleDeleteCustom = async (id: string) => {
+    if (!confirm('Удалить эту сборку? Файлы игры на диске останутся.')) return
+    await window.api.custom.delete(id)
+    await loadCustom()
+    if (selectedId === id) setSelectedId(modpackIndex?.modpacks[0]?.id ?? null)
   }
 
   return (
@@ -98,11 +119,14 @@ export default function App() {
         <div className={styles.layout}>
           <Sidebar
             index={modpackIndex}
+            customPacks={customPacks}
             selectedId={selectedId}
             seenUpdates={seenUpdates}
             onSelect={setSelectedId}
             onSettings={() => setSettingsOpen(true)}
             onRefresh={handleRefresh}
+            onCreate={() => setCreateOpen(true)}
+            onDeleteCustom={handleDeleteCustom}
           />
           <MainPanel
             modpack={modpack}
@@ -116,6 +140,9 @@ export default function App() {
               onPathChange={setInstallPath}
               onClose={() => setSettingsOpen(false)}
             />
+          )}
+          {createOpen && (
+            <CreateModpackModal onCreate={handleCreated} onClose={() => setCreateOpen(false)} />
           )}
         </div>
       )}

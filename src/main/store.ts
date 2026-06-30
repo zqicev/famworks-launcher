@@ -1,4 +1,5 @@
 import Store from 'electron-store'
+import { Modpack } from '../types/modpack'
 
 export interface Account {
   id: string                    // 'offline:<ник>' или 'msa:<uuid>'
@@ -16,6 +17,7 @@ interface StoreSchema {
   runningPid: number | null
   runningModpackId: string | null
   runningModpackName: string | null
+  customModpacks: Modpack[]
 }
 
 export const store = new Store<StoreSchema>({
@@ -26,6 +28,7 @@ export const store = new Store<StoreSchema>({
     allocatedMemory: 4096,
     runningPid: null,
     runningModpackId: null,
-    runningModpackName: null
+    runningModpackName: null,
+    customModpacks: []
   }
 })

@@ -147,3 +147,22 @@
 .dotActive { background: var(--accent); }
 
 .spacer { flex: 1; }
+
+.scroll { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
+.scroll .section + .section { margin-top: 8px; }
+
+.addMini {
+  width: 18px; height: 18px; border-radius: 5px; background: var(--bg-active);
+  color: var(--accent); font-size: 14px; line-height: 1; display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s;
+}
+.addMini:hover { background: var(--bg-hover); }
+
+.emptyHint { padding: 6px 10px; font-size: 11px; color: var(--text-dim); }
+
+.delPack {
+  font-size: 10px; color: var(--text-dim); padding: 3px 6px; border-radius: 4px;
+  opacity: 0; transition: opacity 0.15s, color 0.15s; flex-shrink: 0;
+}
+.item:hover .delPack { opacity: 1; }
+.delPack:hover { color: var(--red); }

@@ -148,6 +148,29 @@ export function setupIpcHandlers() {
 
   ipcMain.handle('app:version', () => app.getVersion())
 
+  // Последняя стабильная версия Fabric-загрузчика для версии MC (для создания кастомной сборки)
+  ipcMain.handle('fabric:loader', async (_, mc: string) => {
+    try {
+      const axios = (await import('axios')).default
+      const res = await axios.get(`https://meta.fabricmc.net/v2/versions/loader/${mc}`, { timeout: 8000 })
+      const stable = (res.data as any[]).find(v => v.loader?.stable) ?? res.data[0]
+      return stable?.loader?.version ?? ''
+    } catch { return '' }
+  })
+
+  // Кастомные (локальные) сборки
+  ipcMain.handle('custom:list', () => store.get('customModpacks'))
+  ipcMain.handle('custom:save', (_, mp) => {
+    const list = (store.get('customModpacks') as any[]).filter(m => m.id !== mp.id)
+    list.push(mp)
+    store.set('customModpacks', list)
+    return true
+  })
+  ipcMain.handle('custom:delete', (_, id: string) => {
+    store.set('customModpacks', (store.get('customModpacks') as any[]).filter(m => m.id !== id))
+    return true
+  })
+
   ipcMain.handle('shell:open-folder', (_, folderPath: string) => shell.openPath(folderPath))
 
   ipcMain.handle('system:total-memory-mb', async () => {

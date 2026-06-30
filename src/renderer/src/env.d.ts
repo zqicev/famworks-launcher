@@ -31,6 +31,12 @@ interface Window {
     cancel: () => Promise<void>
     gameRunning: () => Promise<string | null>
     appVersion: () => Promise<string>
+    fabricLoader: (mc: string) => Promise<string>
+    custom: {
+      list: () => Promise<import('../../types/modpack').Modpack[]>
+      save: (mp: import('../../types/modpack').Modpack) => Promise<boolean>
+      delete: (id: string) => Promise<boolean>
+    }
     auth: {
       microsoftLogin: () => Promise<{ username: string; uuid: string; refreshToken: string; mclc: unknown }>
     }
