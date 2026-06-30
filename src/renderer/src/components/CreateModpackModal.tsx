@@ -52,7 +52,7 @@ export default function CreateModpackModal({ onCreate, onClose }: Props) {
         </div>
         <div className={styles.body}>
           <Field label="НАЗВАНИЕ">
-            <input className={styles.cinput} value={name} onChange={e => setName(e.target.value)} placeholder="Моя сборка" autoFocus />
+            <input className={styles.cinput} value={name} maxLength={40} onChange={e => setName(e.target.value)} placeholder="Моя сборка" autoFocus />
           </Field>
           <div style={{ display: 'flex', gap: 10 }}>
             <Field label="ВЕРСИЯ MC">

@@ -177,7 +177,9 @@
   padding: 10px 24px;
   border-radius: 10px;
   min-width: 180px;
+  max-width: 280px;
   flex-shrink: 0;
+  overflow: hidden;
   transition: background 0.15s, opacity 0.15s, transform 0.12s, box-shadow 0.15s;
 }
 
@@ -219,4 +221,8 @@
   font-weight: 500;
   opacity: 0.65;
   margin-top: 3px;
+  align-self: stretch;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
