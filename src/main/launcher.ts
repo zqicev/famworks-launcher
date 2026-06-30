@@ -9,7 +9,7 @@ import { setPlaying, setIdle } from './discord'
 import { store } from './store'
 import { opSignal } from './abort'
 import axios from 'axios'
-import { mkdirSync, writeFileSync, existsSync } from 'fs'
+import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'fs'
 import { createHash } from 'crypto'
 
 function emit(win: BrowserWindow, event: ProgressEvent) {
@@ -63,10 +63,19 @@ export async function launchGame(
   const gameRoot = join(installPath, modpack.id)
   const fabricVersionId = await installFabric(modpack, gameRoot, win)
 
-  // 3. Серверы сборки → servers.dat (мердж, не теряя серверы игрока)
+  // 3. Серверы сборки → servers.dat. Сеем один раз: если набор серверов не менялся,
+  //    повторно не трогаем (пользователь волен удалять/менять их у себя).
   if (modpack.servers?.length) {
-    try { await writeServers(gameRoot, modpack.servers) } catch (e) {
-      win.webContents.send('launch:log', `[servers] ${String(e)}`)
+    const key = JSON.stringify(modpack.servers.map(s => s.port && s.port !== 25565 ? `${s.ip}:${s.port}` : s.ip))
+    const marker = join(gameRoot, '.fwservers')
+    const prev = existsSync(marker) ? readFileSync(marker, 'utf8') : ''
+    if (prev !== key) {
+      try {
+        await writeServers(gameRoot, modpack.servers)
+        writeFileSync(marker, key)
+      } catch (e) {
+        win.webContents.send('launch:log', `[servers] ${String(e)}`)
+      }
     }
   }
 
