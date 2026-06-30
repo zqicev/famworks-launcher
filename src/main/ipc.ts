@@ -32,8 +32,9 @@ export function setupIpcHandlers() {
     toggleMod(modsDir, filename, enabled))
   ipcMain.handle('mods:delete', (_, modsDir: string, filename: string) =>
     deleteMod(modsDir, filename))
-  ipcMain.handle('mods:add-file', async () => {
-    const result = await dialog.showOpenDialog({ filters: [{ name: 'Mod', extensions: ['jar'] }], properties: ['openFile'] })
+  ipcMain.handle('mods:add-file', async (_, exts?: string[]) => {
+    const extensions = exts && exts.length ? exts : ['jar']
+    const result = await dialog.showOpenDialog({ filters: [{ name: 'File', extensions }], properties: ['openFile'] })
     return result.filePaths[0] ?? null
   })
 

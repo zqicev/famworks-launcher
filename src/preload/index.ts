@@ -23,7 +23,7 @@ contextBridge.exposeInMainWorld('api', {
     toggle: (modsDir: string, filename: string, enabled: boolean) =>
       ipcRenderer.invoke('mods:toggle', modsDir, filename, enabled),
     delete: (modsDir: string, filename: string) => ipcRenderer.invoke('mods:delete', modsDir, filename),
-    addFile: () => ipcRenderer.invoke('mods:add-file'),
+    addFile: (exts?: string[]) => ipcRenderer.invoke('mods:add-file', exts),
     fileSize: (modsDir: string, filename: string) => ipcRenderer.invoke('mods:file-size', modsDir, filename),
     copyJar: (srcPath: string, modsDir: string) => ipcRenderer.invoke('mods:copy-jar', srcPath, modsDir)
   },

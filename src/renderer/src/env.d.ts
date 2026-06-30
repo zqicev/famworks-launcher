@@ -15,7 +15,7 @@ interface Window {
       installed: (modsDir: string) => Promise<string[]>
       toggle: (modsDir: string, filename: string, enabled: boolean) => Promise<void>
       delete: (modsDir: string, filename: string) => Promise<void>
-      addFile: () => Promise<string | null>
+      addFile: (exts?: string[]) => Promise<string | null>
       fileSize: (modsDir: string, filename: string) => Promise<number>
       copyJar: (srcPath: string, modsDir: string) => Promise<string>
     }

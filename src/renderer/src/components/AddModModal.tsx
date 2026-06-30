@@ -92,8 +92,11 @@ export default function AddModModal({ modpack, modsDir, kind = 'mod', onClose }:
   }
 
   const addFromFile = async () => {
-    const path = await window.api.mods.addFile()
-    if (path) onClose()
+    const ext = kind === 'resourcepack' ? 'zip' : 'jar'
+    const path = await window.api.mods.addFile([ext])
+    if (!path) return
+    await window.api.mods.copyJar(path, modsDir)
+    onClose()
   }
 
   return (
@@ -114,11 +117,9 @@ export default function AddModModal({ modpack, modsDir, kind = 'mod', onClose }:
             autoFocus
           />
           <button className={styles.searchBtn} onClick={search}>Найти</button>
-          {kind === 'mod' && (
-            <button className={styles.fileBtn} onClick={addFromFile}>
-              .jar файл
-            </button>
-          )}
+          <button className={styles.fileBtn} onClick={addFromFile}>
+            {kind === 'resourcepack' ? '.zip файл' : '.jar файл'}
+          </button>
         </div>
 
         {notice && <div className={styles.notice}>{notice}</div>}
