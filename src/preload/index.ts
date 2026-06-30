@@ -28,10 +28,10 @@ contextBridge.exposeInMainWorld('api', {
     copyJar: (srcPath: string, modsDir: string) => ipcRenderer.invoke('mods:copy-jar', srcPath, modsDir)
   },
   modrinth: {
-    search: (query: string, mcVersion: string, loader: string) =>
-      ipcRenderer.invoke('modrinth:search', query, mcVersion, loader),
-    versions: (projectId: string, mcVersion: string, loader: string) =>
-      ipcRenderer.invoke('modrinth:versions', projectId, mcVersion, loader),
+    search: (query: string, mcVersion: string, loader: string, type?: string) =>
+      ipcRenderer.invoke('modrinth:search', query, mcVersion, loader, type),
+    versions: (projectId: string, mcVersion: string, loader: string, type?: string) =>
+      ipcRenderer.invoke('modrinth:versions', projectId, mcVersion, loader, type),
     download: (url: string, filename: string, modsDir: string, sha512?: string) =>
       ipcRenderer.invoke('modrinth:download', url, filename, modsDir, sha512)
   },

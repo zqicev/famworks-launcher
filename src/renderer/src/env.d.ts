@@ -20,8 +20,8 @@ interface Window {
       copyJar: (srcPath: string, modsDir: string) => Promise<string>
     }
     modrinth: {
-      search: (query: string, mcVersion: string, loader: string) => Promise<unknown[]>
-      versions: (projectId: string, mcVersion: string, loader: string) => Promise<unknown[]>
+      search: (query: string, mcVersion: string, loader: string, type?: string) => Promise<unknown[]>
+      versions: (projectId: string, mcVersion: string, loader: string, type?: string) => Promise<unknown[]>
       download: (url: string, filename: string, modsDir: string, sha512?: string) => Promise<string>
     }
     install: {

@@ -5,6 +5,7 @@ import styles from '../styles/AddModModal.module.css'
 interface Props {
   modpack: Modpack
   modsDir: string
+  kind?: 'mod' | 'resourcepack'
   onClose: () => void
 }
 
@@ -19,7 +20,7 @@ interface SearchResult {
   categories: string[]
 }
 
-export default function AddModModal({ modpack, modsDir, onClose }: Props) {
+export default function AddModModal({ modpack, modsDir, kind = 'mod', onClose }: Props) {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<SearchResult[]>([])
   const [loading, setLoading] = useState(false)
@@ -40,7 +41,7 @@ export default function AddModModal({ modpack, modsDir, onClose }: Props) {
     if (!query.trim()) return
     setLoading(true)
     try {
-      const hits = await window.api.modrinth.search(query, modpack.mc_version, modpack.loader)
+      const hits = await window.api.modrinth.search(query, modpack.mc_version, modpack.loader, kind)
       setResults(hits as SearchResult[])
     } finally {
       setLoading(false)
@@ -51,7 +52,7 @@ export default function AddModModal({ modpack, modsDir, onClose }: Props) {
     setInstalling(mod.project_id)
     setNotice('')
     try {
-      const versions = await window.api.modrinth.versions(mod.project_id, modpack.mc_version, modpack.loader) as any[]
+      const versions = await window.api.modrinth.versions(mod.project_id, modpack.mc_version, modpack.loader, kind) as any[]
       setInstalling(null)
       if (!versions.length) {
         setNotice(`Нет версий «${mod.title}», совместимых с ${modpack.loader} ${modpack.mc_version}`)
@@ -99,7 +100,7 @@ export default function AddModModal({ modpack, modsDir, onClose }: Props) {
     <div className={styles.overlay} onClick={onClose}>
       <div className={styles.modal} onClick={e => e.stopPropagation()}>
         <div className={styles.header}>
-          <h2 className={styles.title}>Добавить мод</h2>
+          <h2 className={styles.title}>{kind === 'resourcepack' ? 'Добавить ресурспак' : 'Добавить мод'}</h2>
           <button className={styles.close} onClick={onClose}>✕</button>
         </div>
 
@@ -113,9 +114,11 @@ export default function AddModModal({ modpack, modsDir, onClose }: Props) {
             autoFocus
           />
           <button className={styles.searchBtn} onClick={search}>Найти</button>
-          <button className={styles.fileBtn} onClick={addFromFile}>
-            .jar файл
-          </button>
+          {kind === 'mod' && (
+            <button className={styles.fileBtn} onClick={addFromFile}>
+              .jar файл
+            </button>
+          )}
         </div>
 
         {notice && <div className={styles.notice}>{notice}</div>}

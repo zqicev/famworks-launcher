@@ -37,10 +37,10 @@ export function setupIpcHandlers() {
     return result.filePaths[0] ?? null
   })
 
-  ipcMain.handle('modrinth:search', (_, query: string, mcVersion: string, loader: string) =>
-    searchModrinth(query, mcVersion, loader))
-  ipcMain.handle('modrinth:versions', (_, projectId: string, mcVersion: string, loader: string) =>
-    getModVersions(projectId, mcVersion, loader))
+  ipcMain.handle('modrinth:search', (_, query: string, mcVersion: string, loader: string, type?: string) =>
+    searchModrinth(query, mcVersion, loader, type))
+  ipcMain.handle('modrinth:versions', (_, projectId: string, mcVersion: string, loader: string, type?: string) =>
+    getModVersions(projectId, mcVersion, loader, type))
   ipcMain.handle('modrinth:download', async (_, url: string, filename: string, modsDir: string, sha512?: string) => {
     await downloadModToDir(url, filename, modsDir, getWindow(), sha512)
     return filename

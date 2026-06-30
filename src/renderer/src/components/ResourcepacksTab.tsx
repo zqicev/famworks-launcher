@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Modpack, Mod } from '../../../types/modpack'
 import ModRow from './ModRow'
+import AddModModal from './AddModModal'
 import styles from '../styles/ModsTab.module.css'
 
 interface Props {
@@ -15,6 +16,7 @@ export default function ResourcepacksTab({ modpack, dir }: Props) {
   const [extra, setExtra] = useState<Mod[]>([])
   const [deleted, setDeleted] = useState<Set<string>>(new Set())
   const [dragging, setDragging] = useState(false)
+  const [addOpen, setAddOpen] = useState(false)
 
   const scan = useCallback(async () => {
     const files = await window.api.mods.installed(dir).catch(() => [] as string[])
@@ -72,7 +74,8 @@ export default function ResourcepacksTab({ modpack, dir }: Props) {
           <span className={styles.searchIcon}>⌕</span>
           <input className={styles.search} placeholder="Поиск ресурспаков" value={search} onChange={e => setSearch(e.target.value)} />
         </div>
-        <span className={styles.activeCount}>{all.length} паков · перетащите .zip сюда</span>
+        <span className={styles.activeCount}>{all.length} паков</span>
+        <button className={styles.addBtn} onClick={() => setAddOpen(true)}>+ ДОБАВИТЬ</button>
         <button className={styles.folderBtn} onClick={() => window.api.shell.openFolder(dir)} title="Открыть папку">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M4 5h5l2 2h9a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" />
@@ -85,6 +88,15 @@ export default function ResourcepacksTab({ modpack, dir }: Props) {
           <ModRow key={p.id} mod={p} enabled={!disabled.has(p.filename)} onToggle={v => handleToggle(p, v)} onDelete={() => handleDelete(p)} />
         ))}
       </div>
+
+      {addOpen && (
+        <AddModModal
+          modpack={modpack}
+          modsDir={dir}
+          kind="resourcepack"
+          onClose={() => { setAddOpen(false); setTimeout(scan, 600) }}
+        />
+      )}
     </div>
   )
 }
