@@ -9,7 +9,8 @@ const MEMORY_OPTIONS = [2048, 4096, 6144, 8192, 12288, 16384, 24576, 32768]
 interface Props {
   modpack: Modpack
   installPath: string
-  extraModsCount?: number
+  activeMods?: number
+  totalMods?: number
 }
 
 type ModpackStatus = 'checking' | 'not_installed' | 'outdated' | 'ready' | 'installing' | 'launching' | 'running'
@@ -40,7 +41,7 @@ function formatSpeed(bps: number) {
   return `${(bps / 1024 / 1024).toFixed(1)} МБ/с`
 }
 
-export default function BottomBar({ modpack, installPath, extraModsCount = 0 }: Props) {
+export default function BottomBar({ modpack, installPath, activeMods = 0, totalMods = 0 }: Props) {
   const [status, setStatus] = useState<ModpackStatus>('checking')
   const [memory, setMemory] = useState(4096)
   const [totalRamMb, setTotalRamMb] = useState(16384)
@@ -252,7 +253,7 @@ export default function BottomBar({ modpack, installPath, extraModsCount = 0 }: 
           <div className={styles.divider} />
           <div className={styles.stat}>
             <span className={styles.statLabel}>МОДОВ АКТИВНО</span>
-            <span className={styles.statVal}>{modpack.mods.length + extraModsCount} из {modpack.mods.length + extraModsCount}</span>
+            <span className={styles.statVal}>{activeMods} из {totalMods}</span>
           </div>
         </div>
 

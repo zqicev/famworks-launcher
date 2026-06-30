@@ -7,15 +7,14 @@ import styles from '../styles/ModsTab.module.css'
 interface Props {
   modpack: Modpack
   modsDir: string
-  onExtraCountChange?: (count: number) => void
-  onCount?: (total: number) => void
+  onCount?: (total: number, active: number) => void
 }
 
 interface LocalMod extends Mod {
   _local?: boolean
 }
 
-export default function ModsTab({ modpack, modsDir, onExtraCountChange, onCount }: Props) {
+export default function ModsTab({ modpack, modsDir, onCount }: Props) {
   const [search, setSearch] = useState('')
   const [disabled, setDisabled] = useState<Set<string>>(new Set())
   const [addOpen, setAddOpen] = useState(false)
@@ -89,19 +88,17 @@ export default function ModsTab({ modpack, modsDir, onExtraCountChange, onCount 
     ? modpack.mods.filter(m => presentBases.has(m.filename))
     : modpack.mods
   const allMods: LocalMod[] = [...packMods, ...extraMods].filter(m => !deletedIds.has(m.id))
+  const enabledCount = allMods.filter(m => !disabled.has(m.id)).length
 
-  // Родитель считает modpack.mods.length + extraCount → отдаём (фактический total − modpack.mods.length)
+  // Отдаём родителю фактическое число модов и сколько из них включено
   useEffect(() => {
-    onExtraCountChange?.(allMods.length - modpack.mods.length)
-    onCount?.(allMods.length)
-  }, [allMods.length, modpack.mods.length])
+    onCount?.(allMods.length, enabledCount)
+  }, [allMods.length, enabledCount])
 
   const filtered = allMods.filter(m =>
     m.name.toLowerCase().includes(search.toLowerCase()) ||
     m.category.toLowerCase().includes(search.toLowerCase())
   )
-
-  const enabledCount = allMods.filter(m => !disabled.has(m.id)).length
 
   const handleToggle = async (mod: LocalMod, enabled: boolean) => {
     if (mod.required) return
