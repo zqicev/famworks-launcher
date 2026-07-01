@@ -125,9 +125,10 @@ export default function ModsTab({ modpack, modsDir, onCount }: Props) {
   const handleDrop = useCallback(async (e: React.DragEvent) => {
     e.preventDefault()
     setDragging(false)
-    const files = Array.from(e.dataTransfer.files).filter(f => f.name.endsWith('.jar'))
+    const files = Array.from(e.dataTransfer.files).filter(f => f.name.toLowerCase().endsWith('.jar'))
     for (const file of files) {
-      await window.api.mods.copyJar((file as any).path, modsDir)
+      const path = window.api.getPathForFile(file)
+      if (path) await window.api.mods.copyJar(path, modsDir)
     }
     if (files.length) setTimeout(scanMods, 300)
   }, [modsDir])

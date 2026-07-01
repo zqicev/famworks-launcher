@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron'
+import { contextBridge, ipcRenderer, IpcRendererEvent, webUtils } from 'electron'
 
 // Подписка с поддержкой нескольких слушателей и корректной отпиской.
 // Возвращает функцию cleanup — компоненты вызывают её в useEffect cleanup.
@@ -18,6 +18,8 @@ contextBridge.exposeInMainWorld('api', {
     get: (id: string) => ipcRenderer.invoke('modpacks:get', id),
     status: (id: string) => ipcRenderer.invoke('modpack:status', id)
   },
+  // В Electron 33+ File.path удалён — путь берём через webUtils
+  getPathForFile: (file: File) => webUtils.getPathForFile(file),
   mods: {
     installed: (modsDir: string) => ipcRenderer.invoke('mods:installed', modsDir),
     toggle: (modsDir: string, filename: string, enabled: boolean) =>

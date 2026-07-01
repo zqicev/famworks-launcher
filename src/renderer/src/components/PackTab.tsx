@@ -82,7 +82,10 @@ export default function PackTab({ modpack, dir, items, kind, noun, onCount }: Pr
   const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault(); setDragging(false)
     const files = Array.from(e.dataTransfer.files).filter(f => f.name.toLowerCase().endsWith('.zip'))
-    for (const f of files) await window.api.mods.copyJar((f as any).path, dir)
+    for (const f of files) {
+      const path = window.api.getPathForFile(f)
+      if (path) await window.api.mods.copyJar(path, dir)
+    }
     if (files.length) setTimeout(scan, 300)
   }
 

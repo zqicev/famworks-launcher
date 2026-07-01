@@ -11,6 +11,7 @@ interface Window {
       get: (id: string) => Promise<import('../../types/modpack').Modpack>
       status: (id: string) => Promise<'not_installed' | 'outdated' | 'ready'>
     }
+    getPathForFile: (file: File) => string
     mods: {
       installed: (modsDir: string) => Promise<string[]>
       toggle: (modsDir: string, filename: string, enabled: boolean) => Promise<void>
