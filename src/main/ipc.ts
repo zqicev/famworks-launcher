@@ -191,6 +191,11 @@ export function setupIpcHandlers() {
     return getRecent(pathJoin(store.get('installPath') as string, modpackId))
   })
 
+  ipcMain.handle('server:ping', async (_, ip: string) => {
+    const { pingServer } = await import('./mcping')
+    return pingServer(ip)
+  })
+
   // Прогресс на иконке в панели задач. mode: none|normal|indeterminate
   ipcMain.on('taskbar:progress', (_, value: number, mode: 'none' | 'normal' | 'indeterminate') => {
     getWindow()?.setProgressBar(value, { mode })

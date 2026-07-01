@@ -82,6 +82,7 @@ contextBridge.exposeInMainWorld('api', {
     onError: (cb: (msg: string) => void) => subscribe('update:error', cb)
   },
   recentGet: (id: string) => ipcRenderer.invoke('recent:get', id),
+  serverPing: (ip: string) => ipcRenderer.invoke('server:ping', ip),
   window: {
     minimize: () => ipcRenderer.send('window:minimize'),
     maximize: () => ipcRenderer.send('window:maximize'),

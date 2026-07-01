@@ -4,46 +4,88 @@ import styles from '../styles/OverviewTab.module.css'
 
 interface Props { modpack: Modpack; busyId: string | null }
 
-type Recent = {
-  worlds: { kind: 'world'; folder: string; name: string; lastPlayed: number }[]
-  servers: { kind: 'server'; name: string; ip: string }[]
-}
+type World = { kind: 'world'; folder: string; name: string; lastPlayed: number; mode: string; icon: string | null }
+type Server = { kind: 'server'; name: string; ip: string; icon: string | null }
+type Recent = { worlds: World[]; servers: Server[] }
+type PingResult = { online: number; max: number; favicon: string | null; ping: number; motd: string; version: string } | null
+type PingState = { loading: boolean; data: PingResult }
 
 export default function OverviewTab({ modpack, busyId }: Props) {
   const totalMB = modpack.mods.reduce((s, m) => s + m.size_mb, 0)
-  const sizeFmt = totalMB >= 1000
-    ? `${(totalMB / 1024).toFixed(1)} ГБ`
-    : `${totalMB.toFixed(0)} МБ`
+  const sizeFmt = totalMB >= 1000 ? `${(totalMB / 1024).toFixed(1)} ГБ` : `${totalMB.toFixed(0)} МБ`
 
   const [recent, setRecent] = useState<Recent>({ worlds: [], servers: [] })
+  const [pings, setPings] = useState<Record<string, PingState>>({})
+
   useEffect(() => {
-    window.api.recentGet(modpack.id).then(setRecent).catch(() => {})
+    let alive = true
+    window.api.recentGet(modpack.id).then((r) => {
+      if (!alive) return
+      setRecent(r)
+      // Пингуем каждый сервер отдельно (может занять до 3с)
+      for (const s of r.servers) {
+        setPings((p) => ({ ...p, [s.ip]: { loading: true, data: null } }))
+        window.api.serverPing(s.ip).then((data) => {
+          if (alive) setPings((p) => ({ ...p, [s.ip]: { loading: false, data } }))
+        })
+      }
+    }).catch(() => {})
+    return () => { alive = false }
   }, [modpack.id])
 
   const locked = !!busyId
-  const playWorld = (folder: string) => window.api.launch.start(modpack.id, { type: 'singleplayer', identifier: folder })
-  const playServer = (ip: string) => window.api.launch.start(modpack.id, { type: 'multiplayer', identifier: ip })
+  const playWorld = (folder: string): void => { window.api.launch.start(modpack.id, { type: 'singleplayer', identifier: folder }) }
+  const playServer = (ip: string): void => { window.api.launch.start(modpack.id, { type: 'multiplayer', identifier: ip }) }
 
-  const items = [
-    ...recent.worlds.slice(0, 4).map(w => ({ key: 'w:' + w.folder, icon: '🌍', name: w.name, sub: 'Одиночная игра', onPlay: () => playWorld(w.folder) })),
-    ...recent.servers.map(s => ({ key: 's:' + s.ip, icon: '🖥', name: s.name, sub: s.ip, onPlay: () => playServer(s.ip) }))
-  ].slice(0, 4)
+  const worlds = recent.worlds.slice(0, 4)
+  const servers = recent.servers.slice(0, 4)
+  const hasRecent = worlds.length > 0 || servers.length > 0
 
   return (
     <div className={styles.wrapper}>
       <div className={styles.left}>
-        {items.length > 0 && (
+        {hasRecent && (
           <section className={styles.section}>
             <div className={styles.label}>ПРОДОЛЖИТЬ ИГРУ</div>
             <div className={styles.recentGrid}>
-              {items.map(it => (
-                <div key={it.key} className={styles.recentCard}>
-                  <div className={styles.recentIcon}>{it.icon}</div>
-                  <div className={styles.recentInfo}>
-                    <div className={styles.recentName}>{it.name}</div>
-                    <div className={styles.recentSub}>{it.sub}</div>
+              {servers.map((s) => {
+                const st = pings[s.ip]
+                const icon = st?.data?.favicon || s.icon
+                return (
+                  <div key={'s:' + s.ip} className={styles.recentCard}>
+                    <div className={styles.recentIcon}>
+                      {icon ? <img src={icon} alt="" className={styles.iconImg} /> : <span className={styles.iconFallback}>🖥</span>}
+                    </div>
+                    <div className={styles.recentInfo}>
+                      <div className={styles.recentName}>{s.name}</div>
+                      <div className={styles.recentSub}>
+                        <ServerStatus state={st} />
+                      </div>
+                    </div>
+                    <button
+                      className={styles.recentPlay}
+                      onClick={() => playServer(s.ip)}
+                      disabled={locked}
+                      title="Играть"
+                    >▶</button>
                   </div>
-                  <button className={styles.recentPlay} onClick={it.onPlay} disabled={locked} title="Играть">▶</button>
+                )
+              })}
+              {worlds.map((w) => (
+                <div key={'w:' + w.folder} className={styles.recentCard}>
+                  <div className={styles.recentIcon}>
+                    {w.icon ? <img src={w.icon} alt="" className={styles.iconImg} /> : <span className={styles.iconFallback}>🌍</span>}
+                  </div>
+                  <div className={styles.recentInfo}>
+                    <div className={styles.recentName}>{w.name}</div>
+                    <div className={styles.recentSub}>{w.mode} · {fmtLastPlayed(w.lastPlayed)}</div>
+                  </div>
+                  <button
+                    className={styles.recentPlay}
+                    onClick={() => playWorld(w.folder)}
+                    disabled={locked}
+                    title="Играть"
+                  >▶</button>
                 </div>
               ))}
             </div>
@@ -59,7 +101,7 @@ export default function OverviewTab({ modpack, busyId }: Props) {
           <section className={styles.section}>
             <div className={styles.label}>ПОСЛЕДНИЕ ИЗМЕНЕНИЯ</div>
             <div className={styles.changelog}>
-              {modpack.changelog.map(entry => (
+              {modpack.changelog.map((entry) => (
                 <div key={entry.version} className={styles.changelogRow}>
                   <span className={styles.version}>{entry.version}</span>
                   <span className={styles.changeDesc}>{entry.description}</span>
@@ -74,9 +116,7 @@ export default function OverviewTab({ modpack, busyId }: Props) {
         <div className={styles.paramTitle}>ПАРАМЕТРЫ</div>
         <div className={styles.paramRow}>
           <span className={styles.paramKey}>ЗАГРУЗЧИК</span>
-          <span className={styles.paramVal}>
-            {modpack.loader.charAt(0).toUpperCase() + modpack.loader.slice(1)}
-          </span>
+          <span className={styles.paramVal}>{modpack.loader.charAt(0).toUpperCase() + modpack.loader.slice(1)}</span>
         </div>
         <div className={styles.paramRow}>
           <span className={styles.paramKey}>ВЕРСИЯ MC</span>
@@ -99,7 +139,35 @@ export default function OverviewTab({ modpack, busyId }: Props) {
   )
 }
 
-function formatDate(iso: string) {
+function ServerStatus({ state }: { state: PingState | undefined }): JSX.Element {
+  if (!state || state.loading) return <span className={styles.statusChecking}>проверка…</span>
+  if (!state.data) return <span className={styles.statusOffline}><span className={styles.dotOff} />офлайн</span>
+  const { online, max, ping } = state.data
+  return (
+    <span className={styles.statusOnline}>
+      <span className={styles.dotOn} />
+      {online}/{max} онлайн
+      <span className={styles.pingVal}>{ping} мс</span>
+    </span>
+  )
+}
+
+function fmtLastPlayed(ms: number): string {
+  if (!ms) return ''
+  const now = new Date()
+  const d = new Date(ms)
+  const days = Math.floor((startOfDay(now) - startOfDay(d)) / 86400000)
+  if (days <= 0) return 'сегодня'
+  if (days === 1) return 'вчера'
+  if (days < 7) return `${days} дн. назад`
+  return d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })
+}
+
+function startOfDay(d: Date): number {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime()
+}
+
+function formatDate(iso: string): string {
   try {
     return new Date(iso).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' })
   } catch {

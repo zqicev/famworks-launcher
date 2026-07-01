@@ -70,9 +70,17 @@ interface Window {
       onError: (cb: (msg: string) => void) => () => void
     }
     recentGet: (id: string) => Promise<{
-      worlds: { kind: 'world'; folder: string; name: string; lastPlayed: number }[]
-      servers: { kind: 'server'; name: string; ip: string }[]
+      worlds: { kind: 'world'; folder: string; name: string; lastPlayed: number; mode: string; icon: string | null }[]
+      servers: { kind: 'server'; name: string; ip: string; icon: string | null }[]
     }>
+    serverPing: (ip: string) => Promise<{
+      online: number
+      max: number
+      favicon: string | null
+      ping: number
+      motd: string
+      version: string
+    } | null>
     window: {
       minimize: () => void
       maximize: () => void
