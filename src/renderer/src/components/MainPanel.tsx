@@ -29,8 +29,14 @@ async function countDir(dir: string, ext: string): Promise<{ total: number; enab
 }
 
 export default function MainPanel({ modpack, installPath, loading, error }: Props) {
-  const [tab, setTab] = useState<'mods' | 'resourcepacks' | 'shaders' | 'overview'>('mods')
+  const [tab, setTab] = useState<'mods' | 'resourcepacks' | 'shaders' | 'overview'>('overview')
   const [counts, setCounts] = useState({ modsTotal: 0, modsActive: 0, rp: 0, sh: 0 })
+  const [busyId, setBusyId] = useState<string | null>(null)
+
+  useEffect(() => {
+    window.api.busyGet().then(setBusyId).catch(() => {})
+    return window.api.onBusyChanged(setBusyId)
+  }, [])
 
   const mpId = modpack?.id
   const refreshCounts = useCallback(async () => {
@@ -97,6 +103,9 @@ export default function MainPanel({ modpack, installPath, loading, error }: Prop
         <p className={styles.desc}>{modpack.description}</p>
 
         <div className={styles.tabs}>
+          <button className={`${styles.tab} ${tab === 'overview' ? styles.tabActive : ''}`} onClick={() => setTab('overview')}>
+            ОБЗОР
+          </button>
           <button className={`${styles.tab} ${tab === 'mods' ? styles.tabActive : ''}`} onClick={() => setTab('mods')}>
             МОДЫ <span className={styles.tabCount}>{counts.modsTotal}</span>
           </button>
@@ -105,9 +114,6 @@ export default function MainPanel({ modpack, installPath, loading, error }: Prop
           </button>
           <button className={`${styles.tab} ${tab === 'shaders' ? styles.tabActive : ''}`} onClick={() => setTab('shaders')}>
             ШЕЙДЕРЫ <span className={styles.tabCount}>{counts.sh}</span>
-          </button>
-          <button className={`${styles.tab} ${tab === 'overview' ? styles.tabActive : ''}`} onClick={() => setTab('overview')}>
-            ОБЗОР
           </button>
 
           <div className={styles.stats}>
@@ -123,7 +129,7 @@ export default function MainPanel({ modpack, installPath, loading, error }: Prop
         {tab === 'mods' && <ModsTab modpack={modpack} modsDir={modsDir} onCount={(total, active) => setCounts(c => ({ ...c, modsTotal: total, modsActive: active }))} />}
         {tab === 'resourcepacks' && <PackTab modpack={modpack} dir={rpDir} items={modpack.resourcepacks ?? []} kind="resourcepack" noun="ресурспаков" onCount={n => setCounts(c => ({ ...c, rp: n }))} />}
         {tab === 'shaders' && <PackTab modpack={modpack} dir={shDir} items={modpack.shaders ?? []} kind="shader" noun="шейдеров" onCount={n => setCounts(c => ({ ...c, sh: n }))} />}
-        {tab === 'overview' && <OverviewTab modpack={modpack} />}
+        {tab === 'overview' && <OverviewTab modpack={modpack} busyId={busyId} />}
       </div>
 
       <BottomBar modpack={modpack} installPath={installPath} activeMods={counts.modsActive} totalMods={counts.modsTotal} />

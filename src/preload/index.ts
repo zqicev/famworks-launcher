@@ -55,10 +55,11 @@ contextBridge.exposeInMainWorld('api', {
     microsoftLogin: () => ipcRenderer.invoke('auth:microsoft-login')
   },
   launch: {
-    start: (id: string) => ipcRenderer.invoke('launch', id),
+    start: (id: string, quickPlay?: unknown) => ipcRenderer.invoke('launch', id, quickPlay),
     onLog: (cb: (msg: string) => void) => subscribe('launch:log', cb),
     onClose: (cb: (code: number) => void) => subscribe('launch:close', cb),
-    onError: (cb: (msg: string) => void) => subscribe('launch:error', cb)
+    onError: (cb: (msg: string) => void) => subscribe('launch:error', cb),
+    onSpawned: (cb: (id: string) => void) => subscribe('launch:spawned', cb)
   },
   dialog: {
     pickFolder: () => ipcRenderer.invoke('dialog:pick-folder')
@@ -80,8 +81,10 @@ contextBridge.exposeInMainWorld('api', {
     onDownloaded: (cb: (info: { version: string }) => void) => subscribe('update:downloaded', cb),
     onError: (cb: (msg: string) => void) => subscribe('update:error', cb)
   },
+  recentGet: (id: string) => ipcRenderer.invoke('recent:get', id),
   window: {
     minimize: () => ipcRenderer.send('window:minimize'),
+    maximize: () => ipcRenderer.send('window:maximize'),
     close: () => ipcRenderer.send('window:close')
   },
   taskbarProgress: (value: number, mode: 'none' | 'normal' | 'indeterminate') =>

@@ -128,7 +128,12 @@ export default function BottomBar({ modpack, installPath, activeMods = 0, totalM
       setStatus('ready')
     })
 
-    return () => { offProgress(); offClose(); offError() }
+    // Игра запустилась (в т.ч. по кнопке из Обзора)
+    const offSpawned = window.api.launch.onSpawned((id: string) => {
+      if (id === modpack.id) setStatus('running')
+    })
+
+    return () => { offProgress(); offClose(); offError(); offSpawned() }
   }, [modpack.id, checkStatus])
 
   useEffect(() => {
@@ -137,6 +142,13 @@ export default function BottomBar({ modpack, installPath, activeMods = 0, totalM
     window.api.busyGet().then(setBusyId).catch(() => {})
     return window.api.onBusyChanged(setBusyId)
   }, [])
+
+  // Если работа началась с этой сборкой извне (например, запуск из Обзора) — отражаем статус
+  useEffect(() => {
+    if (busyId === modpack.id) {
+      setStatus(s => (s === 'installing' || s === 'launching' || s === 'running') ? s : 'launching')
+    }
+  }, [busyId, modpack.id])
 
   // Пока игра запущена — следим, не закрылась ли она (актуально после перезапуска лаунчера)
   useEffect(() => {

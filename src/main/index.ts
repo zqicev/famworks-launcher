@@ -36,6 +36,7 @@ function createWindow() {
     win.loadFile(join(__dirname, '../renderer/index.html'))
   }
 
+  win.maximize() // по умолчанию открываем на весь экран
   return win
 }
 

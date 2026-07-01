@@ -38,12 +38,18 @@ export async function installFabric(modpack: Modpack, gameRoot: string, win: Bro
   return versionId
 }
 
+export interface QuickPlay {
+  type: 'singleplayer' | 'multiplayer'
+  identifier: string   // папка мира или host:port
+}
+
 export async function launchGame(
   modpack: Modpack,
   authorization: ILauncherOptions['authorization'],
   installPath: string,
   memoryMB: number,
-  win: BrowserWindow
+  win: BrowserWindow,
+  quickPlay?: QuickPlay
 ): Promise<void> {
   gameSpawned = false
   launchAborted = false
@@ -85,8 +91,9 @@ export async function launchGame(
     version: { number: modpack.mc_version, type: 'release', custom: fabricVersionId },
     memory: { max: `${memoryMB}M`, min: '512M' },
     javaPath,
-    overrides: { detached: true }
-  }
+    overrides: { detached: true },
+    ...(quickPlay ? { quickPlay: { type: quickPlay.type, identifier: quickPlay.identifier } } : {})
+  } as ILauncherOptions
 
   // mclc гоняем в отдельном процессе, чтобы можно было прервать скачивание ассетов
   await new Promise<void>((resolve, reject) => {
@@ -104,6 +111,7 @@ export async function launchGame(
         store.set('runningModpackId', modpack.id)
         store.set('runningModpackName', modpack.name)
         emit(win, { phase: 'done', message: '' })
+        win.webContents.send('launch:spawned', modpack.id)
         setPlaying(modpack.name)
         resolve()
       } else if (msg.t === 'close') {

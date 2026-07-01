@@ -6,7 +6,7 @@ import { setIdle } from './discord'
 import { store } from './store'
 import { fetchModpackIndex, fetchModpack } from './modpacks'
 import { checkAndInstallModpack, getModpackStatus, toggleMod, deleteMod, getInstalledMods, downloadModToDir, getModFileSizeBytes } from './installer'
-import { launchGame, installFabric, offlineAuthorization, abortLaunch } from './launcher'
+import { launchGame, installFabric, offlineAuthorization, abortLaunch, QuickPlay } from './launcher'
 import { searchModrinth, getModVersions } from './modrinth'
 import { microsoftLogin, microsoftRefresh } from './msAuth'
 import { Account } from './store'
@@ -83,7 +83,7 @@ export function setupIpcHandlers() {
     return res
   })
 
-  ipcMain.handle('launch', async (_, modpackId: string) => {
+  ipcMain.handle('launch', async (_, modpackId: string, quickPlay?: QuickPlay) => {
     const win = getWindow()
     if (getBusyId() && getBusyId() !== modpackId) return false // занята другая сборка
     beginOperation()
@@ -118,7 +118,7 @@ export function setupIpcHandlers() {
         authorization = offlineAuthorization(account?.username ?? 'Player')
       }
 
-      await launchGame(modpack, authorization, installPath, memory, win)
+      await launchGame(modpack, authorization, installPath, memory, win, quickPlay)
       return true
     } catch (e) {
       if (isCancelError(e)) {
@@ -186,6 +186,11 @@ export function setupIpcHandlers() {
 
   ipcMain.handle('app:version', () => app.getVersion())
 
+  ipcMain.handle('recent:get', async (_, modpackId: string) => {
+    const { getRecent } = await import('./recent')
+    return getRecent(pathJoin(store.get('installPath') as string, modpackId))
+  })
+
   // Прогресс на иконке в панели задач. mode: none|normal|indeterminate
   ipcMain.on('taskbar:progress', (_, value: number, mode: 'none' | 'normal' | 'indeterminate') => {
     getWindow()?.setProgressBar(value, { mode })
@@ -236,5 +241,9 @@ export function setupIpcHandlers() {
   })
 
   ipcMain.on('window:minimize', () => BrowserWindow.getFocusedWindow()?.minimize())
+  ipcMain.on('window:maximize', () => {
+    const w = BrowserWindow.getFocusedWindow()
+    if (w?.isMaximized()) w.unmaximize(); else w?.maximize()
+  })
   ipcMain.on('window:close', () => BrowserWindow.getFocusedWindow()?.close())
 }

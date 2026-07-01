@@ -44,10 +44,11 @@ interface Window {
       microsoftLogin: () => Promise<{ username: string; uuid: string; refreshToken: string; mclc: unknown }>
     }
     launch: {
-      start: (id: string) => Promise<boolean>
+      start: (id: string, quickPlay?: { type: 'singleplayer' | 'multiplayer'; identifier: string }) => Promise<boolean>
       onLog: (cb: (msg: string) => void) => () => void
       onClose: (cb: (code: number) => void) => () => void
       onError: (cb: (msg: string) => void) => () => void
+      onSpawned: (cb: (id: string) => void) => () => void
     }
     dialog: {
       pickFolder: () => Promise<string | null>
@@ -68,8 +69,13 @@ interface Window {
       onDownloaded: (cb: (info: { version: string }) => void) => () => void
       onError: (cb: (msg: string) => void) => () => void
     }
+    recentGet: (id: string) => Promise<{
+      worlds: { kind: 'world'; folder: string; name: string; lastPlayed: number }[]
+      servers: { kind: 'server'; name: string; ip: string }[]
+    }>
     window: {
       minimize: () => void
+      maximize: () => void
       close: () => void
     }
     taskbarProgress: (value: number, mode: 'none' | 'normal' | 'indeterminate') => void

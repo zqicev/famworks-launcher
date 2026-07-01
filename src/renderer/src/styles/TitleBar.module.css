@@ -28,6 +28,9 @@
   font-size: 11px;
   color: var(--text-secondary);
   transition: background 0.15s, color 0.15s;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .btn:hover {
