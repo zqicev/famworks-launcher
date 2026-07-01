@@ -9,6 +9,7 @@ export interface RecentWorld {
   name: string
   lastPlayed: number
   mode: string
+  version: string // версия MC, в которой сохранён мир (Data.Version.Name)
   icon: string | null // data URL иконки мира (saves/<world>/icon.png)
   score: number
 }
@@ -80,6 +81,7 @@ async function readWorlds(gameRoot: string, stats: Stats): Promise<RecentWorld[]
       else if (typeof lp === 'string') lastPlayed = Number(lp)
       if (!lastPlayed) lastPlayed = statSync(levelDat).mtimeMs
       const gt = data?.Player?.value?.playerGameType?.value ?? data?.GameType?.value ?? 0
+      const version = data?.Version?.value?.Name?.value ?? ''
       const st = stats['w:' + folder]
       const last = Math.max(lastPlayed, st?.last ?? 0)
       out.push({
@@ -88,6 +90,7 @@ async function readWorlds(gameRoot: string, stats: Stats): Promise<RecentWorld[]
         name: String(name),
         lastPlayed,
         mode: GAME_MODES[gt] ?? 'Выживание',
+        version: String(version),
         icon: readIcon(join(dir, 'icon.png')),
         score: frecency(last, st?.count ?? 0)
       })

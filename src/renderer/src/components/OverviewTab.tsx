@@ -4,7 +4,7 @@ import styles from '../styles/OverviewTab.module.css'
 
 interface Props { modpack: Modpack; busyId: string | null }
 
-type World = { kind: 'world'; folder: string; name: string; lastPlayed: number; mode: string; icon: string | null; score: number }
+type World = { kind: 'world'; folder: string; name: string; lastPlayed: number; mode: string; version: string; icon: string | null; score: number }
 type Server = { kind: 'server'; name: string; ip: string; icon: string | null; score: number }
 type Entry = World | Server
 type PingResult = { online: number; max: number; favicon: string | null; ping: number; motd: string; version: string } | null
@@ -59,6 +59,7 @@ export default function OverviewTab({ modpack, busyId }: Props) {
               {entries.map((e) => {
                 const st = e.kind === 'server' ? pings[e.ip] : undefined
                 const img = e.kind === 'server' ? (st?.data?.favicon || e.icon) : e.icon
+                const version = e.kind === 'world' ? e.version : st?.data?.version
                 return (
                   <div key={e.kind === 'world' ? 'w:' + e.folder : 's:' + e.ip} className={styles.recentCard}>
                     <div className={styles.recentIcon}>
@@ -67,7 +68,10 @@ export default function OverviewTab({ modpack, busyId }: Props) {
                         : e.kind === 'world' ? <WorldIcon /> : <ServerIcon />}
                     </div>
                     <div className={styles.recentInfo}>
-                      <div className={styles.recentName}>{e.name}</div>
+                      <div className={styles.recentName}>
+                        <span className={styles.nameText}>{e.name}</span>
+                        {version ? <span className={styles.verBadge}>{cleanVersion(version)}</span> : null}
+                      </div>
                       <div className={styles.recentSub}>
                         {e.kind === 'world'
                           ? `${e.mode} · ${fmtLastPlayed(e.lastPlayed)}`
@@ -168,6 +172,12 @@ function ServerIcon(): JSX.Element {
       </svg>
     </div>
   )
+}
+
+/** У серверов version.name бывает «Paper 1.20.1», «Spigot 1.21» — оставляем номер версии. */
+function cleanVersion(raw: string): string {
+  const m = raw.match(/\d+\.\d+(\.\d+)?/)
+  return m ? m[0] : raw.slice(0, 12)
 }
 
 function fmtLastPlayed(ms: number): string {

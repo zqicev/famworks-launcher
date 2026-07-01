@@ -70,7 +70,7 @@ interface Window {
       onError: (cb: (msg: string) => void) => () => void
     }
     recentGet: (id: string) => Promise<Array<
-      | { kind: 'world'; folder: string; name: string; lastPlayed: number; mode: string; icon: string | null; score: number }
+      | { kind: 'world'; folder: string; name: string; lastPlayed: number; mode: string; version: string; icon: string | null; score: number }
       | { kind: 'server'; name: string; ip: string; icon: string | null; score: number }
     >>
     serverPing: (ip: string) => Promise<{

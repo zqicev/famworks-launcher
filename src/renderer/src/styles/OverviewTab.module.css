@@ -39,7 +39,14 @@
 .fbWorld { background: linear-gradient(135deg, #1c2610 0%, #121212 100%); }
 .fbServer { background: linear-gradient(135deg, #17251f 0%, #121212 100%); }
 .recentInfo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
-.recentName { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.recentName { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; }
+.nameText { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.verBadge {
+  flex-shrink: 0; font-size: 10px; font-weight: 600; line-height: 1;
+  padding: 2px 5px; border-radius: 5px; color: var(--accent);
+  background: rgba(197, 248, 42, 0.12); max-width: 90px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
 .recentSub { font-size: 11px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .statusChecking { color: var(--text-dim); }
