@@ -34,7 +34,10 @@
   flex-shrink: 0; overflow: hidden;
 }
 .iconImg { width: 100%; height: 100%; object-fit: cover; image-rendering: pixelated; }
-.iconFallback { line-height: 1; }
+.iconFallback { width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; }
+.iconSvg { width: 68%; height: 68%; display: block; }
+.fbWorld { background: linear-gradient(135deg, #1c2610 0%, #121212 100%); }
+.fbServer { background: linear-gradient(135deg, #17251f 0%, #121212 100%); }
 .recentInfo { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .recentName { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .recentSub { font-size: 11px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

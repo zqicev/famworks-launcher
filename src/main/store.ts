@@ -18,6 +18,9 @@ interface StoreSchema {
   runningModpackId: string | null
   runningModpackName: string | null
   customModpacks: Modpack[]
+  // Статистика запусков миров/серверов для сортировки «Продолжить игру»:
+  // { [modpackId]: { 'w:<folder>' | 's:<ip>': { count, last } } }
+  playStats: Record<string, Record<string, { count: number; last: number }>>
 }
 
 export const store = new Store<StoreSchema>({
@@ -29,6 +32,7 @@ export const store = new Store<StoreSchema>({
     runningPid: null,
     runningModpackId: null,
     runningModpackName: null,
-    customModpacks: []
+    customModpacks: [],
+    playStats: {}
   }
 })

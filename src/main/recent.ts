@@ -1,6 +1,7 @@
 import { join } from 'path'
 import { existsSync, readFileSync, readdirSync, statSync } from 'fs'
 import * as nbt from 'prismarine-nbt'
+import { store } from './store'
 
 export interface RecentWorld {
   kind: 'world'
@@ -9,20 +10,43 @@ export interface RecentWorld {
   lastPlayed: number
   mode: string
   icon: string | null // data URL иконки мира (saves/<world>/icon.png)
+  score: number
 }
 export interface RecentServer {
   kind: 'server'
   name: string
   ip: string
   icon: string | null // data URL кэшированного фавикона из servers.dat
+  score: number
 }
 export type RecentEntry = RecentWorld | RecentServer
 
 const GAME_MODES = ['Выживание', 'Творческий', 'Приключение', 'Наблюдатель']
+const DAY = 86400000
 
-/** Читает миры (saves) и серверы (servers.dat) сборки. */
-export async function getRecent(gameRoot: string): Promise<{ worlds: RecentWorld[]; servers: RecentServer[] }> {
-  return { worlds: await readWorlds(gameRoot), servers: await readServers(gameRoot) }
+/** «Frecency»: свежесть (0..60) + частота (0..20). Как в Modrinth — недавние и частые выше. */
+function frecency(last: number, count: number): number {
+  const recency = last ? Math.max(0, 30 - (Date.now() - last) / DAY) * 2 : 0
+  const freq = Math.min(count, 20)
+  return recency + freq
+}
+
+/** Записывает факт запуска мира/сервера (key: 'w:<folder>' | 's:<ip>'). */
+export function recordPlay(modpackId: string, key: string): void {
+  const all = { ...(store.get('playStats') || {}) }
+  const forPack = { ...(all[modpackId] || {}) }
+  const prev = forPack[key] || { count: 0, last: 0 }
+  forPack[key] = { count: prev.count + 1, last: Date.now() }
+  all[modpackId] = forPack
+  store.set('playStats', all)
+}
+
+/** Единый список «Продолжить игру» (миры + серверы), отсортированный по frecency, максимум 6. */
+export async function getRecent(gameRoot: string, modpackId: string): Promise<RecentEntry[]> {
+  const stats = (store.get('playStats') || {})[modpackId] || {}
+  const worlds = await readWorlds(gameRoot, stats)
+  const servers = await readServers(gameRoot, stats)
+  return [...worlds, ...servers].sort((a, b) => b.score - a.score).slice(0, 6)
 }
 
 function readIcon(path: string): string | null {
@@ -34,7 +58,9 @@ function readIcon(path: string): string | null {
   }
 }
 
-async function readWorlds(gameRoot: string): Promise<RecentWorld[]> {
+type Stats = Record<string, { count: number; last: number }>
+
+async function readWorlds(gameRoot: string, stats: Stats): Promise<RecentWorld[]> {
   const savesDir = join(gameRoot, 'saves')
   if (!existsSync(savesDir)) return []
   const out: RecentWorld[] = []
@@ -54,22 +80,25 @@ async function readWorlds(gameRoot: string): Promise<RecentWorld[]> {
       else if (typeof lp === 'string') lastPlayed = Number(lp)
       if (!lastPlayed) lastPlayed = statSync(levelDat).mtimeMs
       const gt = data?.Player?.value?.playerGameType?.value ?? data?.GameType?.value ?? 0
+      const st = stats['w:' + folder]
+      const last = Math.max(lastPlayed, st?.last ?? 0)
       out.push({
         kind: 'world',
         folder,
         name: String(name),
         lastPlayed,
         mode: GAME_MODES[gt] ?? 'Выживание',
-        icon: readIcon(join(dir, 'icon.png'))
+        icon: readIcon(join(dir, 'icon.png')),
+        score: frecency(last, st?.count ?? 0)
       })
     } catch {
       /* битый мир — пропускаем */
     }
   }
-  return out.sort((a, b) => b.lastPlayed - a.lastPlayed)
+  return out
 }
 
-async function readServers(gameRoot: string): Promise<RecentServer[]> {
+async function readServers(gameRoot: string, stats: Stats): Promise<RecentServer[]> {
   const file = join(gameRoot, 'servers.dat')
   if (!existsSync(file)) return []
   try {
@@ -79,11 +108,15 @@ async function readServers(gameRoot: string): Promise<RecentServer[]> {
     return list
       .map((s: any) => {
         const rawIcon = s.icon?.value
+        const ip = s.ip?.value ?? ''
+        const st = stats['s:' + ip]
         return {
           kind: 'server' as const,
-          name: s.name?.value ?? s.ip?.value ?? 'Сервер',
-          ip: s.ip?.value ?? '',
-          icon: typeof rawIcon === 'string' && rawIcon ? 'data:image/png;base64,' + rawIcon : null
+          name: s.name?.value ?? ip ?? 'Сервер',
+          ip,
+          icon: typeof rawIcon === 'string' && rawIcon ? 'data:image/png;base64,' + rawIcon : null,
+          // Сервер без статистики держим на умеренном уровне, чтобы он не терялся сразу
+          score: Math.max(8, frecency(st?.last ?? 0, st?.count ?? 0))
         }
       })
       .filter((s: RecentServer) => s.ip)

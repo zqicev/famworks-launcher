@@ -4,9 +4,9 @@ import styles from '../styles/OverviewTab.module.css'
 
 interface Props { modpack: Modpack; busyId: string | null }
 
-type World = { kind: 'world'; folder: string; name: string; lastPlayed: number; mode: string; icon: string | null }
-type Server = { kind: 'server'; name: string; ip: string; icon: string | null }
-type Recent = { worlds: World[]; servers: Server[] }
+type World = { kind: 'world'; folder: string; name: string; lastPlayed: number; mode: string; icon: string | null; score: number }
+type Server = { kind: 'server'; name: string; ip: string; icon: string | null; score: number }
+type Entry = World | Server
 type PingResult = { online: number; max: number; favicon: string | null; ping: number; motd: string; version: string } | null
 type PingState = { loading: boolean; data: PingResult }
 
@@ -14,19 +14,21 @@ export default function OverviewTab({ modpack, busyId }: Props) {
   const totalMB = modpack.mods.reduce((s, m) => s + m.size_mb, 0)
   const sizeFmt = totalMB >= 1000 ? `${(totalMB / 1024).toFixed(1)} ГБ` : `${totalMB.toFixed(0)} МБ`
 
-  const [recent, setRecent] = useState<Recent>({ worlds: [], servers: [] })
+  const [entries, setEntries] = useState<Entry[]>([])
   const [pings, setPings] = useState<Record<string, PingState>>({})
 
   useEffect(() => {
     let alive = true
-    window.api.recentGet(modpack.id).then((r) => {
+    window.api.recentGet(modpack.id).then((list) => {
       if (!alive) return
-      setRecent(r)
+      setEntries(list)
       // Пингуем каждый сервер отдельно (может занять до 3с)
-      for (const s of r.servers) {
-        setPings((p) => ({ ...p, [s.ip]: { loading: true, data: null } }))
-        window.api.serverPing(s.ip).then((data) => {
-          if (alive) setPings((p) => ({ ...p, [s.ip]: { loading: false, data } }))
+      for (const e of list) {
+        if (e.kind !== 'server') continue
+        const ip = e.ip
+        setPings((p) => ({ ...p, [ip]: { loading: true, data: null } }))
+        window.api.serverPing(ip).then((data) => {
+          if (alive) setPings((p) => ({ ...p, [ip]: { loading: false, data } }))
         })
       }
     }).catch(() => {})
@@ -34,60 +36,40 @@ export default function OverviewTab({ modpack, busyId }: Props) {
   }, [modpack.id])
 
   const locked = !!busyId
-  const playWorld = (folder: string): void => { window.api.launch.start(modpack.id, { type: 'singleplayer', identifier: folder }) }
-  const playServer = (ip: string): void => { window.api.launch.start(modpack.id, { type: 'multiplayer', identifier: ip }) }
-
-  const worlds = recent.worlds.slice(0, 4)
-  const servers = recent.servers.slice(0, 4)
-  const hasRecent = worlds.length > 0 || servers.length > 0
+  const play = (e: Entry): void => {
+    if (e.kind === 'world') window.api.launch.start(modpack.id, { type: 'singleplayer', identifier: e.folder })
+    else window.api.launch.start(modpack.id, { type: 'multiplayer', identifier: e.ip })
+  }
 
   return (
     <div className={styles.wrapper}>
       <div className={styles.left}>
-        {hasRecent && (
+        {entries.length > 0 && (
           <section className={styles.section}>
             <div className={styles.label}>ПРОДОЛЖИТЬ ИГРУ</div>
             <div className={styles.recentGrid}>
-              {servers.map((s) => {
-                const st = pings[s.ip]
-                const icon = st?.data?.favicon || s.icon
+              {entries.map((e) => {
+                const st = e.kind === 'server' ? pings[e.ip] : undefined
+                const img = e.kind === 'server' ? (st?.data?.favicon || e.icon) : e.icon
                 return (
-                  <div key={'s:' + s.ip} className={styles.recentCard}>
+                  <div key={e.kind === 'world' ? 'w:' + e.folder : 's:' + e.ip} className={styles.recentCard}>
                     <div className={styles.recentIcon}>
-                      {icon ? <img src={icon} alt="" className={styles.iconImg} /> : <span className={styles.iconFallback}>🖥</span>}
+                      {img
+                        ? <img src={img} alt="" className={styles.iconImg} />
+                        : e.kind === 'world' ? <WorldIcon /> : <ServerIcon />}
                     </div>
                     <div className={styles.recentInfo}>
-                      <div className={styles.recentName}>{s.name}</div>
+                      <div className={styles.recentName}>{e.name}</div>
                       <div className={styles.recentSub}>
-                        <ServerStatus state={st} />
+                        {e.kind === 'world'
+                          ? `${e.mode} · ${fmtLastPlayed(e.lastPlayed)}`
+                          : <ServerStatus state={st} />}
                       </div>
                     </div>
-                    <button
-                      className={styles.recentPlay}
-                      onClick={() => playServer(s.ip)}
-                      disabled={locked}
-                      title="Играть"
-                    >▶</button>
+                    <button className={styles.recentPlay} onClick={() => play(e)} disabled={locked} title="Играть">▶</button>
                   </div>
                 )
               })}
-              {worlds.map((w) => (
-                <div key={'w:' + w.folder} className={styles.recentCard}>
-                  <div className={styles.recentIcon}>
-                    {w.icon ? <img src={w.icon} alt="" className={styles.iconImg} /> : <span className={styles.iconFallback}>🌍</span>}
-                  </div>
-                  <div className={styles.recentInfo}>
-                    <div className={styles.recentName}>{w.name}</div>
-                    <div className={styles.recentSub}>{w.mode} · {fmtLastPlayed(w.lastPlayed)}</div>
-                  </div>
-                  <button
-                    className={styles.recentPlay}
-                    onClick={() => playWorld(w.folder)}
-                    disabled={locked}
-                    title="Играть"
-                  >▶</button>
-                </div>
-              ))}
             </div>
           </section>
         )}
@@ -149,6 +131,34 @@ function ServerStatus({ state }: { state: PingState | undefined }): JSX.Element 
       {online}/{max} онлайн
       <span className={styles.pingVal}>{ping} мс</span>
     </span>
+  )
+}
+
+/** Фирменная заглушка мира — изометрический блок травы в акцентных тонах. */
+function WorldIcon(): JSX.Element {
+  return (
+    <div className={`${styles.iconFallback} ${styles.fbWorld}`}>
+      <svg viewBox="0 0 46 46" className={styles.iconSvg} xmlns="http://www.w3.org/2000/svg">
+        <polygon points="23,9 37,17 23,25 9,17" fill="#c5f82a" />
+        <polygon points="9,17 23,25 23,39 9,31" fill="#6f9418" />
+        <polygon points="23,25 37,17 37,31 23,39" fill="#557214" />
+        <polygon points="23,9 37,17 23,25 9,17" fill="none" stroke="#0a0a0a" strokeOpacity="0.15" strokeWidth="0.6" />
+      </svg>
+    </div>
+  )
+}
+
+/** Фирменная заглушка сервера — стойка с индикаторами в акцентном цвете. */
+function ServerIcon(): JSX.Element {
+  return (
+    <div className={`${styles.iconFallback} ${styles.fbServer}`}>
+      <svg viewBox="0 0 46 46" className={styles.iconSvg} fill="none" stroke="#c5f82a" strokeWidth="2" xmlns="http://www.w3.org/2000/svg">
+        <rect x="11" y="13" width="24" height="8.5" rx="2.5" />
+        <rect x="11" y="24.5" width="24" height="8.5" rx="2.5" />
+        <circle cx="16" cy="17.2" r="1.4" fill="#c5f82a" stroke="none" />
+        <circle cx="16" cy="28.7" r="1.4" fill="#c5f82a" stroke="none" />
+      </svg>
+    </div>
   )
 }
 

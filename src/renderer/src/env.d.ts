@@ -69,10 +69,10 @@ interface Window {
       onDownloaded: (cb: (info: { version: string }) => void) => () => void
       onError: (cb: (msg: string) => void) => () => void
     }
-    recentGet: (id: string) => Promise<{
-      worlds: { kind: 'world'; folder: string; name: string; lastPlayed: number; mode: string; icon: string | null }[]
-      servers: { kind: 'server'; name: string; ip: string; icon: string | null }[]
-    }>
+    recentGet: (id: string) => Promise<Array<
+      | { kind: 'world'; folder: string; name: string; lastPlayed: number; mode: string; icon: string | null; score: number }
+      | { kind: 'server'; name: string; ip: string; icon: string | null; score: number }
+    >>
     serverPing: (ip: string) => Promise<{
       online: number
       max: number

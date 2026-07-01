@@ -118,6 +118,11 @@ export function setupIpcHandlers() {
         authorization = offlineAuthorization(account?.username ?? 'Player')
       }
 
+      if (quickPlay) {
+        const { recordPlay } = await import('./recent')
+        recordPlay(modpackId, (quickPlay.type === 'singleplayer' ? 'w:' : 's:') + quickPlay.identifier)
+      }
+
       await launchGame(modpack, authorization, installPath, memory, win, quickPlay)
       return true
     } catch (e) {
@@ -188,7 +193,7 @@ export function setupIpcHandlers() {
 
   ipcMain.handle('recent:get', async (_, modpackId: string) => {
     const { getRecent } = await import('./recent')
-    return getRecent(pathJoin(store.get('installPath') as string, modpackId))
+    return getRecent(pathJoin(store.get('installPath') as string, modpackId), modpackId)
   })
 
   ipcMain.handle('server:ping', async (_, ip: string) => {
