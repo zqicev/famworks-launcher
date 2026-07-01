@@ -222,6 +222,13 @@ export function setupIpcHandlers() {
     const list = (store.get('customModpacks') as any[]).filter(m => m.id !== mp.id)
     list.push(mp)
     store.set('customModpacks', list)
+    // Сразу создаём структуру папок, чтобы «Открыть папку» и добавление файлов работали до установки
+    try {
+      const root = pathJoin(store.get('installPath') as string, mp.id)
+      for (const sub of ['mods', 'resourcepacks', 'shaderpacks']) {
+        mkdirSync(pathJoin(root, sub), { recursive: true })
+      }
+    } catch { /* installPath не задан — создастся позже при установке */ }
     return true
   })
   ipcMain.handle('custom:delete', (_, id: string, deleteFiles: boolean) => {
@@ -233,7 +240,10 @@ export function setupIpcHandlers() {
     return true
   })
 
-  ipcMain.handle('shell:open-folder', (_, folderPath: string) => shell.openPath(folderPath))
+  ipcMain.handle('shell:open-folder', (_, folderPath: string) => {
+    try { mkdirSync(folderPath, { recursive: true }) } catch { /* игнорируем */ }
+    return shell.openPath(folderPath)
+  })
 
   ipcMain.handle('system:total-memory-mb', async () => {
     const os = await import('os')
