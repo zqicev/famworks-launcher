@@ -37,7 +37,7 @@ export default function OverviewTab({ modpack, busyId }: Props) {
       const ips = list.filter((e): e is Server => e.kind === 'server').map((e) => e.ip)
       if (ips.length === 0) return
       pingAll(ips, true)
-      timer = setInterval(() => alive && pingAll(ips, false), 20000) // авто-обновление онлайна
+      timer = setInterval(() => alive && pingAll(ips, false), 180000) // авто-обновление онлайна раз в 3 мин
     }).catch(() => {})
 
     return () => { alive = false; if (timer) clearInterval(timer) }
