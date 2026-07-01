@@ -19,20 +19,28 @@ export default function OverviewTab({ modpack, busyId }: Props) {
 
   useEffect(() => {
     let alive = true
-    window.api.recentGet(modpack.id).then((list) => {
-      if (!alive) return
-      setEntries(list)
-      // Пингуем каждый сервер отдельно (может занять до 3с)
-      for (const e of list) {
-        if (e.kind !== 'server') continue
-        const ip = e.ip
-        setPings((p) => ({ ...p, [ip]: { loading: true, data: null } }))
+    let timer: ReturnType<typeof setInterval> | undefined
+
+    // first=true — показываем «проверка…»; при авто-обновлении держим прежнее значение до ответа
+    const pingAll = (ips: string[], first: boolean): void => {
+      for (const ip of ips) {
+        if (first) setPings((p) => ({ ...p, [ip]: { loading: true, data: null } }))
         window.api.serverPing(ip).then((data) => {
           if (alive) setPings((p) => ({ ...p, [ip]: { loading: false, data } }))
         })
       }
+    }
+
+    window.api.recentGet(modpack.id).then((list) => {
+      if (!alive) return
+      setEntries(list)
+      const ips = list.filter((e): e is Server => e.kind === 'server').map((e) => e.ip)
+      if (ips.length === 0) return
+      pingAll(ips, true)
+      timer = setInterval(() => alive && pingAll(ips, false), 20000) // авто-обновление онлайна
     }).catch(() => {})
-    return () => { alive = false }
+
+    return () => { alive = false; if (timer) clearInterval(timer) }
   }, [modpack.id])
 
   const locked = !!busyId
@@ -123,7 +131,7 @@ export default function OverviewTab({ modpack, busyId }: Props) {
 
 function ServerStatus({ state }: { state: PingState | undefined }): JSX.Element {
   if (!state || state.loading) return <span className={styles.statusChecking}>проверка…</span>
-  if (!state.data) return <span className={styles.statusOffline}><span className={styles.dotOff} />офлайн</span>
+  if (!state.data) return <span className={styles.statusOffline}><span className={styles.dotOff} />offline</span>
   const { online, max, ping } = state.data
   return (
     <span className={styles.statusOnline}>

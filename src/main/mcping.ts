@@ -71,26 +71,46 @@ function resolveTarget(host: string, port?: number): Promise<{ host: string; por
   })
 }
 
-/** Пингует Minecraft-сервер (Server List Ping). Возвращает null, если недоступен. */
+/** Пробует вычленить один пакет из буфера: [VarInt длина][полезная нагрузка]. */
+function tryReadPacket(buf: Buffer): { payload: Buffer; rest: Buffer } | null {
+  let len: { value: number; size: number }
+  try {
+    len = readVarInt(buf, 0)
+  } catch {
+    return null // длина ещё не пришла целиком
+  }
+  const total = len.size + len.value
+  if (buf.length < total) return null
+  return { payload: buf.slice(len.size, total), rest: buf.slice(total) }
+}
+
+/** Пингует Minecraft-сервер (Server List Ping). Возвращает null, если недоступен.
+ *  Латентность меряется отдельным Ping/Pong-пакетом (чистый 1 RTT), а не временем установки соединения. */
 export async function pingServer(address: string, timeout = 3000): Promise<PingResult | null> {
   const parsed = splitHostPort(address)
   const target = await resolveTarget(parsed.host, parsed.port)
 
   return new Promise<PingResult | null>((resolve) => {
     const socket = net.createConnection({ host: target.host, port: target.port })
-    const start = Date.now()
-    let chunks = Buffer.alloc(0)
+    let chunks: Buffer = Buffer.alloc(0)
+    let phase: 'status' | 'pong' = 'status'
+    let status: Omit<PingResult, 'ping'> | null = null
+    let fallbackPing = 0
+    let pingStart = 0
+    let pongTimer: NodeJS.Timeout | undefined
     let done = false
+    const connectStart = Date.now()
 
     const finish = (r: PingResult | null): void => {
       if (done) return
       done = true
+      if (pongTimer) clearTimeout(pongTimer)
       socket.destroy()
       resolve(r)
     }
 
     socket.setTimeout(timeout)
-    socket.on('timeout', () => finish(null))
+    socket.on('timeout', () => finish(status ? { ...status, ping: fallbackPing } : null))
     socket.on('error', () => finish(null))
 
     socket.on('connect', () => {
@@ -111,24 +131,37 @@ export async function pingServer(address: string, timeout = 3000): Promise<PingR
     socket.on('data', (data) => {
       chunks = Buffer.concat([chunks, data])
       try {
-        const len = readVarInt(chunks, 0)
-        const total = len.size + len.value
-        if (chunks.length < total) return // ждём остаток пакета
-        let off = len.size
-        const pid = readVarInt(chunks, off)
-        off += pid.size
-        const jsonLen = readVarInt(chunks, off)
-        off += jsonLen.size
-        if (chunks.length < off + jsonLen.value) return
-        const json = JSON.parse(chunks.slice(off, off + jsonLen.value).toString('utf8'))
-        finish({
-          online: json.players?.online ?? 0,
-          max: json.players?.max ?? 0,
-          favicon: typeof json.favicon === 'string' ? json.favicon : null,
-          ping: Date.now() - start,
-          motd: parseMotd(json.description),
-          version: json.version?.name ?? ''
-        })
+        if (phase === 'status') {
+          const pkt = tryReadPacket(chunks)
+          if (!pkt) return
+          chunks = pkt.rest
+          let off = readVarInt(pkt.payload, 0).size // packet id
+          const jsonLen = readVarInt(pkt.payload, off)
+          off += jsonLen.size
+          const json = JSON.parse(pkt.payload.slice(off, off + jsonLen.value).toString('utf8'))
+          fallbackPing = Date.now() - connectStart
+          status = {
+            online: json.players?.online ?? 0,
+            max: json.players?.max ?? 0,
+            favicon: typeof json.favicon === 'string' ? json.favicon : null,
+            motd: parseMotd(json.description),
+            version: json.version?.name ?? ''
+          }
+          // Ping-пакет: 0x01 + 8-байтный payload; сервер эхом вернёт Pong
+          pingStart = Date.now()
+          const payload = Buffer.alloc(8)
+          payload.writeBigInt64BE(BigInt(pingStart))
+          const ping = Buffer.concat([Buffer.from([0x01]), payload])
+          socket.write(Buffer.concat([Buffer.from(writeVarInt(ping.length)), ping]))
+          phase = 'pong'
+          // Не все серверы отвечают на Pong — не ждём дольше 1.2с, берём оценку
+          pongTimer = setTimeout(() => finish(status ? { ...status, ping: fallbackPing } : null), 1200)
+        }
+        if (phase === 'pong') {
+          const pkt = tryReadPacket(chunks)
+          if (!pkt || !status) return
+          finish({ ...status, ping: Date.now() - pingStart })
+        }
       } catch {
         /* пакет ещё не целиком — ждём */
       }
