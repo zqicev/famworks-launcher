@@ -3,7 +3,7 @@ import { join } from 'path'
 import { BrowserWindow, utilityProcess, UtilityProcess } from 'electron'
 import { Modpack } from '../types/modpack'
 import { ProgressEvent } from './installer'
-import { setupLoader, requiredJavaMajor } from './loaders'
+import { setupLoader, requiredJavaMajor, loaderJvmArgs } from './loaders'
 import { ensureJava } from './java'
 import { writeServers } from './servers'
 import { setPlaying, setIdle } from './discord'
@@ -20,6 +20,7 @@ function emit(win: BrowserWindow, event: ProgressEvent) {
 let currentWorker: UtilityProcess | null = null
 let gameSpawned = false
 let launchAborted = false
+let spawnedAt = 0
 
 export interface QuickPlay {
   type: 'singleplayer' | 'multiplayer'
@@ -36,6 +37,7 @@ export async function launchGame(
 ): Promise<void> {
   gameSpawned = false
   launchAborted = false
+  spawnedAt = 0
 
   // 1. Гарантируем Java нужной мажорной версии (зависит от версии MC)
   let javaPath: string
@@ -49,6 +51,9 @@ export async function launchGame(
   // 2. Загрузчик (Fabric/Quilt — meta-профиль, Forge/NeoForge — установщик). Все дают version-профиль.
   const gameRoot = join(installPath, modpack.id)
   const loaderVersionId = await setupLoader(modpack, gameRoot, win)
+  // Forge/NeoForge держат module-path и прочие JVM-аргументы в профиле, а mclc их не читает —
+  // передаём вручную через customArgs.
+  const extraJvmArgs = loaderJvmArgs(modpack, gameRoot)
 
   // 3. Серверы сборки → servers.dat. Сеем один раз: если набор серверов не менялся,
   //    повторно не трогаем (пользователь волен удалять/менять их у себя).
@@ -75,6 +80,7 @@ export async function launchGame(
     memory: { max: `${memoryMB}M`, min: '512M' },
     javaPath,
     overrides: { detached: true },
+    ...(extraJvmArgs.length ? { customArgs: extraJvmArgs } : {}),
     ...(quickPlay ? { quickPlay: { type: quickPlay.type, identifier: quickPlay.identifier } } : {})
   } as ILauncherOptions
 
@@ -90,6 +96,7 @@ export async function launchGame(
       } else if (msg.t === 'spawned') {
         spawned = true
         gameSpawned = true
+        spawnedAt = Date.now()
         store.set('runningPid', msg.pid)
         store.set('runningModpackId', modpack.id)
         store.set('runningModpackName', modpack.name)
@@ -102,6 +109,11 @@ export async function launchGame(
         store.set('runningModpackId', null)
         store.set('runningModpackName', null)
         setBusy(null)
+        // Игра упала сразу после старта (не штатный выход) — показываем причину, а не молча сбрасываем
+        if (msg.code && spawnedAt && Date.now() - spawnedAt < 10000) {
+          const hint = pickErrorLine(msg.tail)
+          win.webContents.send('launch:error', `Игра завершилась с ошибкой (код ${msg.code}).${hint ? ' ' + hint : ''}`)
+        }
         win.webContents.send('launch:close', msg.code)
         win.webContents.send('install:progress', { phase: 'done', message: '' })
         setIdle()
@@ -133,6 +145,17 @@ export function abortLaunch(): boolean {
     return true
   }
   return false
+}
+
+/** Выбирает информативную строку из хвоста лога упавшей игры (для сообщения пользователю). */
+function pickErrorLine(tail?: string): string {
+  if (!tail) return ''
+  const lines = tail.split(/\r?\n/).map(l => l.trim()).filter(Boolean)
+  const key = /(Exception|Error|Caused by|Could not|Unable to|FATAL|failed|module)/i
+  for (let i = lines.length - 1; i >= 0; i--) {
+    if (key.test(lines[i])) return lines[i].slice(0, 300)
+  }
+  return lines[lines.length - 1]?.slice(0, 300) ?? ''
 }
 
 export function offlineAuthorization(username: string): ILauncherOptions['authorization'] {

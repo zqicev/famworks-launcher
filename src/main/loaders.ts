@@ -1,5 +1,5 @@
 import { join, dirname } from 'path'
-import { existsSync, mkdirSync, writeFileSync, createWriteStream, rmSync, renameSync } from 'fs'
+import { existsSync, mkdirSync, writeFileSync, readFileSync, createWriteStream, rmSync, renameSync } from 'fs'
 import { spawn } from 'child_process'
 import axios from 'axios'
 import { BrowserWindow } from 'electron'
@@ -42,6 +42,35 @@ export function versionIdFor(mp: Modpack): string {
 export function loaderInstalled(mp: Modpack, gameRoot: string): boolean {
   const id = versionIdFor(mp)
   return existsSync(join(gameRoot, 'versions', id, `${id}.json`))
+}
+
+/** JVM-аргументы загрузчика из профиля (module-path и пр. у Forge/NeoForge).
+ *  mclc НЕ читает arguments.jvm из кастомного профиля, поэтому передаём их через options.customArgs.
+ *  Для Fabric/Quilt пусто — им спец-аргументы не нужны. */
+export function loaderJvmArgs(mp: Modpack, gameRoot: string): string[] {
+  if (mp.loader !== 'forge' && mp.loader !== 'neoforge') return []
+  const id = versionIdFor(mp)
+  const jsonPath = join(gameRoot, 'versions', id, `${id}.json`)
+  if (!existsSync(jsonPath)) return []
+  let json: any
+  try { json = JSON.parse(readFileSync(jsonPath, 'utf8')) } catch { return [] }
+  const raw = json?.arguments?.jvm
+  if (!Array.isArray(raw)) return []
+
+  const libDir = join(gameRoot, 'libraries')
+  const sep = process.platform === 'win32' ? ';' : ':'
+  const versionName = json.inheritsFrom || mp.mc_version
+  const subst = (s: string): string => s
+    .split('${library_directory}').join(libDir)
+    .split('${classpath_separator}').join(sep)
+    .split('${version_name}').join(versionName)
+
+  const out: string[] = []
+  for (const a of raw) {
+    // Условные объекты {rules,value} у jvm Forge/NeoForge практически не встречаются — берём строки
+    if (typeof a === 'string') out.push(subst(a))
+  }
+  return out
 }
 
 /** Готовит загрузчик и возвращает id профиля для options.version.custom.
