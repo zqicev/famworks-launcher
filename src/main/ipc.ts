@@ -6,7 +6,8 @@ import { setIdle } from './discord'
 import { store } from './store'
 import { fetchModpackIndex, fetchModpack } from './modpacks'
 import { checkAndInstallModpack, getModpackStatus, toggleMod, deleteMod, getInstalledMods, downloadModToDir, getModFileSizeBytes } from './installer'
-import { launchGame, installFabric, offlineAuthorization, abortLaunch, QuickPlay } from './launcher'
+import { launchGame, offlineAuthorization, abortLaunch, QuickPlay } from './launcher'
+import { setupLoader, latestLoaderVersion, LoaderId } from './loaders'
 import { searchModrinth, getModVersions } from './modrinth'
 import { microsoftLogin, microsoftRefresh } from './msAuth'
 import { Account } from './store'
@@ -62,7 +63,7 @@ export function setupIpcHandlers() {
       const modpack = await fetchModpack(modpackId)
       const installPath = store.get('installPath') as string
       const gameRoot = pathJoin(installPath, modpack.id)
-      await installFabric(modpack, gameRoot, win)
+      await setupLoader(modpack, gameRoot, win)
       await checkAndInstallModpack(modpack, installPath, win)
       return true
     } catch (e) {
@@ -206,15 +207,8 @@ export function setupIpcHandlers() {
     getWindow()?.setProgressBar(value, { mode })
   })
 
-  // Последняя стабильная версия Fabric-загрузчика для версии MC (для создания кастомной сборки)
-  ipcMain.handle('fabric:loader', async (_, mc: string) => {
-    try {
-      const axios = (await import('axios')).default
-      const res = await axios.get(`https://meta.fabricmc.net/v2/versions/loader/${mc}`, { timeout: 8000 })
-      const stable = (res.data as any[]).find(v => v.loader?.stable) ?? res.data[0]
-      return stable?.loader?.version ?? ''
-    } catch { return '' }
-  })
+  // Последняя версия выбранного загрузчика под версию MC (для создания кастомной сборки)
+  ipcMain.handle('loader:latest', (_, loader: LoaderId, mc: string) => latestLoaderVersion(loader, mc))
 
   // Кастомные (локальные) сборки
   ipcMain.handle('custom:list', () => store.get('customModpacks'))

@@ -37,7 +37,8 @@ const FABRIC_API_PROJECT = 'P7dR8mSH'
 /** По полю fabric_api_version гарантирует Fabric API именно нужной версии (обязательный мод).
  *  Если запись Fabric API уже есть в списке — пиннит её к версии; иначе добавляет новую. */
 function injectFabricApi(mp: Modpack): void {
-  if (mp.loader !== 'fabric' || !mp.fabric_api_version) return
+  // Fabric API работает и на Quilt (через встроенный слой совместимости)
+  if ((mp.loader !== 'fabric' && mp.loader !== 'quilt') || !mp.fabric_api_version) return
   const ver = mp.fabric_api_version
   const existing = mp.mods.find(m => m.id === 'fabric-api' || m.modrinth_id === FABRIC_API_PROJECT)
   if (existing) {

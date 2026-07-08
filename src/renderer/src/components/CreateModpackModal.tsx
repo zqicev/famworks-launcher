@@ -10,16 +10,18 @@ interface Props {
 export default function CreateModpackModal({ onCreate, onClose }: Props) {
   const [name, setName] = useState('')
   const [mc, setMc] = useState('1.21.1')
-  const [loader, setLoader] = useState<'fabric' | 'forge'>('fabric')
+  const [loader, setLoader] = useState<'fabric' | 'forge' | 'neoforge' | 'quilt'>('fabric')
   const [loaderVer, setLoaderVer] = useState('')
   const [fabricApi, setFabricApi] = useState('')
   const [busy, setBusy] = useState(false)
 
-  // Подтягиваем последнюю версию Fabric-загрузчика под выбранную версию MC
+  const usesFabricApi = loader === 'fabric' || loader === 'quilt'
+
+  // Подтягиваем последнюю версию выбранного загрузчика под выбранную версию MC
   useEffect(() => {
-    if (loader !== 'fabric') return
     let active = true
-    window.api.fabricLoader(mc).then(v => { if (active && v) setLoaderVer(v) })
+    setLoaderVer('')
+    window.api.loaderLatest(loader, mc).then(v => { if (active && v) setLoaderVer(v) })
     return () => { active = false }
   }, [mc, loader])
 
@@ -61,14 +63,16 @@ export default function CreateModpackModal({ onCreate, onClose }: Props) {
             <Field label="ЗАГРУЗЧИК">
               <select className={styles.cinput} value={loader} onChange={e => setLoader(e.target.value as any)}>
                 <option value="fabric">Fabric</option>
+                <option value="quilt">Quilt</option>
                 <option value="forge">Forge</option>
+                <option value="neoforge">NeoForge</option>
               </select>
             </Field>
           </div>
           <Field label="ВЕРСИЯ ЗАГРУЗЧИКА">
             <input className={styles.cinput} value={loaderVer} onChange={e => setLoaderVer(e.target.value)} placeholder="подтянется автоматически" />
           </Field>
-          {loader === 'fabric' && (
+          {usesFabricApi && (
             <Field label="ВЕРСИЯ FABRIC API (необязательно)">
               <input className={styles.cinput} value={fabricApi} onChange={e => setFabricApi(e.target.value)} placeholder="напр. 0.116.0+1.21.1" />
             </Field>

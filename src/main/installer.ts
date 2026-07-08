@@ -5,6 +5,7 @@ import axios from 'axios'
 import { BrowserWindow } from 'electron'
 import { Modpack, Mod } from '../types/modpack'
 import { opSignal, isCancelled } from './abort'
+import { loaderInstalled } from './loaders'
 
 interface ResolvedMod {
   url: string
@@ -49,7 +50,7 @@ export async function checkAndInstallModpack(
   emit(win, { phase: 'check', message: 'Проверка модов...' })
 
   // Удаляем устаревшие версии Fabric API (оставляем только нужную) — иначе две версии = краш
-  if (modpack.loader === 'fabric' && modpack.fabric_api_version) {
+  if ((modpack.loader === 'fabric' || modpack.loader === 'quilt') && modpack.fabric_api_version) {
     const target = `fabric-api-${modpack.fabric_api_version}.jar`
     for (const f of readdirSync(modsDir)) {
       const base = f.replace(/\.disabled$/, '')
@@ -163,11 +164,9 @@ export async function getModpackStatus(
   installPath: string
 ): Promise<'not_installed' | 'outdated' | 'ready'> {
   const gameRoot = join(installPath, modpack.id)
-  const versionId = `fabric-loader-${modpack.loader_version}-${modpack.mc_version}`
-  const versionFile = join(gameRoot, 'versions', versionId, `${versionId}.json`)
 
-  // Если нет даже Fabric-профиля — не установлена
-  if (!existsSync(versionFile)) return 'not_installed'
+  // Если загрузчик ещё не подготовлен (профиль Fabric/Quilt или installer Forge/NeoForge) — не установлена
+  if (!loaderInstalled(modpack, gameRoot)) return 'not_installed'
 
   // Если нет всех обязательных модов — нужно обновление
   const modsDir = join(gameRoot, 'mods')

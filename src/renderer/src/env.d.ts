@@ -35,7 +35,7 @@ interface Window {
     busyGet: () => Promise<string | null>
     onBusyChanged: (cb: (id: string | null) => void) => () => void
     appVersion: () => Promise<string>
-    fabricLoader: (mc: string) => Promise<string>
+    loaderLatest: (loader: string, mc: string) => Promise<string>
     custom: {
       list: () => Promise<import('../../types/modpack').Modpack[]>
       save: (mp: import('../../types/modpack').Modpack) => Promise<boolean>

@@ -47,7 +47,7 @@ contextBridge.exposeInMainWorld('api', {
   busyGet: () => ipcRenderer.invoke('busy:get'),
   onBusyChanged: (cb: (id: string | null) => void) => subscribe('busy:changed', cb),
   appVersion: () => ipcRenderer.invoke('app:version'),
-  fabricLoader: (mc: string) => ipcRenderer.invoke('fabric:loader', mc),
+  loaderLatest: (loader: string, mc: string) => ipcRenderer.invoke('loader:latest', loader, mc),
   custom: {
     list: () => ipcRenderer.invoke('custom:list'),
     save: (mp: unknown) => ipcRenderer.invoke('custom:save', mp),

@@ -3,14 +3,13 @@ import { join } from 'path'
 import { BrowserWindow, utilityProcess, UtilityProcess } from 'electron'
 import { Modpack } from '../types/modpack'
 import { ProgressEvent } from './installer'
+import { setupLoader, requiredJavaMajor } from './loaders'
 import { ensureJava } from './java'
 import { writeServers } from './servers'
 import { setPlaying, setIdle } from './discord'
 import { setBusy } from './busy'
 import { store } from './store'
-import { opSignal } from './abort'
-import axios from 'axios'
-import { mkdirSync, writeFileSync, readFileSync, existsSync } from 'fs'
+import { writeFileSync, readFileSync, existsSync } from 'fs'
 import { createHash } from 'crypto'
 
 function emit(win: BrowserWindow, event: ProgressEvent) {
@@ -21,22 +20,6 @@ function emit(win: BrowserWindow, event: ProgressEvent) {
 let currentWorker: UtilityProcess | null = null
 let gameSpawned = false
 let launchAborted = false
-
-export async function installFabric(modpack: Modpack, gameRoot: string, win: BrowserWindow): Promise<string> {
-  const versionId = `fabric-loader-${modpack.loader_version}-${modpack.mc_version}`
-  const versionDir = join(gameRoot, 'versions', versionId)
-  const versionFile = join(versionDir, `${versionId}.json`)
-
-  if (!existsSync(versionFile)) {
-    emit(win, { phase: 'download', message: 'Загрузка Fabric...' })
-    const url = `https://meta.fabricmc.net/v2/versions/loader/${modpack.mc_version}/${modpack.loader_version}/profile/json`
-    const res = await axios.get(url, { timeout: 10000, signal: opSignal() })
-    mkdirSync(versionDir, { recursive: true })
-    writeFileSync(versionFile, JSON.stringify(res.data, null, 2))
-  }
-
-  return versionId
-}
 
 export interface QuickPlay {
   type: 'singleplayer' | 'multiplayer'
@@ -54,18 +37,18 @@ export async function launchGame(
   gameSpawned = false
   launchAborted = false
 
-  // 1. Гарантируем Java (скачиваем если надо)
+  // 1. Гарантируем Java нужной мажорной версии (зависит от версии MC)
   let javaPath: string
   try {
-    javaPath = await ensureJava(installPath, win)
+    javaPath = await ensureJava(installPath, win, requiredJavaMajor(modpack.mc_version))
   } catch (e) {
     win.webContents.send('launch:error', `Не удалось установить Java: ${String(e)}`)
     return
   }
 
-  // 2. Fabric-профиль
+  // 2. Загрузчик (Fabric/Quilt — профиль, Forge/NeoForge — installer)
   const gameRoot = join(installPath, modpack.id)
-  const fabricVersionId = await installFabric(modpack, gameRoot, win)
+  const loaderSetup = await setupLoader(modpack, gameRoot, win)
 
   // 3. Серверы сборки → servers.dat. Сеем один раз: если набор серверов не менялся,
   //    повторно не трогаем (пользователь волен удалять/менять их у себя).
@@ -88,10 +71,16 @@ export async function launchGame(
   const options: ILauncherOptions = {
     authorization,
     root: gameRoot,
-    version: { number: modpack.mc_version, type: 'release', custom: fabricVersionId },
+    version: {
+      number: modpack.mc_version,
+      type: 'release',
+      // Fabric/Quilt запускаются через custom-профиль; Forge/NeoForge — через options.forge
+      ...(loaderSetup.kind === 'custom' ? { custom: loaderSetup.versionId } : {})
+    },
     memory: { max: `${memoryMB}M`, min: '512M' },
     javaPath,
     overrides: { detached: true },
+    ...(loaderSetup.kind === 'forge' ? { forge: loaderSetup.installerPath } : {}),
     ...(quickPlay ? { quickPlay: { type: quickPlay.type, identifier: quickPlay.identifier } } : {})
   } as ILauncherOptions
 

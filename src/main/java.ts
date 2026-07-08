@@ -7,8 +7,6 @@ import { BrowserWindow } from 'electron'
 import { ProgressEvent } from './installer'
 import { opSignal } from './abort'
 
-const JAVA_MAJOR = 21
-
 function emit(win: BrowserWindow, event: ProgressEvent) {
   win.webContents.send('install:progress', event)
 }
@@ -45,11 +43,11 @@ function findJavaBin(dir: string): string | null {
 
 /** Проверяет что java по пути реально мажорной версии JAVA_MAJOR.
  *  ВАЖНО: `java -version` печатает в stderr, поэтому ловим оба потока через 2>&1. */
-function javaVersionOk(javaPath: string): boolean {
+function javaVersionOk(javaPath: string, major: number): boolean {
   try {
     const out = execSync(`"${javaPath}" -version 2>&1`, { encoding: 'utf8', timeout: 5000 })
     const m = out.match(/version "(\d+)/)
-    return !!m && parseInt(m[1], 10) >= JAVA_MAJOR
+    return !!m && parseInt(m[1], 10) === major
   } catch {
     return false
   }
@@ -60,9 +58,9 @@ function javaVersionOk(javaPath: string): boolean {
  * Если нет — скачивает портативную сборку с Adoptium и распаковывает.
  * Возвращает путь к java.
  */
-export async function ensureJava(installPath: string, win: BrowserWindow): Promise<string> {
+export async function ensureJava(installPath: string, win: BrowserWindow, major = 21): Promise<string> {
   const runtimeRoot = join(installPath, 'runtime')
-  const javaDir = join(runtimeRoot, `jre-${JAVA_MAJOR}`)
+  const javaDir = join(runtimeRoot, `jre-${major}`)
   const marker = join(javaDir, '.ready')
 
   // Быстрый путь: есть маркер успешной установки + бинарь на месте → доверяем без запуска java.
@@ -71,7 +69,7 @@ export async function ensureJava(installPath: string, win: BrowserWindow): Promi
 
   // Маркера нет, но бинарь есть и версия ок (например, обновились с прошлой версии лаунчера) —
   // ставим маркер и используем, без перекачивания.
-  if (existing && javaVersionOk(existing)) {
+  if (existing && javaVersionOk(existing, major)) {
     try { writeFileSync(marker, new Date().toISOString()) } catch {}
     return existing
   }
@@ -89,15 +87,15 @@ export async function ensureJava(installPath: string, win: BrowserWindow): Promi
   mkdirSync(javaDir, { recursive: true })
 
   const { os, arch, isWin } = platformInfo()
-  const url = `https://api.adoptium.net/v3/binary/latest/${JAVA_MAJOR}/ga/${os}/${arch}/jre/hotspot/normal/eclipse`
+  const url = `https://api.adoptium.net/v3/binary/latest/${major}/ga/${os}/${arch}/jre/hotspot/normal/eclipse`
 
-  emit(win, { phase: 'download', message: `Загрузка Java ${JAVA_MAJOR}...`, bytesDownloaded: 0, bytesTotal: 0, speedBps: 0 })
+  emit(win, { phase: 'download', message: `Загрузка Java ${major}...`, bytesDownloaded: 0, bytesTotal: 0, speedBps: 0 })
 
-  const archivePath = join(runtimeRoot, isWin ? 'jre.zip' : 'jre.tar.gz')
+  const archivePath = join(runtimeRoot, isWin ? `jre-${major}.zip` : `jre-${major}.tar.gz`)
   await downloadFile(url, archivePath, (bytes, total, speed) => {
     emit(win, {
       phase: 'download',
-      message: `Загрузка Java ${JAVA_MAJOR}`,
+      message: `Загрузка Java ${major}`,
       bytesDownloaded: bytes,
       bytesTotal: total,
       speedBps: speed
