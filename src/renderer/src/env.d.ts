@@ -25,6 +25,11 @@ interface Window {
       versions: (projectId: string, mcVersion: string, loader: string, type?: string) => Promise<unknown[]>
       download: (url: string, filename: string, modsDir: string, sha512?: string) => Promise<string>
     }
+    curseforge: {
+      search: (query: string, mcVersion: string, loader: string, type?: string) => Promise<unknown[]>
+      files: (modId: number, mcVersion: string, loader: string, type?: string) => Promise<unknown[]>
+      download: (url: string, filename: string, modsDir: string, sha1?: string) => Promise<string>
+    }
     install: {
       modpack: (id: string) => Promise<boolean>
       onProgress: (cb: (data: unknown) => void) => () => void

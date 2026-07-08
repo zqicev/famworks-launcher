@@ -37,6 +37,14 @@ contextBridge.exposeInMainWorld('api', {
     download: (url: string, filename: string, modsDir: string, sha512?: string) =>
       ipcRenderer.invoke('modrinth:download', url, filename, modsDir, sha512)
   },
+  curseforge: {
+    search: (query: string, mcVersion: string, loader: string, type?: string) =>
+      ipcRenderer.invoke('cf:search', query, mcVersion, loader, type),
+    files: (modId: number, mcVersion: string, loader: string, type?: string) =>
+      ipcRenderer.invoke('cf:files', modId, mcVersion, loader, type),
+    download: (url: string, filename: string, modsDir: string, sha1?: string) =>
+      ipcRenderer.invoke('cf:download', url, filename, modsDir, sha1)
+  },
   install: {
     modpack: (id: string) => ipcRenderer.invoke('install:modpack', id),
     onProgress: (cb: (data: unknown) => void) => subscribe('install:progress', cb)

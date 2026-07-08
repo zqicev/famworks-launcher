@@ -29,6 +29,31 @@
   border-bottom: 1px solid var(--border);
 }
 
+.sourceTabs {
+  display: flex;
+  gap: 6px;
+  padding: 12px 20px 0;
+}
+.sourceTab {
+  flex: 1;
+  padding: 8px 0;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+  color: var(--text-secondary);
+  background: var(--bg-active);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+}
+.sourceTab:hover { color: var(--text); background: var(--bg-hover); }
+.sourceActive {
+  color: #0a0a0a;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.sourceActive:hover { background: var(--accent); color: #0a0a0a; }
+
 .title {
   font-family: var(--font-display);
   font-size: 20px;

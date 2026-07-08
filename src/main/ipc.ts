@@ -54,6 +54,20 @@ export function setupIpcHandlers() {
     return filename
   })
 
+  // CurseForge через прокси-воркер (ключ не в клиенте)
+  ipcMain.handle('cf:search', async (_, query: string, mc: string, loader: string, type?: string) => {
+    const { searchCurseforge } = await import('./curseforge')
+    return searchCurseforge(query, mc, loader, type)
+  })
+  ipcMain.handle('cf:files', async (_, modId: number, mc: string, loader: string, type?: string) => {
+    const { getCurseforgeFiles } = await import('./curseforge')
+    return getCurseforgeFiles(modId, mc, loader, type)
+  })
+  ipcMain.handle('cf:download', async (_, url: string, filename: string, modsDir: string, sha1?: string) => {
+    await downloadModToDir(url, filename, modsDir, getWindow(), undefined, sha1)
+    return filename
+  })
+
   ipcMain.handle('install:modpack', async (_, modpackId: string) => {
     const win = getWindow()
     if (getBusyId() && getBusyId() !== modpackId) return false // занята другая сборка
