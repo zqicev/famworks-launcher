@@ -188,14 +188,18 @@ export default function Editor({ packKey, loaded, onSaved, onDeleted }: Props) {
             </Field>
             <Field label="Название"><input className={styles.input} value={draft.name} onChange={e => set('name', e.target.value)} /></Field>
             <Field label="Загрузчик">
-              <select className={styles.input} value={draft.loader} onChange={e => set('loader', e.target.value as 'fabric' | 'forge')}>
+              <select className={styles.input} value={draft.loader} onChange={e => set('loader', e.target.value as 'fabric' | 'forge' | 'neoforge' | 'quilt')}>
                 <option value="fabric">Fabric</option>
+                <option value="quilt">Quilt</option>
                 <option value="forge">Forge</option>
+                <option value="neoforge">NeoForge</option>
               </select>
             </Field>
             <Field label="Версия MC"><input className={styles.input} value={draft.mc_version} onChange={e => set('mc_version', e.target.value)} /></Field>
             <Field label="Версия загрузчика"><input className={styles.input} value={draft.loader_version} onChange={e => set('loader_version', e.target.value)} /></Field>
-            <Field label="Версия Fabric API"><input className={styles.input} value={draft.fabric_api_version} onChange={e => set('fabric_api_version', e.target.value)} /></Field>
+            {(draft.loader === 'fabric' || draft.loader === 'quilt') && (
+              <Field label="Версия Fabric API"><input className={styles.input} value={draft.fabric_api_version} onChange={e => set('fabric_api_version', e.target.value)} /></Field>
+            )}
             <Field label="Краткое описание" full><input className={styles.input} value={draft.description} onChange={e => set('description', e.target.value)} /></Field>
             <Field label="Полное описание (вкладка Обзор)" full>
               <textarea className={styles.textarea} value={draft.long_description} onChange={e => set('long_description', e.target.value)} rows={3} />
