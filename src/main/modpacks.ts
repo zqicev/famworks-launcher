@@ -4,22 +4,30 @@ import { store } from './store'
 
 // Сборки хранятся в отдельном публичном репозитории famworks-builds.
 const GITHUB_BASE = 'https://raw.githubusercontent.com/zqicev/famworks-builds/main/modpacks'
-const FALLBACK_BASE = '' // TODO: добавить fallback URL (Cloudflare R2 и т.д.)
+// Зеркало через CDN jsDelivr — на случай, если провайдер режет raw.githubusercontent.com
+// (частая ситуация в РФ: сам github.com работает, а raw недоступен).
+const FALLBACK_BASE = 'https://cdn.jsdelivr.net/gh/zqicev/famworks-builds@main/modpacks'
 
-async function fetchJson<T>(url: string): Promise<T> {
+function errMsg(e: unknown): string {
+  return e instanceof Error ? e.message : String(e)
+}
+
+async function fetchJson<T>(url: string, timeout: number): Promise<T> {
   // cache-busting: GitHub raw кэширует на ~5 мин, ?t= даёт свежие данные после обновления сборки
-  const res = await axios.get<T>(`${url}?t=${Date.now()}`, { timeout: 8000 })
+  const res = await axios.get<T>(`${url}?t=${Date.now()}`, { timeout })
   return res.data
 }
 
 async function fetchWithFallback<T>(path: string): Promise<T> {
   try {
-    return await fetchJson<T>(`${GITHUB_BASE}/${path}`)
-  } catch {
-    if (FALLBACK_BASE) {
-      return await fetchJson<T>(`${FALLBACK_BASE}/${path}`)
+    // Основной источник — raw (всегда свежий), короткий таймаут чтобы быстро уйти на зеркало
+    return await fetchJson<T>(`${GITHUB_BASE}/${path}`, 6000)
+  } catch (primary) {
+    try {
+      return await fetchJson<T>(`${FALLBACK_BASE}/${path}`, 9000)
+    } catch (fallback) {
+      throw new Error(`Источник недоступен (raw: ${errMsg(primary)}; зеркало: ${errMsg(fallback)})`)
     }
-    throw new Error(`Failed to fetch ${path}`)
   }
 }
 

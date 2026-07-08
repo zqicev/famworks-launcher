@@ -47,8 +47,9 @@ export default function App() {
       if (!selectedId && index.modpacks.length > 0) {
         setSelectedId(index.modpacks[0].id)
       }
-    } catch {
-      setError('Не удалось загрузить список сборок. Проверьте интернет-соединение.')
+    } catch (e) {
+      const reason = e instanceof Error && e.message ? ` (${e.message})` : ''
+      setError(`Не удалось загрузить список сборок. Проверьте интернет-соединение.${reason}`)
     }
   }, [selectedId])
 
