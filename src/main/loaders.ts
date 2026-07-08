@@ -59,7 +59,9 @@ export function loaderJvmArgs(mp: Modpack, gameRoot: string): string[] {
 
   const libDir = join(gameRoot, 'libraries')
   const sep = process.platform === 'win32' ? ';' : ':'
-  const versionName = json.inheritsFrom || mp.mc_version
+  // ВАЖНО: ${version_name} — это имя ПРОФИЛЯ (neoforge-21.1.235), а не версия MC.
+  // В -DignoreList он исключает neoforge-*-universal.jar с classpath; иначе модуль neoforge дублируется.
+  const versionName = versionIdFor(mp)
   const subst = (s: string): string => s
     .split('${library_directory}').join(libDir)
     .split('${classpath_separator}').join(sep)
