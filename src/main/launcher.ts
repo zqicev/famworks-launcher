@@ -46,9 +46,9 @@ export async function launchGame(
     return
   }
 
-  // 2. Загрузчик (Fabric/Quilt — профиль, Forge/NeoForge — installer)
+  // 2. Загрузчик (Fabric/Quilt — meta-профиль, Forge/NeoForge — установщик). Все дают version-профиль.
   const gameRoot = join(installPath, modpack.id)
-  const loaderSetup = await setupLoader(modpack, gameRoot, win)
+  const loaderVersionId = await setupLoader(modpack, gameRoot, win)
 
   // 3. Серверы сборки → servers.dat. Сеем один раз: если набор серверов не менялся,
   //    повторно не трогаем (пользователь волен удалять/менять их у себя).
@@ -71,16 +71,10 @@ export async function launchGame(
   const options: ILauncherOptions = {
     authorization,
     root: gameRoot,
-    version: {
-      number: modpack.mc_version,
-      type: 'release',
-      // Fabric/Quilt запускаются через custom-профиль; Forge/NeoForge — через options.forge
-      ...(loaderSetup.kind === 'custom' ? { custom: loaderSetup.versionId } : {})
-    },
+    version: { number: modpack.mc_version, type: 'release', custom: loaderVersionId },
     memory: { max: `${memoryMB}M`, min: '512M' },
     javaPath,
     overrides: { detached: true },
-    ...(loaderSetup.kind === 'forge' ? { forge: loaderSetup.installerPath } : {}),
     ...(quickPlay ? { quickPlay: { type: quickPlay.type, identifier: quickPlay.identifier } } : {})
   } as ILauncherOptions
 

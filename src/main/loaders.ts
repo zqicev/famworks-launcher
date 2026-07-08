@@ -1,19 +1,14 @@
 import { join, dirname } from 'path'
-import { existsSync, mkdirSync, writeFileSync, createWriteStream, rmSync } from 'fs'
+import { existsSync, mkdirSync, writeFileSync, createWriteStream, rmSync, renameSync } from 'fs'
+import { spawn } from 'child_process'
 import axios from 'axios'
 import { BrowserWindow } from 'electron'
 import type { ProgressEvent } from './installer'
 import { Modpack } from '../types/modpack'
+import { ensureJava } from './java'
 import { opSignal } from './abort'
 
 export type LoaderId = 'fabric' | 'quilt' | 'forge' | 'neoforge'
-
-/** Как запускать сборку после подготовки загрузчика:
- *  - custom: vanilla-style version json (Fabric/Quilt) → options.version.custom
- *  - forge:  installer-jar (Forge/NeoForge) → options.forge (mclc сам прогонит процессоры) */
-export type LoaderSetup =
-  | { kind: 'custom'; versionId: string }
-  | { kind: 'forge'; installerPath: string }
 
 const LABELS: Record<LoaderId, string> = { fabric: 'Fabric', quilt: 'Quilt', forge: 'Forge', neoforge: 'NeoForge' }
 
@@ -31,62 +26,91 @@ export function requiredJavaMajor(mc: string): number {
   return 8 // 1.16.5 и старше
 }
 
-/** Vanilla-style version id для Fabric/Quilt (папка versions/<id>/<id>.json). */
-function customVersionId(modpack: Modpack): string | null {
-  const { loader, mc_version: mc, loader_version: lv } = modpack
-  if (loader === 'fabric') return `fabric-loader-${lv}-${mc}`
-  if (loader === 'quilt') return `quilt-loader-${lv}-${mc}`
-  return null
+/** Имя vanilla-style version-профиля (папка versions/<id>/<id>.json) для каждого загрузчика.
+ *  Fabric/Quilt отдают его в meta-API; Forge/NeoForge создают такой же профиль установщиком. */
+export function versionIdFor(mp: Modpack): string {
+  const { loader, mc_version: mc, loader_version: lv } = mp
+  switch (loader) {
+    case 'quilt': return `quilt-loader-${lv}-${mc}`
+    case 'forge': return `${mc}-forge-${lv}`
+    case 'neoforge': return `neoforge-${lv}`
+    default: return `fabric-loader-${lv}-${mc}`
+  }
 }
 
-/** Путь к кэшированному installer-jar для Forge/NeoForge. */
-function installerPath(gameRoot: string, modpack: Modpack): string {
-  return join(gameRoot, '.loader', `${modpack.loader}-${modpack.loader_version}-installer.jar`)
+/** Установлен ли загрузчик — есть ли готовый version-профиль (для определения статуса без запуска). */
+export function loaderInstalled(mp: Modpack, gameRoot: string): boolean {
+  const id = versionIdFor(mp)
+  return existsSync(join(gameRoot, 'versions', id, `${id}.json`))
 }
 
-/** Установлен ли загрузчик (для определения статуса сборки без запуска). */
-export function loaderInstalled(modpack: Modpack, gameRoot: string): boolean {
-  const id = customVersionId(modpack)
-  if (id) return existsSync(join(gameRoot, 'versions', id, `${id}.json`))
-  return existsSync(installerPath(gameRoot, modpack))
-}
+/** Готовит загрузчик и возвращает id профиля для options.version.custom.
+ *  Fabric/Quilt — тянет готовый профиль из meta-API.
+ *  Forge/NeoForge — скачивает официальный установщик и прогоняет --installClient (создаёт профиль). */
+export async function setupLoader(mp: Modpack, gameRoot: string, win: BrowserWindow): Promise<string> {
+  const loader = mp.loader as LoaderId
+  const id = versionIdFor(mp)
+  const versionFile = join(gameRoot, 'versions', id, `${id}.json`)
+  if (existsSync(versionFile)) return id
 
-/** Готовит загрузчик: скачивает профиль (Fabric/Quilt) или installer (Forge/NeoForge). */
-export async function setupLoader(modpack: Modpack, gameRoot: string, win: BrowserWindow): Promise<LoaderSetup> {
-  const loader = modpack.loader as LoaderId
-  const { mc_version: mc, loader_version: lv } = modpack
-
-  // Fabric / Quilt — забираем готовый vanilla-style профиль из meta-API
-  const id = customVersionId(modpack)
-  if (id) {
-    const versionDir = join(gameRoot, 'versions', id)
-    const versionFile = join(versionDir, `${id}.json`)
-    if (!existsSync(versionFile)) {
-      emit(win, { phase: 'download', message: `Загрузка ${LABELS[loader]}...` })
-      const url = loader === 'fabric'
-        ? `https://meta.fabricmc.net/v2/versions/loader/${mc}/${lv}/profile/json`
-        : `https://meta.quiltmc.org/v3/versions/loader/${mc}/${lv}/profile/json`
-      const res = await axios.get(url, { timeout: 15000, signal: opSignal() })
-      mkdirSync(versionDir, { recursive: true })
-      writeFileSync(versionFile, JSON.stringify(res.data, null, 2))
-    }
-    return { kind: 'custom', versionId: id }
+  if (loader === 'fabric' || loader === 'quilt') {
+    emit(win, { phase: 'download', message: `Загрузка ${LABELS[loader]}...` })
+    const url = loader === 'fabric'
+      ? `https://meta.fabricmc.net/v2/versions/loader/${mp.mc_version}/${mp.loader_version}/profile/json`
+      : `https://meta.quiltmc.org/v3/versions/loader/${mp.mc_version}/${mp.loader_version}/profile/json`
+    const res = await axios.get(url, { timeout: 15000, signal: opSignal() })
+    mkdirSync(dirname(versionFile), { recursive: true })
+    writeFileSync(versionFile, JSON.stringify(res.data, null, 2))
+    return id
   }
 
-  // Forge / NeoForge — скачиваем официальный installer, процессоры прогонит mclc при запуске
-  const dest = installerPath(gameRoot, modpack)
-  if (!existsSync(dest)) {
+  // Forge / NeoForge — официальный установщик
+  const installer = join(gameRoot, '.loader', `${loader}-${mp.loader_version}-installer.jar`)
+  if (!existsSync(installer)) {
     emit(win, { phase: 'download', message: `Загрузка установщика ${LABELS[loader]}...` })
     const url = loader === 'forge'
-      ? `https://maven.minecraftforge.net/net/minecraftforge/forge/${mc}-${lv}/forge-${mc}-${lv}-installer.jar`
-      : `https://maven.neoforged.net/releases/net/neoforged/neoforge/${lv}/neoforge-${lv}-installer.jar`
-    mkdirSync(dirname(dest), { recursive: true })
-    await downloadFile(url, dest)
+      ? `https://maven.minecraftforge.net/net/minecraftforge/forge/${mp.mc_version}-${mp.loader_version}/forge-${mp.mc_version}-${mp.loader_version}-installer.jar`
+      : `https://maven.neoforged.net/releases/net/neoforged/neoforge/${mp.loader_version}/neoforge-${mp.loader_version}-installer.jar`
+    mkdirSync(dirname(installer), { recursive: true })
+    await downloadFile(url, installer)
   }
-  return { kind: 'forge', installerPath: dest }
+
+  emit(win, { phase: 'download', message: `Установка ${LABELS[loader]} (может занять минуту)...` })
+  const javaPath = await ensureJava(dirname(gameRoot), win, requiredJavaMajor(mp.mc_version))
+  await runClientInstaller(javaPath, installer, gameRoot, win)
+  if (!existsSync(versionFile)) {
+    throw new Error(`${LABELS[loader]}: установщик не создал профиль ${id}. Проверьте версию загрузчика (${mp.loader_version}).`)
+  }
+  return id
 }
 
-/** Последняя версия загрузчика под данную версию MC (для создания сборки). '' если не нашли. */
+/** Прогоняет установщик Forge/NeoForge в headless-режиме (создаёт versions/<id>/<id>.json + библиотеки). */
+async function runClientInstaller(javaPath: string, installer: string, gameRoot: string, win: BrowserWindow): Promise<void> {
+  mkdirSync(gameRoot, { recursive: true })
+  // Установщик требует наличия launcher_profiles.json в целевой папке
+  const profiles = join(gameRoot, 'launcher_profiles.json')
+  if (!existsSync(profiles)) {
+    writeFileSync(profiles, JSON.stringify({ profiles: {}, selectedProfile: '', clientToken: 'famworks' }))
+  }
+  await new Promise<void>((resolve, reject) => {
+    const proc = spawn(javaPath, ['-jar', installer, '--installClient', gameRoot], { cwd: gameRoot })
+    let tail = ''
+    const onOut = (d: Buffer): void => {
+      const s = d.toString()
+      tail = (tail + s).slice(-800)
+      win.webContents.send('launch:log', `[installer] ${s.trim()}`)
+    }
+    proc.stdout.on('data', onOut)
+    proc.stderr.on('data', onOut)
+    proc.on('error', reject)
+    proc.on('close', (code) => {
+      if (code === 0) resolve()
+      else reject(new Error(`Установщик завершился с кодом ${code}: ${tail.slice(-300)}`))
+    })
+  })
+}
+
+/** Последняя версия выбранного загрузчика под данную версию MC (для создания сборки). '' если не нашли. */
 export async function latestLoaderVersion(loader: LoaderId, mc: string): Promise<string> {
   try {
     if (loader === 'fabric') {
@@ -143,6 +167,5 @@ async function downloadFile(url: string, dest: string): Promise<void> {
     res.data.on('error', fail)
     res.data.on('aborted', () => fail(new DOMException('Aborted', 'AbortError')))
   })
-  const { renameSync } = await import('fs')
   renameSync(tmp, dest)
 }
