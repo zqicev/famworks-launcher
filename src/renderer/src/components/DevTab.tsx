@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react'
 import styles from '../styles/DevTab.module.css'
 
-interface DevCfg { debug: boolean; port: number; projectPath: string; ideaPath: string; watching: boolean }
+interface DevCfg { debug: boolean; port: number; projectPath: string; ideaPath: string; watching: boolean; hotswap: boolean; jbr: string }
 
 export default function DevTab({ modpackId }: { modpackId: string }) {
-  const [cfg, setCfg] = useState<DevCfg>({ debug: false, port: 5005, projectPath: '', ideaPath: '', watching: false })
+  const [cfg, setCfg] = useState<DevCfg>({ debug: false, port: 5005, projectPath: '', ideaPath: '', watching: false, hotswap: false, jbr: '' })
   const [notice, setNotice] = useState<{ text: string; ok: boolean } | null>(null)
   const [building, setBuilding] = useState(false)
 
@@ -16,7 +16,7 @@ export default function DevTab({ modpackId }: { modpackId: string }) {
     return window.api.dev.onSynced(r => { if (r.id === modpackId) flash(`jar синхронизирован (${r.filename})`, true) })
   }, [modpackId])
 
-  const patch = async (p: Partial<DevCfg>) => {
+  const patch = async (p: Partial<DevCfg> & { jbrPath?: string }) => {
     const next = await window.api.dev.set(modpackId, p)
     setCfg(next)
   }
@@ -33,6 +33,10 @@ export default function DevTab({ modpackId }: { modpackId: string }) {
   const pickIdea = async () => {
     const p = await window.api.dev.pickIdea()
     if (p) patch({ ideaPath: p })
+  }
+  const pickJbr = async () => {
+    const p = await window.api.dev.pickJbr()
+    if (p) patch({ jbrPath: p })
   }
   const openIde = async () => {
     const r = await window.api.dev.openIntelliJ(modpackId)
@@ -150,8 +154,38 @@ export default function DevTab({ modpackId }: { modpackId: string }) {
           <button className={styles.btn} onClick={syncOnly} disabled={!cfg.projectPath}>Синхронизировать jar</button>
         </div>
         <p className={styles.foot}>
-          Тумблер справа — <b>авто-синк</b>: как только пересоберёшь мод в IntelliJ, свежий jar сам заменит
+          Тумблер справа - <b>авто-синк</b>: как только пересоберёшь мод в IntelliJ, свежий jar сам заменит
           прошлую версию в модах сборки{cfg.watching ? ' (включено)' : ''}. Вывод сборки идёт во вкладку «Логи».
+        </p>
+      </section>
+
+      {/* Hot-swap */}
+      <section className={styles.card}>
+        <div className={styles.cardHead}>
+          <div>
+            <div className={styles.cardTitle}>Hot-swap (замена кода без рестарта)</div>
+            <div className={styles.cardSub}>Запуск на JetBrains Runtime — правки применяются в живой игре.</div>
+          </div>
+          <button
+            className={`${styles.switch} ${cfg.hotswap ? styles.switchOn : ''}`}
+            onClick={() => patch({ hotswap: !cfg.hotswap })}
+            disabled={!cfg.jbr}
+            title={cfg.jbr ? 'Запускать с hot-swap' : 'Не найден JetBrains Runtime'}
+          ><span className={styles.knob} /></button>
+        </div>
+
+        {cfg.jbr ? (
+          <div className={styles.attachHint} style={{ wordBreak: 'break-all' }}>JBR: {cfg.jbr}</div>
+        ) : (
+          <div className={styles.pathRow}>
+            <div className={styles.pathBox}><span className={styles.dim}>JetBrains Runtime не найден — укажите IntelliJ выше или JBR вручную</span></div>
+            <button className={styles.btn} onClick={pickJbr}>JBR</button>
+          </div>
+        )}
+
+        <p className={styles.foot}>
+          После правок в IntelliJ жми <b>Reload Changed Classes</b> (Ctrl+Shift+F9) — код применится без перезапуска.
+          Поддерживает тела методов и добавление методов/полей (не смену суперкласса). Hot-swap автоматически включает отладку.
         </p>
       </section>
 

@@ -68,6 +68,7 @@ contextBridge.exposeInMainWorld('api', {
     set: (id: string, partial: unknown) => ipcRenderer.invoke('dev:set', id, partial),
     pickProject: () => ipcRenderer.invoke('dev:pick-project'),
     pickIdea: () => ipcRenderer.invoke('dev:pick-idea'),
+    pickJbr: () => ipcRenderer.invoke('dev:pick-jbr'),
     openIntelliJ: (id: string) => ipcRenderer.invoke('dev:open-intellij', id),
     runConfig: (id: string) => ipcRenderer.invoke('dev:run-config', id),
     build: (id: string) => ipcRenderer.invoke('dev:build', id),

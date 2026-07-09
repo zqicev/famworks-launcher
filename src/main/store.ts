@@ -24,7 +24,8 @@ interface StoreSchema {
   // Режим разработчика (инструменты мододела)
   devMode: boolean
   ideaPath: string // путь к idea64.exe для «Открыть в IntelliJ»
-  devSettings: Record<string, { debug?: boolean; port?: number; projectPath?: string }>
+  jbrPath: string // путь к java.exe из JetBrains Runtime (для hot-swap); авто из IntelliJ, если пусто
+  devSettings: Record<string, { debug?: boolean; port?: number; projectPath?: string; lastJar?: string; hotswap?: boolean }>
 }
 
 export const store = new Store<StoreSchema>({
@@ -40,6 +41,7 @@ export const store = new Store<StoreSchema>({
     playStats: {},
     devMode: false,
     ideaPath: '',
+    jbrPath: '',
     devSettings: {}
   }
 })

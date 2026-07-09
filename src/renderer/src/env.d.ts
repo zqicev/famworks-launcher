@@ -49,10 +49,11 @@ interface Window {
       delete: (id: string, deleteFiles: boolean) => Promise<boolean>
     }
     dev: {
-      get: (id: string) => Promise<{ debug: boolean; port: number; projectPath: string; ideaPath: string; watching: boolean }>
-      set: (id: string, partial: { debug?: boolean; port?: number; projectPath?: string; ideaPath?: string }) => Promise<{ debug: boolean; port: number; projectPath: string; ideaPath: string; watching: boolean }>
+      get: (id: string) => Promise<{ debug: boolean; port: number; projectPath: string; ideaPath: string; watching: boolean; hotswap: boolean; jbr: string }>
+      set: (id: string, partial: { debug?: boolean; port?: number; projectPath?: string; ideaPath?: string; jbrPath?: string; hotswap?: boolean }) => Promise<{ debug: boolean; port: number; projectPath: string; ideaPath: string; watching: boolean; hotswap: boolean; jbr: string }>
       pickProject: () => Promise<string | null>
       pickIdea: () => Promise<string | null>
+      pickJbr: () => Promise<string | null>
       openIntelliJ: (id: string) => Promise<{ ok: boolean; error?: string }>
       runConfig: (id: string) => Promise<{ ok: boolean; path?: string; error?: string }>
       build: (id: string) => Promise<{ ok: boolean; error?: string }>

@@ -4,8 +4,11 @@ import { join } from 'path'
 import { existsSync, mkdirSync, writeFileSync, readdirSync, statSync, copyFileSync, rmSync, watch, FSWatcher } from 'fs'
 import { store } from './store'
 
-interface DevSetting { debug?: boolean; port?: number; projectPath?: string; lastJar?: string }
-export interface DevConfig { debug: boolean; port: number; projectPath: string; ideaPath: string; watching: boolean }
+interface DevSetting { debug?: boolean; port?: number; projectPath?: string; lastJar?: string; hotswap?: boolean }
+export interface DevConfig {
+  debug: boolean; port: number; projectPath: string; ideaPath: string; watching: boolean
+  hotswap: boolean; jbr: string
+}
 
 function emit(channel: string, payload: unknown): void {
   BrowserWindow.getAllWindows()[0]?.webContents.send(channel, payload)
@@ -22,8 +25,63 @@ export function getDevConfig(id: string): DevConfig {
     port: s.port || 5005,
     projectPath: s.projectPath || '',
     ideaPath: (store.get('ideaPath') as string) || '',
-    watching: watchers.has(id)
+    watching: watchers.has(id),
+    hotswap: !!s.hotswap,
+    jbr: resolveJbr()
   }
+}
+
+/** JetBrains Runtime (java из IntelliJ или указанный вручную) — нужен для hot-swap. '' если не найден. */
+export function resolveJbr(): string {
+  const manual = (store.get('jbrPath') as string) || ''
+  if (manual && existsSync(manual)) return manual
+  const idea = (store.get('ideaPath') as string) || ''
+  if (idea) {
+    const root = join(idea, '..', '..') // <IDE>/bin/idea64.exe → <IDE>
+    const winCand = join(root, 'jbr', 'bin', 'java.exe')
+    if (existsSync(winCand)) return winCand
+    const unixCand = join(root, 'jbr', 'bin', 'java')
+    if (existsSync(unixCand)) return unixCand
+    const macCand = join(root, 'jbr', 'Contents', 'Home', 'bin', 'java')
+    if (existsSync(macCand)) return macCand
+  }
+  return ''
+}
+
+export async function pickJbr(): Promise<string | null> {
+  const r = await dialog.showOpenDialog({
+    title: 'java из JetBrains Runtime (JBR)',
+    properties: ['openFile'],
+    filters: [{ name: 'java', extensions: ['exe', ''] }, { name: 'Все файлы', extensions: ['*'] }]
+  })
+  return r.filePaths[0] ?? null
+}
+
+/** Переопределения запуска из dev-режима: JBR как JVM (для hot-swap) и JVM-аргументы (отладка/enhanced-redefine). */
+export function devLaunchOverrides(id: string): { javaPath: string | null; jvmArgs: string[]; notes: string[] } {
+  const s = getMap()[id]
+  const jvmArgs: string[] = []
+  const notes: string[] = []
+  let javaPath: string | null = null
+
+  const debug = !!s?.debug || !!s?.hotswap // hot-swap требует подключённый отладчик
+  if (debug) {
+    const port = s?.port || 5005
+    jvmArgs.push(`-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:${port}`)
+    notes.push(`[FamWorks] Отладка на порту ${port}`)
+  }
+  if (s?.hotswap) {
+    const jbr = resolveJbr()
+    if (jbr) {
+      javaPath = jbr
+      // IgnoreUnrecognized — страховка на случай, если билд JBR не знает флаг (тогда просто без enhanced)
+      jvmArgs.push('-XX:+IgnoreUnrecognizedVMOptions', '-XX:+AllowEnhancedClassRedefinition')
+      notes.push('[FamWorks] Hot-swap включён (JetBrains Runtime). В IntelliJ: Reload Changed Classes.')
+    } else {
+      notes.push('[FamWorks] Hot-swap не активирован: не найден JetBrains Runtime (укажите IntelliJ или JBR).')
+    }
+  }
+  return { javaPath, jvmArgs, notes }
 }
 
 function modsDir(id: string): string {
@@ -114,25 +172,18 @@ export function setWatch(id: string, enable: boolean): { ok: boolean; watching: 
   }
 }
 
-export function setDevConfig(id: string, partial: DevSetting & { ideaPath?: string }): DevConfig {
+export function setDevConfig(id: string, partial: DevSetting & { ideaPath?: string; jbrPath?: string }): DevConfig {
   if (typeof partial.ideaPath === 'string') store.set('ideaPath', partial.ideaPath)
+  if (typeof partial.jbrPath === 'string') store.set('jbrPath', partial.jbrPath)
   const rest: DevSetting = {}
   if ('debug' in partial) rest.debug = partial.debug
   if ('port' in partial) rest.port = partial.port
   if ('projectPath' in partial) rest.projectPath = partial.projectPath
+  if ('hotswap' in partial) rest.hotswap = partial.hotswap
   const map = { ...getMap() }
   map[id] = { ...(map[id] || {}), ...rest }
   store.set('devSettings', map)
   return getDevConfig(id)
-}
-
-/** JVM-аргумент отладки (JDWP) для запуска сборки, если включена отладка. Иначе null. */
-export function debugJvmArg(id: string): string | null {
-  const s = getMap()[id]
-  if (!s?.debug) return null
-  const port = s.port || 5005
-  // server=y,suspend=n — игра стартует сразу, IntelliJ подключается когда удобно
-  return `-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:${port}`
 }
 
 export async function pickProject(): Promise<string | null> {

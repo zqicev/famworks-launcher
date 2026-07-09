@@ -4,7 +4,7 @@ import { BrowserWindow, utilityProcess, UtilityProcess } from 'electron'
 import { Modpack } from '../types/modpack'
 import { ProgressEvent } from './installer'
 import { setupLoader, requiredJavaMajor, loaderJvmArgs } from './loaders'
-import { debugJvmArg } from './dev'
+import { devLaunchOverrides } from './dev'
 import { ensureJava } from './java'
 import { writeServers } from './servers'
 import { setPlaying, setIdle } from './discord'
@@ -40,23 +40,29 @@ export async function launchGame(
   launchAborted = false
   spawnedAt = 0
 
-  // 1. Гарантируем Java нужной мажорной версии (зависит от версии MC)
+  // Dev-режим: отладка (JDWP) и hot-swap (JVM от JetBrains Runtime + enhanced redefinition)
+  const dev = devLaunchOverrides(modpack.id)
+
+  // 1. Java: hot-swap использует JBR; иначе гарантируем Java нужной мажорной версии (по версии MC)
   let javaPath: string
-  try {
-    javaPath = await ensureJava(installPath, win, requiredJavaMajor(modpack.mc_version))
-  } catch (e) {
-    win.webContents.send('launch:error', `Не удалось установить Java: ${String(e)}`)
-    return
+  if (dev.javaPath) {
+    javaPath = dev.javaPath
+  } else {
+    try {
+      javaPath = await ensureJava(installPath, win, requiredJavaMajor(modpack.mc_version))
+    } catch (e) {
+      win.webContents.send('launch:error', `Не удалось установить Java: ${String(e)}`)
+      return
+    }
   }
 
   // 2. Загрузчик (Fabric/Quilt — meta-профиль, Forge/NeoForge — установщик). Все дают version-профиль.
   const gameRoot = join(installPath, modpack.id)
   const loaderVersionId = await setupLoader(modpack, gameRoot, win)
   // Forge/NeoForge держат module-path и прочие JVM-аргументы в профиле, а mclc их не читает —
-  // передаём вручную через customArgs. Плюс отладка (JDWP), если включена в dev-режиме.
-  const dbg = debugJvmArg(modpack.id)
-  const extraJvmArgs = [...loaderJvmArgs(modpack, gameRoot), ...(dbg ? [dbg] : [])]
-  if (dbg) win.webContents.send('launch:log', { id: modpack.id, text: `[FamWorks] Отладка включена: ${dbg}` })
+  // передаём вручную через customArgs. Плюс dev-аргументы (отладка/hot-swap).
+  const extraJvmArgs = [...loaderJvmArgs(modpack, gameRoot), ...dev.jvmArgs]
+  for (const n of dev.notes) win.webContents.send('launch:log', { id: modpack.id, text: n })
 
   // 3. Серверы сборки → servers.dat. Сеем один раз: если набор серверов не менялся,
   //    повторно не трогаем (пользователь волен удалять/менять их у себя).

@@ -242,6 +242,10 @@ export function setupIpcHandlers() {
     const { pickIdea } = await import('./dev')
     return pickIdea()
   })
+  ipcMain.handle('dev:pick-jbr', async () => {
+    const { pickJbr } = await import('./dev')
+    return pickJbr()
+  })
   ipcMain.handle('dev:open-intellij', async (_, id: string) => {
     const { openInIntelliJ } = await import('./dev')
     return openInIntelliJ(id)
