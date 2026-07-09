@@ -134,7 +134,7 @@ export default function MainPanel({ modpack, installPath, loading, error }: Prop
         {tab === 'resourcepacks' && <PackTab modpack={modpack} dir={rpDir} items={modpack.resourcepacks ?? []} kind="resourcepack" noun="ресурспаков" onCount={n => setCounts(c => ({ ...c, rp: n }))} />}
         {tab === 'shaders' && <PackTab modpack={modpack} dir={shDir} items={modpack.shaders ?? []} kind="shader" noun="шейдеров" onCount={n => setCounts(c => ({ ...c, sh: n }))} />}
         {tab === 'overview' && <OverviewTab modpack={modpack} busyId={busyId} />}
-        {tab === 'logs' && <LogsTab />}
+        {tab === 'logs' && <LogsTab modpackId={modpack.id} />}
       </div>
 
       <BottomBar modpack={modpack} installPath={installPath} activeMods={counts.modsActive} totalMods={counts.modsTotal} />

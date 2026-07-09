@@ -68,7 +68,7 @@ contextBridge.exposeInMainWorld('api', {
   },
   launch: {
     start: (id: string, quickPlay?: unknown) => ipcRenderer.invoke('launch', id, quickPlay),
-    onLog: (cb: (msg: string) => void) => subscribe('launch:log', cb),
+    onLog: (cb: (msg: { id: string; text: string }) => void) => subscribe('launch:log', cb),
     onClose: (cb: (code: number) => void) => subscribe('launch:close', cb),
     onError: (cb: (msg: string) => void) => subscribe('launch:error', cb),
     onSpawned: (cb: (id: string) => void) => subscribe('launch:spawned', cb)

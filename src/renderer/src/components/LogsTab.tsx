@@ -6,9 +6,9 @@ type Filter = 'all' | LogLevel
 const LABEL: Record<Filter, string> = { all: 'Все', error: 'Ошибки', warn: 'Предупр.', info: 'Инфо' }
 const FILTERS: Filter[] = ['all', 'error', 'warn', 'info']
 
-export default function LogsTab() {
+export default function LogsTab({ modpackId }: { modpackId: string }) {
   const version = useSyncExternalStore(subscribeLog, getLogVersion)
-  const all = getLogLines()
+  const all = getLogLines(modpackId)
   const [filter, setFilter] = useState<Filter>('all')
   const [query, setQuery] = useState('')
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -20,7 +20,7 @@ export default function LogsTab() {
     warn: all.filter(l => l.level === 'warn').length,
     info: all.filter(l => l.level === 'info').length
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }), [version])
+  }), [version, modpackId])
 
   const shown = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -29,7 +29,7 @@ export default function LogsTab() {
     )
     return filtered.slice(-1500) // ограничиваем DOM хвостом
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [version, filter, query])
+  }, [version, filter, query, modpackId])
 
   // Автоскролл вниз, если пользователь у нижнего края
   useEffect(() => {
@@ -62,7 +62,7 @@ export default function LogsTab() {
           value={query}
           onChange={e => setQuery(e.target.value)}
         />
-        <button className={styles.clearBtn} onClick={clearLog} disabled={all.length === 0}>Очистить</button>
+        <button className={styles.clearBtn} onClick={() => clearLog(modpackId)} disabled={all.length === 0}>Очистить</button>
       </div>
 
       <div className={styles.console} ref={scrollRef} onScroll={onScroll}>

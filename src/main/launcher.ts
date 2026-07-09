@@ -92,7 +92,9 @@ export async function launchGame(
 
     worker.on('message', (msg: any) => {
       if (msg.t === 'win') {
-        win.webContents.send(msg.channel, msg.payload)
+        // Логи игры помечаем id сборки, чтобы вкладка «Логи» показывала их по своей сборке
+        if (msg.channel === 'launch:log') win.webContents.send('launch:log', { id: modpack.id, text: msg.payload })
+        else win.webContents.send(msg.channel, msg.payload)
       } else if (msg.t === 'spawned') {
         spawned = true
         gameSpawned = true

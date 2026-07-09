@@ -53,7 +53,7 @@ interface Window {
     }
     launch: {
       start: (id: string, quickPlay?: { type: 'singleplayer' | 'multiplayer'; identifier: string }) => Promise<boolean>
-      onLog: (cb: (msg: string) => void) => () => void
+      onLog: (cb: (msg: { id: string; text: string }) => void) => () => void
       onClose: (cb: (code: number) => void) => () => void
       onError: (cb: (msg: string) => void) => () => void
       onSpawned: (cb: (id: string) => void) => () => void
