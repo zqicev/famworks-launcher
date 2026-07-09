@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react'
+import CreateModModal from './CreateModModal'
 import styles from '../styles/DevTab.module.css'
 
 interface DevCfg { debug: boolean; port: number; projectPath: string; ideaPath: string; watching: boolean; hotswap: boolean; jbr: string }
+interface Props { modpackId: string; loader: string; mcVersion: string }
 
-export default function DevTab({ modpackId }: { modpackId: string }) {
+export default function DevTab({ modpackId, loader, mcVersion }: Props) {
   const [cfg, setCfg] = useState<DevCfg>({ debug: false, port: 5005, projectPath: '', ideaPath: '', watching: false, hotswap: false, jbr: '' })
   const [notice, setNotice] = useState<{ text: string; ok: boolean } | null>(null)
   const [building, setBuilding] = useState(false)
+  const [createOpen, setCreateOpen] = useState(false)
 
   useEffect(() => {
     window.api.dev.get(modpackId).then(setCfg).catch(() => {})
@@ -106,7 +109,10 @@ export default function DevTab({ modpackId }: { modpackId: string }) {
 
       {/* Проект мода / IntelliJ */}
       <section className={styles.card}>
-        <div className={styles.cardTitle}>Проект мода (IntelliJ IDEA)</div>
+        <div className={styles.cardHead}>
+          <div className={styles.cardTitle}>Проект мода (IntelliJ IDEA)</div>
+          <button className={styles.btn} onClick={() => setCreateOpen(true)}>+ Создать мод</button>
+        </div>
 
         <div className={styles.pathRow}>
           <div className={styles.pathBox}>
@@ -178,18 +184,27 @@ export default function DevTab({ modpackId }: { modpackId: string }) {
           <div className={styles.attachHint} style={{ wordBreak: 'break-all' }}>JBR: {cfg.jbr}</div>
         ) : (
           <div className={styles.pathRow}>
-            <div className={styles.pathBox}><span className={styles.dim}>JetBrains Runtime не найден — укажите IntelliJ выше или JBR вручную</span></div>
+            <div className={styles.pathBox}><span className={styles.dim}>JetBrains Runtime не найден - укажите IntelliJ выше или JBR вручную</span></div>
             <button className={styles.btn} onClick={pickJbr}>JBR</button>
           </div>
         )}
 
         <p className={styles.foot}>
-          После правок в IntelliJ жми <b>Reload Changed Classes</b> (Ctrl+Shift+F9) — код применится без перезапуска.
+          После правок в IntelliJ жми <b>Reload Changed Classes</b> (Ctrl+Shift+F9) - код применится без перезапуска.
           Поддерживает тела методов и добавление методов/полей (не смену суперкласса). Hot-swap автоматически включает отладку.
         </p>
       </section>
 
       {notice && <div className={`${styles.notice} ${notice.ok ? styles.noticeOk : styles.noticeErr}`}>{notice.text}</div>}
+
+      {createOpen && (
+        <CreateModModal
+          defaultLoader={loader}
+          defaultMc={mcVersion}
+          onClose={() => setCreateOpen(false)}
+          onCreated={(path) => { setCreateOpen(false); patch({ projectPath: path }); flash('Проект мода создан и выбран', true) }}
+        />
+      )}
     </div>
   )
 }

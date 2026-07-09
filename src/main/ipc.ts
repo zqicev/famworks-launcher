@@ -266,6 +266,10 @@ export function setupIpcHandlers() {
     const { setWatch } = await import('./dev')
     return setWatch(id, enable)
   })
+  ipcMain.handle('dev:generate-mod', async (_, opts: unknown) => {
+    const { generateMod } = await import('./dev')
+    return generateMod(opts as { name: string; modId: string; loader: string; mcVersion: string; dest: string })
+  })
 
   // Прогресс на иконке в панели задач. mode: none|normal|indeterminate
   ipcMain.on('taskbar:progress', (_, value: number, mode: 'none' | 'normal' | 'indeterminate') => {

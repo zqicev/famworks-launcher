@@ -60,6 +60,7 @@ interface Window {
       syncJar: (id: string) => Promise<{ ok: boolean; filename?: string; error?: string }>
       watch: (id: string, enable: boolean) => Promise<{ ok: boolean; watching: boolean; error?: string }>
       onSynced: (cb: (r: { id: string; filename: string }) => void) => () => void
+      generateMod: (opts: { name: string; modId: string; loader: string; mcVersion: string; dest: string }) => Promise<{ ok: boolean; path?: string; error?: string }>
     }
     auth: {
       microsoftLogin: () => Promise<{ username: string; uuid: string; refreshToken: string; mclc: unknown }>

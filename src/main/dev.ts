@@ -1,7 +1,9 @@
 import { dialog, shell, BrowserWindow } from 'electron'
 import { spawn } from 'child_process'
-import { join } from 'path'
-import { existsSync, mkdirSync, writeFileSync, readdirSync, statSync, copyFileSync, rmSync, watch, FSWatcher } from 'fs'
+import { join, dirname } from 'path'
+import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, statSync, copyFileSync, rmSync, watch, FSWatcher } from 'fs'
+import axios from 'axios'
+import AdmZip from 'adm-zip'
 import { store } from './store'
 
 interface DevSetting { debug?: boolean; port?: number; projectPath?: string; lastJar?: string; hotswap?: boolean }
@@ -220,6 +222,90 @@ export function openInIntelliJ(id: string): { ok: boolean; error?: string } {
   } catch {
     shell.openPath(cfg.projectPath)
     return { ok: false, error: 'IntelliJ не найден — открыл папку. Укажите путь к idea64.exe.' }
+  }
+}
+
+// ---- Генератор шаблона мода ----
+
+export interface GenOpts { name: string; modId: string; loader: string; mcVersion: string; dest: string }
+
+function sanitizeModId(raw: string): string {
+  const s = raw.toLowerCase().replace(/[^a-z0-9_]+/g, '_').replace(/^_+|_+$/g, '')
+  return /^[a-z]/.test(s) ? s : `mod_${s || 'new'}`
+}
+
+function templateUrl(loader: string, mc: string): string | null {
+  const minor = mc.split('.')[1]
+  if (loader === 'fabric') {
+    // ветки fabric-example-mod соответствуют версиям MC
+    const branch = minor === '21' ? '1.21' : minor === '20' ? '1.20.4' : '1.21'
+    return `https://github.com/FabricMC/fabric-example-mod/archive/refs/heads/${branch}.zip`
+  }
+  if (loader === 'neoforge') {
+    return 'https://github.com/NeoForged/MDK/archive/refs/heads/main.zip'
+  }
+  return null
+}
+
+/** Точечная кастомизация шаблона: id/имя мода в метаданных. */
+function customizeTemplate(dir: string, opts: GenOpts): void {
+  const fmj = join(dir, 'src', 'main', 'resources', 'fabric.mod.json')
+  if (existsSync(fmj)) {
+    try {
+      const j = JSON.parse(readFileSync(fmj, 'utf8'))
+      j.id = opts.modId
+      j.name = opts.name
+      j.description = `${opts.name} — мод для сборки FamWorks`
+      writeFileSync(fmj, JSON.stringify(j, null, 2))
+    } catch { /* оставляем как есть */ }
+  }
+  for (const rel of ['src/main/resources/META-INF/neoforge.mods.toml', 'src/main/resources/META-INF/mods.toml']) {
+    const toml = join(dir, ...rel.split('/'))
+    if (existsSync(toml)) {
+      let t = readFileSync(toml, 'utf8')
+      t = t.replace(/modId\s*=\s*"[^"]*"/, `modId="${opts.modId}"`)
+        .replace(/displayName\s*=\s*"[^"]*"/, `displayName="${opts.name}"`)
+      writeFileSync(toml, t)
+    }
+  }
+  const gp = join(dir, 'gradle.properties')
+  if (existsSync(gp)) {
+    let g = readFileSync(gp, 'utf8')
+    g = g.replace(/^(\s*archives_base_name\s*=).*/m, `$1 ${opts.modId}`)
+      .replace(/^(\s*mod_id\s*=).*/m, `$1 ${opts.modId}`)
+    writeFileSync(gp, g)
+  }
+}
+
+/** Скачивает официальный шаблон мода, распаковывает в dest/<modId> и подставляет id/имя. */
+export async function generateMod(raw: GenOpts): Promise<{ ok: boolean; path?: string; error?: string }> {
+  const opts: GenOpts = { ...raw, modId: sanitizeModId(raw.modId || raw.name) }
+  if (!opts.name.trim()) return { ok: false, error: 'Укажите название мода' }
+  if (!opts.dest) return { ok: false, error: 'Укажите папку назначения' }
+  const url = templateUrl(opts.loader, opts.mcVersion)
+  if (!url) return { ok: false, error: `Нет шаблона для загрузчика ${opts.loader} (пока Fabric и NeoForge)` }
+
+  const projectDir = join(opts.dest, opts.modId)
+  if (existsSync(projectDir)) return { ok: false, error: `Папка ${opts.modId} уже существует` }
+
+  try {
+    const res = await axios.get(url, { responseType: 'arraybuffer', timeout: 30000, maxRedirects: 5 })
+    const zip = new AdmZip(Buffer.from(res.data))
+    mkdirSync(projectDir, { recursive: true })
+    for (const e of zip.getEntries()) {
+      if (e.isDirectory) continue
+      const rel = e.entryName.replace(/^[^/]+\//, '') // убираем верхнюю папку архива
+      if (!rel) continue
+      const out = join(projectDir, rel)
+      mkdirSync(dirname(out), { recursive: true })
+      writeFileSync(out, e.getData())
+    }
+    customizeTemplate(projectDir, opts)
+    return { ok: true, path: projectDir }
+  } catch (e) {
+    try { rmSync(projectDir, { recursive: true, force: true }) } catch { /* ignore */ }
+    const msg = e instanceof Error ? e.message : String(e)
+    return { ok: false, error: `Не удалось скачать шаблон (нужен доступ к github.com): ${msg}` }
   }
 }
 

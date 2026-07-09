@@ -74,7 +74,9 @@ contextBridge.exposeInMainWorld('api', {
     build: (id: string) => ipcRenderer.invoke('dev:build', id),
     syncJar: (id: string) => ipcRenderer.invoke('dev:sync-jar', id),
     watch: (id: string, enable: boolean) => ipcRenderer.invoke('dev:watch', id, enable),
-    onSynced: (cb: (r: { id: string; filename: string }) => void) => subscribe('dev:synced', cb)
+    onSynced: (cb: (r: { id: string; filename: string }) => void) => subscribe('dev:synced', cb),
+    generateMod: (opts: { name: string; modId: string; loader: string; mcVersion: string; dest: string }) =>
+      ipcRenderer.invoke('dev:generate-mod', opts)
   },
   auth: {
     microsoftLogin: () => ipcRenderer.invoke('auth:microsoft-login')
