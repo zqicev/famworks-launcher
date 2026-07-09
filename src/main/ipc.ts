@@ -250,6 +250,18 @@ export function setupIpcHandlers() {
     const { createRunConfig } = await import('./dev')
     return createRunConfig(id)
   })
+  ipcMain.handle('dev:build', async (_, id: string) => {
+    const { buildProject } = await import('./dev')
+    return buildProject(id)
+  })
+  ipcMain.handle('dev:sync-jar', async (_, id: string) => {
+    const { syncJar } = await import('./dev')
+    return syncJar(id)
+  })
+  ipcMain.handle('dev:watch', async (_, id: string, enable: boolean) => {
+    const { setWatch } = await import('./dev')
+    return setWatch(id, enable)
+  })
 
   // Прогресс на иконке в панели задач. mode: none|normal|indeterminate
   ipcMain.on('taskbar:progress', (_, value: number, mode: 'none' | 'normal' | 'indeterminate') => {

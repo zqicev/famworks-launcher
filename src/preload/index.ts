@@ -69,7 +69,11 @@ contextBridge.exposeInMainWorld('api', {
     pickProject: () => ipcRenderer.invoke('dev:pick-project'),
     pickIdea: () => ipcRenderer.invoke('dev:pick-idea'),
     openIntelliJ: (id: string) => ipcRenderer.invoke('dev:open-intellij', id),
-    runConfig: (id: string) => ipcRenderer.invoke('dev:run-config', id)
+    runConfig: (id: string) => ipcRenderer.invoke('dev:run-config', id),
+    build: (id: string) => ipcRenderer.invoke('dev:build', id),
+    syncJar: (id: string) => ipcRenderer.invoke('dev:sync-jar', id),
+    watch: (id: string, enable: boolean) => ipcRenderer.invoke('dev:watch', id, enable),
+    onSynced: (cb: (r: { id: string; filename: string }) => void) => subscribe('dev:synced', cb)
   },
   auth: {
     microsoftLogin: () => ipcRenderer.invoke('auth:microsoft-login')

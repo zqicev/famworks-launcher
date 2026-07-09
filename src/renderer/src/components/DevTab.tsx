@@ -1,14 +1,19 @@
 import { useState, useEffect } from 'react'
 import styles from '../styles/DevTab.module.css'
 
-interface DevCfg { debug: boolean; port: number; projectPath: string; ideaPath: string }
+interface DevCfg { debug: boolean; port: number; projectPath: string; ideaPath: string; watching: boolean }
 
 export default function DevTab({ modpackId }: { modpackId: string }) {
-  const [cfg, setCfg] = useState<DevCfg>({ debug: false, port: 5005, projectPath: '', ideaPath: '' })
+  const [cfg, setCfg] = useState<DevCfg>({ debug: false, port: 5005, projectPath: '', ideaPath: '', watching: false })
   const [notice, setNotice] = useState<{ text: string; ok: boolean } | null>(null)
+  const [building, setBuilding] = useState(false)
 
   useEffect(() => {
     window.api.dev.get(modpackId).then(setCfg).catch(() => {})
+  }, [modpackId])
+
+  useEffect(() => {
+    return window.api.dev.onSynced(r => { if (r.id === modpackId) flash(`jar синхронизирован (${r.filename})`, true) })
   }, [modpackId])
 
   const patch = async (p: Partial<DevCfg>) => {
@@ -38,6 +43,26 @@ export default function DevTab({ modpackId }: { modpackId: string }) {
     flash(r.ok ? 'Конфиг отладки создан в проекте (.idea/runConfigurations)' : (r.error ?? 'Ошибка'), r.ok)
   }
 
+  const buildAndRun = async () => {
+    setBuilding(true)
+    const b = await window.api.dev.build(modpackId)
+    if (!b.ok) { setBuilding(false); flash(b.error ?? 'Ошибка сборки', false); return }
+    const s = await window.api.dev.syncJar(modpackId)
+    setBuilding(false)
+    if (!s.ok) { flash(s.error ?? 'Не удалось скопировать jar', false); return }
+    flash(`Собрано, jar обновлён (${s.filename}). Запускаю…`, true)
+    window.api.launch.start(modpackId)
+  }
+  const syncOnly = async () => {
+    const s = await window.api.dev.syncJar(modpackId)
+    flash(s.ok ? `jar скопирован в моды (${s.filename})` : (s.error ?? 'Ошибка'), s.ok)
+  }
+  const toggleWatch = async () => {
+    const r = await window.api.dev.watch(modpackId, !cfg.watching)
+    if (!r.ok) { flash(r.error ?? 'Ошибка', false); return }
+    setCfg(c => ({ ...c, watching: r.watching }))
+  }
+
   return (
     <div className={styles.wrap}>
       <div className={styles.intro}>
@@ -50,7 +75,7 @@ export default function DevTab({ modpackId }: { modpackId: string }) {
         <div className={styles.cardHead}>
           <div>
             <div className={styles.cardTitle}>Отладка (JDWP)</div>
-            <div className={styles.cardSub}>Игра запустится с открытым портом отладки — подключишься из IntelliJ.</div>
+            <div className={styles.cardSub}>Игра запустится с открытым портом отладки - можно подключиться из IntelliJ.</div>
           </div>
           <button
             className={`${styles.switch} ${cfg.debug ? styles.switchOn : ''}`}
@@ -98,8 +123,35 @@ export default function DevTab({ modpackId }: { modpackId: string }) {
           <button className={styles.btn} onClick={genConfig} disabled={!cfg.projectPath}>Создать конфиг отладки</button>
         </div>
         <p className={styles.foot}>
-          «Создать конфиг отладки» кладёт в проект готовый <b>Remote JVM Debug</b> на порт {cfg.port} —
+          «Создать конфиг отладки» кладёт в проект готовый <b>Remote JVM Debug</b> на порт {cfg.port} -
           после этого в IntelliJ появится кнопка запуска отладчика, жать её после старта игры.
+        </p>
+      </section>
+
+      {/* Gradle: собрать и запустить */}
+      <section className={styles.card}>
+        <div className={styles.cardHead}>
+          <div>
+            <div className={styles.cardTitle}>Сборка мода (Gradle)</div>
+            <div className={styles.cardSub}>gradlew build → свежий jar из build/libs копируется в моды сборки → запуск.</div>
+          </div>
+          <button
+            className={`${styles.switch} ${cfg.watching ? styles.switchOn : ''}`}
+            onClick={toggleWatch}
+            disabled={!cfg.projectPath}
+            title="Авто-синхронизация jar при пересборке"
+          ><span className={styles.knob} /></button>
+        </div>
+
+        <div className={styles.actions}>
+          <button className={styles.btnAccent} onClick={buildAndRun} disabled={!cfg.projectPath || building}>
+            {building ? 'Сборка…' : 'Собрать и запустить'}
+          </button>
+          <button className={styles.btn} onClick={syncOnly} disabled={!cfg.projectPath}>Синхронизировать jar</button>
+        </div>
+        <p className={styles.foot}>
+          Тумблер справа — <b>авто-синк</b>: как только пересоберёшь мод в IntelliJ, свежий jar сам заменит
+          прошлую версию в модах сборки{cfg.watching ? ' (включено)' : ''}. Вывод сборки идёт во вкладку «Логи».
         </p>
       </section>
 

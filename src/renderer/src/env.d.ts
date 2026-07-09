@@ -49,12 +49,16 @@ interface Window {
       delete: (id: string, deleteFiles: boolean) => Promise<boolean>
     }
     dev: {
-      get: (id: string) => Promise<{ debug: boolean; port: number; projectPath: string; ideaPath: string }>
-      set: (id: string, partial: { debug?: boolean; port?: number; projectPath?: string; ideaPath?: string }) => Promise<{ debug: boolean; port: number; projectPath: string; ideaPath: string }>
+      get: (id: string) => Promise<{ debug: boolean; port: number; projectPath: string; ideaPath: string; watching: boolean }>
+      set: (id: string, partial: { debug?: boolean; port?: number; projectPath?: string; ideaPath?: string }) => Promise<{ debug: boolean; port: number; projectPath: string; ideaPath: string; watching: boolean }>
       pickProject: () => Promise<string | null>
       pickIdea: () => Promise<string | null>
       openIntelliJ: (id: string) => Promise<{ ok: boolean; error?: string }>
       runConfig: (id: string) => Promise<{ ok: boolean; path?: string; error?: string }>
+      build: (id: string) => Promise<{ ok: boolean; error?: string }>
+      syncJar: (id: string) => Promise<{ ok: boolean; filename?: string; error?: string }>
+      watch: (id: string, enable: boolean) => Promise<{ ok: boolean; watching: boolean; error?: string }>
+      onSynced: (cb: (r: { id: string; filename: string }) => void) => () => void
     }
     auth: {
       microsoftLogin: () => Promise<{ username: string; uuid: string; refreshToken: string; mclc: unknown }>
