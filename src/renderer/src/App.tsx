@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { ModpackIndex, Modpack } from '../../types/modpack'
 import Sidebar from './components/Sidebar'
 import MainPanel from './components/MainPanel'
@@ -23,6 +23,14 @@ export default function App() {
   const [customPacks, setCustomPacks] = useState<Modpack[]>([])
   const [createOpen, setCreateOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<Modpack | null>(null)
+  const [toast, setToast] = useState<{ text: string; kind: 'info' | 'success' | 'error' } | null>(null)
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const showToast = useCallback((text: string, kind: 'info' | 'success' | 'error') => {
+    if (toastTimer.current) clearTimeout(toastTimer.current)
+    setToast({ text, kind })
+    if (kind !== 'info') toastTimer.current = setTimeout(() => setToast(null), 3800) // info висит до завершения
+  }, [])
 
   const loadCustom = useCallback(async () => {
     setCustomPacks(await window.api.custom.list().catch(() => []))
@@ -118,6 +126,33 @@ export default function App() {
     setDeleteTarget(null)
   }
 
+  const handleImport = async () => {
+    showToast('Импорт сборки…', 'info')
+    try {
+      const res = await window.api.modpacks.import()
+      if (res.cancelled) { setToast(null); return }
+      if (res.ok && res.modpack) {
+        await loadCustom()
+        setSelectedId(res.modpack.id)
+        showToast(`Сборка «${res.modpack.name}» импортирована`, 'success')
+      } else setToast(null)
+    } catch (e) {
+      showToast(`Ошибка импорта: ${e instanceof Error ? e.message : String(e)}`, 'error')
+    }
+  }
+
+  const handleExportCustom = async (id: string) => {
+    showToast('Экспорт сборки…', 'info')
+    try {
+      const res = await window.api.modpacks.export(id)
+      if (res.cancelled) { setToast(null); return }
+      if (res.ok) showToast('Сборка сохранена в файл', 'success')
+      else setToast(null)
+    } catch (e) {
+      showToast(`Ошибка экспорта: ${e instanceof Error ? e.message : String(e)}`, 'error')
+    }
+  }
+
   return (
     <div className={styles.root}>
       <TitleBar />
@@ -136,6 +171,8 @@ export default function App() {
             onRefresh={handleRefresh}
             onCreate={() => setCreateOpen(true)}
             onDeleteCustom={handleDeleteCustom}
+            onImport={handleImport}
+            onExportCustom={handleExportCustom}
           />
           <MainPanel
             modpack={modpack}
@@ -162,6 +199,12 @@ export default function App() {
               onClose={() => setDeleteTarget(null)}
             />
           )}
+        </div>
+      )}
+      {toast && (
+        <div className={`${styles.toast} ${styles['toast_' + toast.kind]}`}>
+          {toast.kind === 'info' && <span className={styles.toastSpinner} />}
+          <span>{toast.text}</span>
         </div>
       )}
     </div>

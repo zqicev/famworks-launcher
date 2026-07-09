@@ -28,6 +28,15 @@ export function setupIpcHandlers() {
   ipcMain.handle('modpacks:index', () => fetchModpackIndex())
   ipcMain.handle('modpacks:get', (_, id: string) => fetchModpack(id))
 
+  ipcMain.handle('modpack:export', async (_, id: string) => {
+    const { exportModpack } = await import('./packio')
+    return exportModpack(id)
+  })
+  ipcMain.handle('modpack:import', async () => {
+    const { importModpack } = await import('./packio')
+    return importModpack()
+  })
+
   ipcMain.handle('modpack:status', async (_, modpackId: string) => {
     const modpack = await fetchModpack(modpackId)
     const installPath = store.get('installPath') as string

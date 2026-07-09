@@ -13,9 +13,22 @@ interface Props {
   onRefresh: () => void
   onCreate: () => void
   onDeleteCustom: (id: string) => void
+  onImport: () => void
+  onExportCustom: (id: string) => void
 }
 
-export default function Sidebar({ index, customPacks, selectedId, seenUpdates, onSelect, onSettings, onRefresh, onCreate, onDeleteCustom }: Props) {
+const ImportIcon = () => (
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" />
+  </svg>
+)
+const ExportIcon = () => (
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
+  </svg>
+)
+
+export default function Sidebar({ index, customPacks, selectedId, seenUpdates, onSelect, onSettings, onRefresh, onCreate, onDeleteCustom, onImport, onExportCustom }: Props) {
   const [version, setVersion] = useState('')
   useEffect(() => { window.api.appVersion().then(setVersion).catch(() => {}) }, [])
 
@@ -66,7 +79,10 @@ export default function Sidebar({ index, customPacks, selectedId, seenUpdates, o
         <div className={styles.section}>
           <div className={styles.sectionHeader}>
             <span>МОИ СБОРКИ</span>
-            <button className={styles.addMini} onClick={onCreate} title="Создать сборку">+</button>
+            <div className={styles.headerActions}>
+              <button className={styles.miniBtn} onClick={onImport} title="Импорт сборки из файла"><ImportIcon /></button>
+              <button className={styles.addMini} onClick={onCreate} title="Создать сборку">+</button>
+            </div>
           </div>
           <div className={styles.list}>
             {customPacks.length === 0 && (
@@ -87,7 +103,10 @@ export default function Sidebar({ index, customPacks, selectedId, seenUpdates, o
                     <div className={styles.name}>{pack.name}</div>
                     <div className={styles.meta}>{pack.loader.charAt(0).toUpperCase() + pack.loader.slice(1)} · {pack.mc_version}</div>
                   </div>
-                  <button className={styles.delPack} onClick={(e) => { e.stopPropagation(); onDeleteCustom(pack.id) }} title="Удалить сборку">✕</button>
+                  <div className={styles.itemActions}>
+                    <button className={styles.actBtn} onClick={(e) => { e.stopPropagation(); onExportCustom(pack.id) }} title="Экспорт сборки в файл"><ExportIcon /></button>
+                    <button className={styles.actBtn} onClick={(e) => { e.stopPropagation(); onDeleteCustom(pack.id) }} title="Удалить сборку"><span className={styles.del}>✕</span></button>
+                  </div>
                 </button>
               )
             })}

@@ -16,7 +16,9 @@ contextBridge.exposeInMainWorld('api', {
   modpacks: {
     index: () => ipcRenderer.invoke('modpacks:index'),
     get: (id: string) => ipcRenderer.invoke('modpacks:get', id),
-    status: (id: string) => ipcRenderer.invoke('modpack:status', id)
+    status: (id: string) => ipcRenderer.invoke('modpack:status', id),
+    export: (id: string) => ipcRenderer.invoke('modpack:export', id),
+    import: () => ipcRenderer.invoke('modpack:import')
   },
   // В Electron 33+ File.path удалён — путь берём через webUtils
   getPathForFile: (file: File) => webUtils.getPathForFile(file),

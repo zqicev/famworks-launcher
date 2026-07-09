@@ -193,9 +193,24 @@
 .createTitle { font-size: 13px; font-weight: 600; color: var(--text); }
 .createSub { font-size: 11px; color: var(--text-dim); margin-top: 1px; }
 
-.delPack {
-  font-size: 10px; color: var(--text-dim); padding: 3px 6px; border-radius: 4px;
-  opacity: 0; transition: opacity 0.15s, color 0.15s; flex-shrink: 0;
+.headerActions { display: flex; align-items: center; gap: 4px; }
+.miniBtn {
+  width: 18px; height: 18px; border-radius: 5px; background: var(--bg-active);
+  color: var(--accent); display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s;
 }
-.item:hover .delPack { opacity: 1; }
-.delPack:hover { color: var(--red); }
+.miniBtn:hover { background: var(--bg-hover); }
+
+.itemActions {
+  display: flex; align-items: center; gap: 2px; flex-shrink: 0;
+  opacity: 0; transition: opacity 0.15s;
+}
+.item:hover .itemActions { opacity: 1; }
+.actBtn {
+  width: 22px; height: 22px; border-radius: 5px; color: var(--text-dim);
+  display: flex; align-items: center; justify-content: center;
+  transition: color 0.15s, background 0.15s;
+}
+.actBtn:hover { color: var(--text); background: var(--bg-hover); }
+.actBtn:hover .del { color: var(--red); }
+.del { font-size: 11px; line-height: 1; }
