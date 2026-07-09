@@ -3,6 +3,7 @@ import { Modpack } from '../../../types/modpack'
 import ModsTab from './ModsTab'
 import PackTab from './PackTab'
 import OverviewTab from './OverviewTab'
+import LogsTab from './LogsTab'
 import BottomBar from './BottomBar'
 import styles from '../styles/MainPanel.module.css'
 
@@ -29,7 +30,7 @@ async function countDir(dir: string, ext: string): Promise<{ total: number; enab
 }
 
 export default function MainPanel({ modpack, installPath, loading, error }: Props) {
-  const [tab, setTab] = useState<'mods' | 'resourcepacks' | 'shaders' | 'overview'>('overview')
+  const [tab, setTab] = useState<'mods' | 'resourcepacks' | 'shaders' | 'overview' | 'logs'>('overview')
   const [counts, setCounts] = useState({ modsTotal: 0, modsActive: 0, rp: 0, sh: 0 })
   const [busyId, setBusyId] = useState<string | null>(null)
 
@@ -115,6 +116,9 @@ export default function MainPanel({ modpack, installPath, loading, error }: Prop
           <button className={`${styles.tab} ${tab === 'shaders' ? styles.tabActive : ''}`} onClick={() => setTab('shaders')}>
             ШЕЙДЕРЫ <span className={styles.tabCount}>{counts.sh}</span>
           </button>
+          <button className={`${styles.tab} ${tab === 'logs' ? styles.tabActive : ''}`} onClick={() => setTab('logs')}>
+            ЛОГИ
+          </button>
 
           <div className={styles.stats}>
             <div className={styles.stat}>
@@ -130,6 +134,7 @@ export default function MainPanel({ modpack, installPath, loading, error }: Prop
         {tab === 'resourcepacks' && <PackTab modpack={modpack} dir={rpDir} items={modpack.resourcepacks ?? []} kind="resourcepack" noun="ресурспаков" onCount={n => setCounts(c => ({ ...c, rp: n }))} />}
         {tab === 'shaders' && <PackTab modpack={modpack} dir={shDir} items={modpack.shaders ?? []} kind="shader" noun="шейдеров" onCount={n => setCounts(c => ({ ...c, sh: n }))} />}
         {tab === 'overview' && <OverviewTab modpack={modpack} busyId={busyId} />}
+        {tab === 'logs' && <LogsTab />}
       </div>
 
       <BottomBar modpack={modpack} installPath={installPath} activeMods={counts.modsActive} totalMods={counts.modsTotal} />

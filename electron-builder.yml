@@ -9,6 +9,14 @@ directories:
 icon: build/icon.ico
 afterPack: scripts/afterPack.js
 
+# Двойной клик по .fwpack открывает лаунчер и импортирует сборку
+fileAssociations:
+  - ext: fwpack
+    name: FamWorks сборка
+    description: FamWorks сборка Minecraft
+    role: Editor
+    icon: build/icon.ico
+
 files:
   - out/**/*
   - package.json

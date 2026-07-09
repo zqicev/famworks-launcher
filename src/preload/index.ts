@@ -95,6 +95,9 @@ contextBridge.exposeInMainWorld('api', {
   },
   recentGet: (id: string) => ipcRenderer.invoke('recent:get', id),
   serverPing: (ip: string) => ipcRenderer.invoke('server:ping', ip),
+  // Импорт .fwpack по ассоциации файла (двойной клик) — main присылает результат
+  onModpackImported: (cb: (res: { ok?: boolean; modpack?: unknown; error?: string }) => void) =>
+    subscribe('modpack:imported', cb),
   window: {
     minimize: () => ipcRenderer.send('window:minimize'),
     maximize: () => ipcRenderer.send('window:maximize'),

@@ -14,6 +14,22 @@ function resolveIcon(): string | undefined {
   return candidates.find(p => existsSync(p))
 }
 
+/** Ищет путь к .fwpack среди аргументов запуска (ассоциация файла). */
+function findFwpack(argv: string[]): string | null {
+  return argv.find(a => typeof a === 'string' && a.toLowerCase().endsWith('.fwpack') && existsSync(a)) ?? null
+}
+
+/** Импортирует .fwpack и уведомляет рендерер (для ассоциации файлов / двойного клика). */
+async function openFwpack(win: BrowserWindow, filePath: string): Promise<void> {
+  try {
+    const { importFromFile } = await import('./packio')
+    const res = await importFromFile(filePath)
+    if (res.ok && res.modpack) win.webContents.send('modpack:imported', { ok: true, modpack: res.modpack })
+  } catch (e) {
+    win.webContents.send('modpack:imported', { ok: false, error: e instanceof Error ? e.message : String(e) })
+  }
+}
+
 function createWindow() {
   const win = new BrowserWindow({
     width: 1200,
@@ -45,19 +61,25 @@ const gotLock = app.requestSingleInstanceLock()
 if (!gotLock) {
   app.quit()
 } else {
-  app.on('second-instance', () => {
+  app.on('second-instance', (_e, argv) => {
     const win = BrowserWindow.getAllWindows()[0]
     if (win) {
       if (win.isMinimized()) win.restore()
       win.focus()
+      const file = findFwpack(argv)
+      if (file) openFwpack(win, file)
     }
   })
 
   app.whenReady().then(() => {
     setupIpcHandlers()
-    createWindow()
+    const win = createWindow()
     setupUpdater()
     initDiscord()
+
+    // Открыт через двойной клик по .fwpack — импортируем после загрузки окна
+    const pending = findFwpack(process.argv)
+    if (pending) win.webContents.once('did-finish-load', () => openFwpack(win, pending))
 
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) createWindow()

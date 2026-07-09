@@ -8,6 +8,7 @@ import SettingsModal from './components/SettingsModal'
 import UpdateBanner from './components/UpdateBanner'
 import CreateModpackModal from './components/CreateModpackModal'
 import ConfirmModal from './components/ConfirmModal'
+import { ensureLogCapture } from './gameLog'
 import styles from './styles/App.module.css'
 
 export default function App() {
@@ -60,6 +61,22 @@ export default function App() {
       setError(`Не удалось загрузить список сборок. Проверьте интернет-соединение.${reason}`)
     }
   }, [selectedId])
+
+  // Захват логов игры для вкладки «Логи» (один раз на всё приложение)
+  useEffect(() => { ensureLogCapture() }, [])
+
+  // Импорт по ассоциации файла (двойной клик по .fwpack)
+  useEffect(() => {
+    return window.api.onModpackImported((res) => {
+      if (res.ok && res.modpack) {
+        loadCustom()
+        setSelectedId(res.modpack.id)
+        showToast(`Сборка «${res.modpack.name}» импортирована`, 'success')
+      } else if (res.error) {
+        showToast(`Ошибка импорта: ${res.error}`, 'error')
+      }
+    })
+  }, [loadCustom, showToast])
 
   useEffect(() => {
     const init = async () => {

@@ -89,6 +89,7 @@ interface Window {
       motd: string
       version: string
     } | null>
+    onModpackImported: (cb: (res: { ok?: boolean; modpack?: import('../../types/modpack').Modpack; error?: string }) => void) => () => void
     window: {
       minimize: () => void
       maximize: () => void

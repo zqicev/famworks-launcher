@@ -42,7 +42,7 @@ export async function exportModpack(id: string): Promise<ExportResult> {
   return { ok: true, path: res.filePath }
 }
 
-/** Импорт .fwpack как новой кастомной сборки (новый id, распаковка файлов в папку сборки). */
+/** Импорт .fwpack через диалог выбора файла. */
 export async function importModpack(): Promise<ImportResult> {
   const res = await dialog.showOpenDialog({
     title: 'Импорт сборки',
@@ -50,8 +50,15 @@ export async function importModpack(): Promise<ImportResult> {
     properties: ['openFile']
   })
   if (res.canceled || !res.filePaths[0]) return { cancelled: true }
+  return importFromFile(res.filePaths[0])
+}
 
-  const zip = new AdmZip(res.filePaths[0])
+/** Импорт .fwpack из конкретного файла (диалог или ассоциация файла) как новой кастомной сборки. */
+export async function importFromFile(filePath: string): Promise<ImportResult> {
+  const installPath = store.get('installPath') as string
+  if (!installPath) throw new Error('Сначала завершите настройку лаунчера (выбор папки установки)')
+
+  const zip = new AdmZip(filePath)
   const entry = zip.getEntry('modpack.json')
   if (!entry) throw new Error('Это не файл сборки FamWorks (нет modpack.json)')
   const meta = JSON.parse(zip.readAsText(entry)) as Modpack
@@ -59,7 +66,6 @@ export async function importModpack(): Promise<ImportResult> {
     throw new Error('Повреждённый файл сборки: не хватает данных о версии/загрузчике')
   }
 
-  const installPath = store.get('installPath') as string
   const id = `custom-${slugify(meta.name)}-${Date.now().toString(36)}`
   const gameRoot = join(installPath, id)
   mkdirSync(gameRoot, { recursive: true })
