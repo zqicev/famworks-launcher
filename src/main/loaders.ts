@@ -150,9 +150,11 @@ export async function latestLoaderVersion(loader: LoaderId, mc: string): Promise
       return stable?.loader?.version ?? ''
     }
     if (loader === 'quilt') {
-      const { data } = await axios.get(`https://meta.quiltmc.org/v3/versions/loader/${mc}`, { timeout: 8000 })
-      const stable = (data as any[]).find(v => !/beta|pre|rc/i.test(v.loader?.version ?? '')) ?? (data as any[])[0]
-      return stable?.loader?.version ?? ''
+      // Лёгкий эндпоинт: только версии загрузчика (Quilt-загрузчик MC-агностичен).
+      // per-MC вариант тянет launcherMeta (~862 КБ) и упирается в таймаут на медленном соединении.
+      const { data } = await axios.get('https://meta.quiltmc.org/v3/versions/loader', { timeout: 12000 })
+      const stable = (data as any[]).find(v => !/beta|pre|rc/i.test(v.version ?? '')) ?? (data as any[])[0]
+      return stable?.version ?? ''
     }
     if (loader === 'forge') {
       const { data } = await axios.get('https://files.minecraftforge.net/net/minecraftforge/forge/promotions_slim.json', { timeout: 8000 })
