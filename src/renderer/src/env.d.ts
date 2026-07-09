@@ -104,6 +104,19 @@ interface Window {
       version: string
     } | null>
     onModpackImported: (cb: (res: { ok?: boolean; modpack?: import('../../types/modpack').Modpack; error?: string }) => void) => () => void
+    crash: {
+      onReport: (cb: (d: {
+        modpackId: string
+        category: 'dependency' | 'conflict' | 'memory' | 'java' | 'mod-bug' | 'unknown'
+        title: string
+        detail: string
+        culprit?: string
+        reportPath?: string
+        copyText: string
+        fix?: { kind: string; label: string; query?: string; version?: string; mod?: string }
+      }) => void) => () => void
+      openReport: (path: string) => Promise<string>
+    }
     window: {
       minimize: () => void
       maximize: () => void

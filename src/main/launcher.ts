@@ -5,6 +5,7 @@ import { Modpack } from '../types/modpack'
 import { ProgressEvent } from './installer'
 import { setupLoader, requiredJavaMajor, loaderJvmArgs } from './loaders'
 import { devLaunchOverrides } from './dev'
+import { diagnoseCrash } from './crash'
 import { ensureJava } from './java'
 import { writeServers } from './servers'
 import { setPlaying, setIdle } from './discord'
@@ -22,6 +23,10 @@ let currentWorker: UtilityProcess | null = null
 let gameSpawned = false
 let launchAborted = false
 let spawnedAt = 0
+let userKilled = false // игру закрыл пользователь кнопкой — не показываем диагностику краша
+
+/** Помечает, что игру убил пользователь (вызывается из обработчика game:kill). */
+export function markUserKill(): void { userKilled = true }
 
 export interface QuickPlay {
   type: 'singleplayer' | 'multiplayer'
@@ -39,6 +44,7 @@ export async function launchGame(
   gameSpawned = false
   launchAborted = false
   spawnedAt = 0
+  userKilled = false
 
   // Dev-режим: отладка (JDWP) и hot-swap (JVM от JetBrains Runtime + enhanced redefinition)
   const dev = devLaunchOverrides(modpack.id)
@@ -120,10 +126,14 @@ export async function launchGame(
         store.set('runningModpackId', null)
         store.set('runningModpackName', null)
         setBusy(null)
-        // Игра упала сразу после старта (не штатный выход) — показываем причину, а не молча сбрасываем
-        if (msg.code && spawnedAt && Date.now() - spawnedAt < 10000) {
-          const hint = pickErrorLine(msg.tail)
-          win.webContents.send('launch:error', `Игра завершилась с ошибкой (код ${msg.code}).${hint ? ' ' + hint : ''}`)
+        // Ненулевой выход и не пользователь закрыл → диагностируем краш
+        if (msg.code && !userKilled) {
+          const diag = diagnoseCrash(modpack, gameRoot, msg.tail ?? '', spawnedAt)
+          if (diag) win.webContents.send('crash:report', { modpackId: modpack.id, ...diag })
+          else {
+            const hint = pickErrorLine(msg.tail)
+            win.webContents.send('launch:error', `Игра завершилась с ошибкой (код ${msg.code}).${hint ? ' ' + hint : ''}`)
+          }
         }
         win.webContents.send('launch:close', msg.code)
         win.webContents.send('install:progress', { phase: 'done', message: '' })

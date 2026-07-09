@@ -6,7 +6,7 @@ import { setIdle } from './discord'
 import { store } from './store'
 import { fetchModpackIndex, fetchModpack } from './modpacks'
 import { checkAndInstallModpack, getModpackStatus, toggleMod, deleteMod, getInstalledMods, downloadModToDir, getModFileSizeBytes } from './installer'
-import { launchGame, offlineAuthorization, abortLaunch, QuickPlay } from './launcher'
+import { launchGame, offlineAuthorization, abortLaunch, markUserKill, QuickPlay } from './launcher'
 import { setupLoader, latestLoaderVersion, LoaderId } from './loaders'
 import { searchModrinth, getModVersions } from './modrinth'
 import { microsoftLogin, microsoftRefresh } from './msAuth'
@@ -171,6 +171,7 @@ export function setupIpcHandlers() {
 
   // Принудительно убить процесс запущенной игры
   ipcMain.handle('game:kill', () => {
+    markUserKill() // не показываем диагностику краша — это пользователь закрыл
     cancelCurrent() // на случай, если ещё идёт скачивание перед запуском
     abortLaunch()
     const pid = store.get('runningPid') as number | null
@@ -307,6 +308,8 @@ export function setupIpcHandlers() {
     try { mkdirSync(folderPath, { recursive: true }) } catch { /* игнорируем */ }
     return shell.openPath(folderPath)
   })
+
+  ipcMain.handle('crash:open-report', (_, filePath: string) => shell.openPath(filePath))
 
   ipcMain.handle('system:total-memory-mb', async () => {
     const os = await import('os')

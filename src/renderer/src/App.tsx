@@ -8,6 +8,7 @@ import SettingsModal from './components/SettingsModal'
 import UpdateBanner from './components/UpdateBanner'
 import CreateModpackModal from './components/CreateModpackModal'
 import ConfirmModal from './components/ConfirmModal'
+import CrashModal, { CrashData } from './components/CrashModal'
 import { ensureLogCapture } from './gameLog'
 import styles from './styles/App.module.css'
 
@@ -27,6 +28,7 @@ export default function App() {
   const [toast, setToast] = useState<{ text: string; kind: 'info' | 'success' | 'error' } | null>(null)
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [devMode, setDevMode] = useState(false)
+  const [crash, setCrash] = useState<CrashData | null>(null)
 
   const showToast = useCallback((text: string, kind: 'info' | 'success' | 'error') => {
     if (toastTimer.current) clearTimeout(toastTimer.current)
@@ -65,6 +67,9 @@ export default function App() {
 
   // Захват логов игры для вкладки «Логи» (один раз на всё приложение)
   useEffect(() => { ensureLogCapture() }, [])
+
+  // Диагностика краша игры
+  useEffect(() => window.api.crash.onReport(d => setCrash(d as CrashData)), [])
 
   // Импорт по ассоциации файла (двойной клик по .fwpack)
   useEffect(() => {
@@ -229,6 +234,7 @@ export default function App() {
           <span>{toast.text}</span>
         </div>
       )}
+      {crash && <CrashModal data={crash} onClose={() => setCrash(null)} />}
     </div>
   )
 }

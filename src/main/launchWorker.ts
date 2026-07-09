@@ -54,7 +54,7 @@ parentPort.on('message', async (e) => {
   let logTail = ''
   client.on('data', (data: any) => {
     const s = String(data)
-    logTail = (logTail + s).slice(-3000) // храним хвост вывода на случай падения
+    logTail = (logTail + s).slice(-8000) // храним хвост вывода на случай падения
     send({ t: 'win', channel: 'launch:log', payload: s })
   })
   client.on('close', (code: number) => { send({ t: 'close', code, tail: logTail }); process.exit(0) })

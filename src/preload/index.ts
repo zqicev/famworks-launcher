@@ -110,6 +110,10 @@ contextBridge.exposeInMainWorld('api', {
   },
   recentGet: (id: string) => ipcRenderer.invoke('recent:get', id),
   serverPing: (ip: string) => ipcRenderer.invoke('server:ping', ip),
+  crash: {
+    onReport: (cb: (d: unknown) => void) => subscribe('crash:report', cb),
+    openReport: (path: string) => ipcRenderer.invoke('crash:open-report', path)
+  },
   // Импорт .fwpack по ассоциации файла (двойной клик) — main присылает результат
   onModpackImported: (cb: (res: { ok?: boolean; modpack?: unknown; error?: string }) => void) =>
     subscribe('modpack:imported', cb),
