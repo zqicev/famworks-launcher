@@ -45,12 +45,27 @@
   font-family: 'Consolas', ui-monospace, monospace; word-break: break-all;
 }
 
-.fixHint {
-  margin-top: 12px; font-size: 12.5px; color: var(--text-secondary);
-  padding: 9px 12px; background: rgba(197, 248, 42, 0.08); border: 1px solid rgba(197, 248, 42, 0.25); border-radius: 9px;
+.fixBox {
+  margin-top: 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px 12px; background: rgba(197, 248, 42, 0.08); border: 1px solid rgba(197, 248, 42, 0.25); border-radius: 9px;
 }
-.fixHint b { color: var(--accent); }
-.soon { color: var(--text-dim); font-size: 11px; }
+.fixText { font-size: 12.5px; color: var(--text-secondary); min-width: 0; }
+.fixText b { color: var(--accent); }
+.fixBtn {
+  height: 30px; padding: 0 14px; font-size: 12px; font-weight: 700; color: #0a0a0a;
+  background: var(--accent); border: none; border-radius: 7px; flex-shrink: 0; transition: background 0.15s;
+}
+.fixBtn:hover:not(:disabled) { background: var(--accent-dim); }
+.fixBtn:disabled { opacity: 0.5; cursor: default; }
+.fixErr {
+  margin-top: 10px; font-size: 12.5px; color: #ffb4b4;
+  padding: 9px 12px; background: rgba(255, 68, 68, 0.1); border: 1px solid rgba(255, 68, 68, 0.3); border-radius: 9px;
+}
+.fixOk {
+  margin-top: 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  padding: 10px 12px; background: rgba(197, 248, 42, 0.12); border: 1px solid rgba(197, 248, 42, 0.35); border-radius: 9px;
+  font-size: 12.5px; color: var(--accent); font-weight: 600;
+}
 
 .actions { display: flex; gap: 8px; margin-top: 18px; justify-content: flex-end; }
 .btn {

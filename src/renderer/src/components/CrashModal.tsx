@@ -23,11 +23,23 @@ const CAT: Record<CrashData['category'], { label: string; cls: string }> = {
 
 export default function CrashModal({ data, onClose }: { data: CrashData; onClose: () => void }) {
   const [copied, setCopied] = useState(false)
+  const [fixState, setFixState] = useState<'idle' | 'applying' | 'done' | 'error'>('idle')
+  const [fixMsg, setFixMsg] = useState('')
   const cat = CAT[data.category]
 
   const copy = async () => {
     try { await navigator.clipboard.writeText(data.copyText); setCopied(true); setTimeout(() => setCopied(false), 1800) } catch { /* noop */ }
   }
+
+  const tryFix = async () => {
+    if (!data.fix) return
+    setFixState('applying'); setFixMsg('')
+    const r = await window.api.crash.applyFix(data.modpackId, data.fix)
+    if (r.ok) { setFixState('done'); setFixMsg(r.message ?? 'Готово') }
+    else { setFixState('error'); setFixMsg(r.error ?? 'Не удалось') }
+  }
+
+  const relaunch = () => { window.api.launch.start(data.modpackId); onClose() }
 
   return (
     <div className={styles.overlay} onClick={onClose}>
@@ -47,9 +59,19 @@ export default function CrashModal({ data, onClose }: { data: CrashData; onClose
           </div>
         )}
 
-        {data.fix && (
-          <div className={styles.fixHint}>
-            Возможное решение: <b>{data.fix.label}</b> <span className={styles.soon}>— авто-починка скоро</span>
+        {data.fix && fixState !== 'done' && (
+          <div className={styles.fixBox}>
+            <div className={styles.fixText}>Возможное решение: <b>{data.fix.label}</b></div>
+            <button className={styles.fixBtn} onClick={tryFix} disabled={fixState === 'applying'}>
+              {fixState === 'applying' ? 'Чиню…' : 'Попробовать решить'}
+            </button>
+          </div>
+        )}
+        {fixState === 'error' && <div className={styles.fixErr}>{fixMsg}</div>}
+        {fixState === 'done' && (
+          <div className={styles.fixOk}>
+            <span>✓ {fixMsg}</span>
+            <button className={styles.fixBtn} onClick={relaunch}>Запустить снова</button>
           </div>
         )}
 
@@ -58,7 +80,7 @@ export default function CrashModal({ data, onClose }: { data: CrashData; onClose
             <button className={styles.btn} onClick={() => window.api.crash.openReport(data.reportPath!)}>Открыть crash-report</button>
           )}
           <button className={styles.btn} onClick={copy}>{copied ? 'Скопировано' : 'Скопировать лог'}</button>
-          <button className={styles.btnPrimary} onClick={onClose}>Понятно</button>
+          <button className={styles.btnPrimary} onClick={onClose}>Закрыть</button>
         </div>
       </div>
     </div>

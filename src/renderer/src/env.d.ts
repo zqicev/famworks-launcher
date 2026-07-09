@@ -116,6 +116,7 @@ interface Window {
         fix?: { kind: string; label: string; query?: string; version?: string; mod?: string }
       }) => void) => () => void
       openReport: (path: string) => Promise<string>
+      applyFix: (modpackId: string, fix: { kind: string; label?: string; query?: string; version?: string; mod?: string }) => Promise<{ ok: boolean; message?: string; error?: string }>
     }
     window: {
       minimize: () => void

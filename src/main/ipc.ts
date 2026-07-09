@@ -310,6 +310,10 @@ export function setupIpcHandlers() {
   })
 
   ipcMain.handle('crash:open-report', (_, filePath: string) => shell.openPath(filePath))
+  ipcMain.handle('crash:fix', async (_, modpackId: string, fix: unknown) => {
+    const { applyCrashFix } = await import('./crashfix')
+    return applyCrashFix(modpackId, fix as { kind: string })
+  })
 
   ipcMain.handle('system:total-memory-mb', async () => {
     const os = await import('os')
