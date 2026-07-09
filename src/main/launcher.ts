@@ -81,7 +81,7 @@ export async function launchGame(
         await writeServers(gameRoot, modpack.servers)
         writeFileSync(marker, key)
       } catch (e) {
-        win.webContents.send('launch:log', `[servers] ${String(e)}`)
+        win.webContents.send('launch:log', { id: modpack.id, text: `[servers] ${String(e)}` })
       }
     }
   }

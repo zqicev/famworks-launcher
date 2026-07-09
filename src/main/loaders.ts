@@ -108,7 +108,7 @@ export async function setupLoader(mp: Modpack, gameRoot: string, win: BrowserWin
 
   emit(win, { phase: 'download', message: `Установка ${LABELS[loader]} (может занять минуту)...` })
   const javaPath = await ensureJava(dirname(gameRoot), win, requiredJavaMajor(mp.mc_version))
-  await runClientInstaller(javaPath, installer, gameRoot, win)
+  await runClientInstaller(javaPath, installer, gameRoot, win, mp.id)
   if (!existsSync(versionFile)) {
     throw new Error(`${LABELS[loader]}: установщик не создал профиль ${id}. Проверьте версию загрузчика (${mp.loader_version}).`)
   }
@@ -116,7 +116,7 @@ export async function setupLoader(mp: Modpack, gameRoot: string, win: BrowserWin
 }
 
 /** Прогоняет установщик Forge/NeoForge в headless-режиме (создаёт versions/<id>/<id>.json + библиотеки). */
-async function runClientInstaller(javaPath: string, installer: string, gameRoot: string, win: BrowserWindow): Promise<void> {
+async function runClientInstaller(javaPath: string, installer: string, gameRoot: string, win: BrowserWindow, id: string): Promise<void> {
   mkdirSync(gameRoot, { recursive: true })
   // Установщик требует наличия launcher_profiles.json в целевой папке
   const profiles = join(gameRoot, 'launcher_profiles.json')
@@ -129,7 +129,7 @@ async function runClientInstaller(javaPath: string, installer: string, gameRoot:
     const onOut = (d: Buffer): void => {
       const s = d.toString()
       tail = (tail + s).slice(-800)
-      win.webContents.send('launch:log', `[installer] ${s.trim()}`)
+      win.webContents.send('launch:log', { id, text: `[installer] ${s.trim()}` })
     }
     proc.stdout.on('data', onOut)
     proc.stderr.on('data', onOut)

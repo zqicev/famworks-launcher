@@ -170,7 +170,7 @@ export default function DevTab({ modpackId, loader, mcVersion }: Props) {
         <div className={styles.cardHead}>
           <div>
             <div className={styles.cardTitle}>Hot-swap (замена кода без рестарта)</div>
-            <div className={styles.cardSub}>Запуск на JetBrains Runtime — правки применяются в живой игре.</div>
+            <div className={styles.cardSub}>Запуск на JetBrains Runtime - правки применяются в живой игре.</div>
           </div>
           <button
             className={`${styles.switch} ${cfg.hotswap ? styles.switchOn : ''}`}
