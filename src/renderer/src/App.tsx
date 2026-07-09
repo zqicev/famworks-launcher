@@ -26,6 +26,7 @@ export default function App() {
   const [deleteTarget, setDeleteTarget] = useState<Modpack | null>(null)
   const [toast, setToast] = useState<{ text: string; kind: 'info' | 'success' | 'error' } | null>(null)
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const [devMode, setDevMode] = useState(false)
 
   const showToast = useCallback((text: string, kind: 'info' | 'success' | 'error') => {
     if (toastTimer.current) clearTimeout(toastTimer.current)
@@ -81,6 +82,7 @@ export default function App() {
   useEffect(() => {
     const init = async () => {
       const path = await window.api.store.get('installPath') as string
+      window.api.store.get('devMode').then(v => setDevMode(!!v)).catch(() => {})
       if (!path) { setNeedsSetup(true); setLoading(false); return }
       setInstallPath(path)
       await Promise.all([loadIndex(), loadCustom()])
@@ -196,11 +198,14 @@ export default function App() {
             installPath={installPath}
             loading={loading}
             error={error}
+            devMode={devMode}
           />
           {settingsOpen && (
             <SettingsModal
               installPath={installPath}
               onPathChange={setInstallPath}
+              devMode={devMode}
+              onDevModeChange={setDevMode}
               onClose={() => setSettingsOpen(false)}
             />
           )}

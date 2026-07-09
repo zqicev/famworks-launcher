@@ -225,6 +225,32 @@ export function setupIpcHandlers() {
     return pingServer(ip)
   })
 
+  // Режим разработчика
+  ipcMain.handle('dev:get', async (_, id: string) => {
+    const { getDevConfig } = await import('./dev')
+    return getDevConfig(id)
+  })
+  ipcMain.handle('dev:set', async (_, id: string, partial: unknown) => {
+    const { setDevConfig } = await import('./dev')
+    return setDevConfig(id, partial as Record<string, unknown>)
+  })
+  ipcMain.handle('dev:pick-project', async () => {
+    const { pickProject } = await import('./dev')
+    return pickProject()
+  })
+  ipcMain.handle('dev:pick-idea', async () => {
+    const { pickIdea } = await import('./dev')
+    return pickIdea()
+  })
+  ipcMain.handle('dev:open-intellij', async (_, id: string) => {
+    const { openInIntelliJ } = await import('./dev')
+    return openInIntelliJ(id)
+  })
+  ipcMain.handle('dev:run-config', async (_, id: string) => {
+    const { createRunConfig } = await import('./dev')
+    return createRunConfig(id)
+  })
+
   // Прогресс на иконке в панели задач. mode: none|normal|indeterminate
   ipcMain.on('taskbar:progress', (_, value: number, mode: 'none' | 'normal' | 'indeterminate') => {
     getWindow()?.setProgressBar(value, { mode })

@@ -4,11 +4,19 @@ import styles from '../styles/SettingsModal.module.css'
 interface Props {
   installPath: string
   onPathChange: (path: string) => void
+  devMode: boolean
+  onDevModeChange: (v: boolean) => void
   onClose: () => void
 }
 
-export default function SettingsModal({ installPath, onPathChange, onClose }: Props) {
+export default function SettingsModal({ installPath, onPathChange, devMode, onDevModeChange, onClose }: Props) {
   const [path, setPath] = useState(installPath)
+
+  const toggleDev = () => {
+    const v = !devMode
+    window.api.store.set('devMode', v)
+    onDevModeChange(v)
+  }
 
   const pickFolder = async () => {
     const p = await window.api.dialog.pickFolder()
@@ -48,6 +56,16 @@ export default function SettingsModal({ installPath, onPathChange, onClose }: Pr
             <p className={styles.hint}>
               Сборки устанавливаются в отдельные подпапки внутри этой директории.
             </p>
+          </div>
+
+          <div className={styles.field}>
+            <button className={styles.toggleRow} onClick={toggleDev}>
+              <div>
+                <div className={styles.label} style={{ marginBottom: 4 }}>РЕЖИМ РАЗРАБОТЧИКА</div>
+                <p className={styles.hint} style={{ margin: 0 }}>Вкладка «Разработка»: запуск с отладкой (JDWP) и интеграция с IntelliJ IDEA.</p>
+              </div>
+              <span className={`${styles.switch} ${devMode ? styles.switchOn : ''}`}><span className={styles.knob} /></span>
+            </button>
           </div>
         </div>
 

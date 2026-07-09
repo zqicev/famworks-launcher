@@ -152,3 +152,28 @@
 }
 .saveBtn:hover:not(:disabled) { background: var(--accent-dim); }
 .saveBtn:disabled { opacity: 0.4; cursor: default; }
+
+.toggleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: 100%;
+  padding: 12px 14px;
+  text-align: left;
+  background: var(--bg-active);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  transition: border-color 0.15s;
+}
+.toggleRow:hover { border-color: #383838; }
+.switch {
+  width: 38px; height: 22px; border-radius: 20px; background: var(--bg-hover);
+  border: 1px solid var(--border); flex-shrink: 0; position: relative; transition: background 0.18s;
+}
+.switchOn { background: var(--accent); border-color: var(--accent); }
+.knob {
+  position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%;
+  background: var(--text-dim); transition: transform 0.18s, background 0.18s;
+}
+.switchOn .knob { transform: translateX(16px); background: #0a0a0a; }

@@ -4,6 +4,7 @@ import { BrowserWindow, utilityProcess, UtilityProcess } from 'electron'
 import { Modpack } from '../types/modpack'
 import { ProgressEvent } from './installer'
 import { setupLoader, requiredJavaMajor, loaderJvmArgs } from './loaders'
+import { debugJvmArg } from './dev'
 import { ensureJava } from './java'
 import { writeServers } from './servers'
 import { setPlaying, setIdle } from './discord'
@@ -52,8 +53,10 @@ export async function launchGame(
   const gameRoot = join(installPath, modpack.id)
   const loaderVersionId = await setupLoader(modpack, gameRoot, win)
   // Forge/NeoForge держат module-path и прочие JVM-аргументы в профиле, а mclc их не читает —
-  // передаём вручную через customArgs.
-  const extraJvmArgs = loaderJvmArgs(modpack, gameRoot)
+  // передаём вручную через customArgs. Плюс отладка (JDWP), если включена в dev-режиме.
+  const dbg = debugJvmArg(modpack.id)
+  const extraJvmArgs = [...loaderJvmArgs(modpack, gameRoot), ...(dbg ? [dbg] : [])]
+  if (dbg) win.webContents.send('launch:log', { id: modpack.id, text: `[FamWorks] Отладка включена: ${dbg}` })
 
   // 3. Серверы сборки → servers.dat. Сеем один раз: если набор серверов не менялся,
   //    повторно не трогаем (пользователь волен удалять/менять их у себя).

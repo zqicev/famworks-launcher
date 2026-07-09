@@ -48,6 +48,14 @@ interface Window {
       save: (mp: import('../../types/modpack').Modpack) => Promise<boolean>
       delete: (id: string, deleteFiles: boolean) => Promise<boolean>
     }
+    dev: {
+      get: (id: string) => Promise<{ debug: boolean; port: number; projectPath: string; ideaPath: string }>
+      set: (id: string, partial: { debug?: boolean; port?: number; projectPath?: string; ideaPath?: string }) => Promise<{ debug: boolean; port: number; projectPath: string; ideaPath: string }>
+      pickProject: () => Promise<string | null>
+      pickIdea: () => Promise<string | null>
+      openIntelliJ: (id: string) => Promise<{ ok: boolean; error?: string }>
+      runConfig: (id: string) => Promise<{ ok: boolean; path?: string; error?: string }>
+    }
     auth: {
       microsoftLogin: () => Promise<{ username: string; uuid: string; refreshToken: string; mclc: unknown }>
     }

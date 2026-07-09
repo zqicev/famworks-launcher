@@ -4,6 +4,7 @@ import ModsTab from './ModsTab'
 import PackTab from './PackTab'
 import OverviewTab from './OverviewTab'
 import LogsTab from './LogsTab'
+import DevTab from './DevTab'
 import BottomBar from './BottomBar'
 import styles from '../styles/MainPanel.module.css'
 
@@ -12,6 +13,7 @@ interface Props {
   installPath: string
   loading: boolean
   error: string | null
+  devMode: boolean
 }
 
 function formatSize(mb: number) {
@@ -29,8 +31,8 @@ async function countDir(dir: string, ext: string): Promise<{ total: number; enab
   return { total, enabled }
 }
 
-export default function MainPanel({ modpack, installPath, loading, error }: Props) {
-  const [tab, setTab] = useState<'mods' | 'resourcepacks' | 'shaders' | 'overview' | 'logs'>('overview')
+export default function MainPanel({ modpack, installPath, loading, error, devMode }: Props) {
+  const [tab, setTab] = useState<'mods' | 'resourcepacks' | 'shaders' | 'overview' | 'logs' | 'dev'>('overview')
   const [counts, setCounts] = useState({ modsTotal: 0, modsActive: 0, rp: 0, sh: 0 })
   const [busyId, setBusyId] = useState<string | null>(null)
 
@@ -119,6 +121,11 @@ export default function MainPanel({ modpack, installPath, loading, error }: Prop
           <button className={`${styles.tab} ${tab === 'logs' ? styles.tabActive : ''}`} onClick={() => setTab('logs')}>
             ЛОГИ
           </button>
+          {devMode && (
+            <button className={`${styles.tab} ${tab === 'dev' ? styles.tabActive : ''}`} onClick={() => setTab('dev')}>
+              РАЗРАБОТКА
+            </button>
+          )}
 
           <div className={styles.stats}>
             <div className={styles.stat}>
@@ -135,6 +142,7 @@ export default function MainPanel({ modpack, installPath, loading, error }: Prop
         {tab === 'shaders' && <PackTab modpack={modpack} dir={shDir} items={modpack.shaders ?? []} kind="shader" noun="шейдеров" onCount={n => setCounts(c => ({ ...c, sh: n }))} />}
         {tab === 'overview' && <OverviewTab modpack={modpack} busyId={busyId} />}
         {tab === 'logs' && <LogsTab modpackId={modpack.id} />}
+        {tab === 'dev' && devMode && <DevTab modpackId={modpack.id} />}
       </div>
 
       <BottomBar modpack={modpack} installPath={installPath} activeMods={counts.modsActive} totalMods={counts.modsTotal} />

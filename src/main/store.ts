@@ -21,6 +21,10 @@ interface StoreSchema {
   // Статистика запусков миров/серверов для сортировки «Продолжить игру»:
   // { [modpackId]: { 'w:<folder>' | 's:<ip>': { count, last } } }
   playStats: Record<string, Record<string, { count: number; last: number }>>
+  // Режим разработчика (инструменты мододела)
+  devMode: boolean
+  ideaPath: string // путь к idea64.exe для «Открыть в IntelliJ»
+  devSettings: Record<string, { debug?: boolean; port?: number; projectPath?: string }>
 }
 
 export const store = new Store<StoreSchema>({
@@ -33,6 +37,9 @@ export const store = new Store<StoreSchema>({
     runningModpackId: null,
     runningModpackName: null,
     customModpacks: [],
-    playStats: {}
+    playStats: {},
+    devMode: false,
+    ideaPath: '',
+    devSettings: {}
   }
 })

@@ -63,6 +63,14 @@ contextBridge.exposeInMainWorld('api', {
     save: (mp: unknown) => ipcRenderer.invoke('custom:save', mp),
     delete: (id: string, deleteFiles: boolean) => ipcRenderer.invoke('custom:delete', id, deleteFiles)
   },
+  dev: {
+    get: (id: string) => ipcRenderer.invoke('dev:get', id),
+    set: (id: string, partial: unknown) => ipcRenderer.invoke('dev:set', id, partial),
+    pickProject: () => ipcRenderer.invoke('dev:pick-project'),
+    pickIdea: () => ipcRenderer.invoke('dev:pick-idea'),
+    openIntelliJ: (id: string) => ipcRenderer.invoke('dev:open-intellij', id),
+    runConfig: (id: string) => ipcRenderer.invoke('dev:run-config', id)
+  },
   auth: {
     microsoftLogin: () => ipcRenderer.invoke('auth:microsoft-login')
   },
