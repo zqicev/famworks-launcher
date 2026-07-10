@@ -1,9 +1,14 @@
 import { app, BrowserWindow } from 'electron'
 import { join } from 'path'
 import { existsSync } from 'fs'
+import { setDefaultResultOrder } from 'dns'
 import { setupIpcHandlers } from './ipc'
 import { setupUpdater } from './updater'
 import { initDiscord } from './discord'
+
+// Предпочитаем IPv4: у части провайдеров/сетей IPv6 «висит», и Node-запросы
+// (Ely.by, GitHub и т.п.) уходят в таймаут, хотя в браузере всё открывается.
+try { setDefaultResultOrder('ipv4first') } catch { /* старый Node */ }
 
 function resolveIcon(): string | undefined {
   // В проде иконка лежит в resources (extraResources), в деве — в build/
