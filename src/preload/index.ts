@@ -79,7 +79,9 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.invoke('dev:generate-mod', opts)
   },
   auth: {
-    microsoftLogin: () => ipcRenderer.invoke('auth:microsoft-login')
+    microsoftLogin: () => ipcRenderer.invoke('auth:microsoft-login'),
+    elyLogin: (username: string, password: string, totp?: string) =>
+      ipcRenderer.invoke('auth:ely-login', username, password, totp)
   },
   launch: {
     start: (id: string, quickPlay?: unknown) => ipcRenderer.invoke('launch', id, quickPlay),

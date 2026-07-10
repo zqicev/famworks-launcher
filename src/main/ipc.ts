@@ -107,6 +107,14 @@ export function setupIpcHandlers() {
     return res
   })
 
+  ipcMain.handle('auth:ely-login', async (_, username: string, password: string, totp?: string) => {
+    const { elyLogin } = await import('./elyAuth')
+    const { randomUUID } = await import('crypto')
+    const clientToken = randomUUID()
+    const pw = totp?.trim() ? `${password}:${totp.trim()}` : password
+    return elyLogin(username, pw, clientToken)
+  })
+
   ipcMain.handle('launch', async (_, modpackId: string, quickPlay?: QuickPlay) => {
     const win = getWindow()
     if (getBusyId() && getBusyId() !== modpackId) return false // занята другая сборка
@@ -122,6 +130,7 @@ export function setupIpcHandlers() {
       const account = accounts.find(a => a.id === activeId) ?? accounts[0]
 
       let authorization
+      let authlibArgs: string[] = []
       if (account?.type === 'microsoft' && account.refreshToken) {
         // Обновляем токен перед запуском (Minecraft-токен живёт ~24ч)
         const res = await microsoftRefresh(account.refreshToken)
@@ -138,6 +147,24 @@ export function setupIpcHandlers() {
           user_properties: res.mclc.user_properties ?? {},
           meta: res.mclc.meta as { type: 'mojang' | 'msa'; demo?: boolean } | undefined
         }
+      } else if (account?.type === 'ely' && account.accessToken && account.clientToken) {
+        // Обновляем токен Ely.by и запускаем с authlib-injector (нативные скины/плащи)
+        const { elyRefresh } = await import('./elyAuth')
+        const { ensureAuthlibInjector } = await import('./authlib')
+        const res = await elyRefresh(account.accessToken, account.clientToken)
+        store.set('accounts', accounts.map(a => a.id === account.id
+          ? { ...a, accessToken: res.accessToken, clientToken: res.clientToken, username: res.name, uuid: res.uuid }
+          : a))
+        authorization = {
+          access_token: res.accessToken,
+          client_token: res.clientToken,
+          uuid: res.uuid,
+          name: res.name,
+          user_properties: {},
+          meta: { type: 'mojang' as const }
+        }
+        const jar = await ensureAuthlibInjector(installPath, win)
+        authlibArgs = [`-javaagent:${jar}=ely.by`]
       } else {
         authorization = offlineAuthorization(account?.username ?? 'Player')
       }
@@ -156,7 +183,7 @@ export function setupIpcHandlers() {
         win.webContents.send('launch:log', { id: modpackId, text: `[skins] ${String(e)}` })
       }
 
-      await launchGame(modpack, authorization, installPath, memory, win, quickPlay)
+      await launchGame(modpack, authorization, installPath, memory, win, quickPlay, authlibArgs)
       return true
     } catch (e) {
       if (isCancelError(e)) {

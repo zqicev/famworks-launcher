@@ -2,11 +2,13 @@ import Store from 'electron-store'
 import { Modpack } from '../types/modpack'
 
 export interface Account {
-  id: string                    // 'offline:<ник>' или 'msa:<uuid>'
+  id: string                    // 'offline:<ник>' | 'msa:<uuid>' | 'ely:<uuid>'
   username: string
-  type: 'offline' | 'microsoft'
-  uuid?: string                 // для microsoft
+  type: 'offline' | 'microsoft' | 'ely'
+  uuid?: string                 // для microsoft/ely
   refreshToken?: string         // для microsoft
+  accessToken?: string          // для ely (Yggdrasil)
+  clientToken?: string          // для ely (нужен при refresh)
   customSkins?: boolean         // офлайн: скины по нику (TLauncher/Ely.by) через CustomSkinLoader
 }
 

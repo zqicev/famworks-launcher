@@ -4,9 +4,11 @@ import styles from '../styles/AccountPanel.module.css'
 interface Account {
   id: string
   username: string
-  type: 'offline' | 'microsoft'
+  type: 'offline' | 'microsoft' | 'ely'
   uuid?: string
   refreshToken?: string
+  accessToken?: string
+  clientToken?: string
   customSkins?: boolean // офлайн: подгружать скины по нику (TLauncher/Ely.by) через CustomSkinLoader
 }
 
@@ -36,6 +38,11 @@ export default function AccountPanel() {
   const [newSkins, setNewSkins] = useState(true)
   const [error, setError] = useState('')
   const [msLoading, setMsLoading] = useState(false)
+  const [elyForm, setElyForm] = useState(false)
+  const [elyUser, setElyUser] = useState('')
+  const [elyPass, setElyPass] = useState('')
+  const [elyTotp, setElyTotp] = useState('')
+  const [elyLoading, setElyLoading] = useState(false)
 
   useEffect(() => {
     Promise.all([
@@ -78,6 +85,22 @@ export default function AccountPanel() {
     setNewName('')
     setError('')
     setAdding(false)
+  }
+
+  const loginEly = async () => {
+    if (!elyUser.trim() || !elyPass) { setError('Введите email/ник и пароль'); return }
+    setElyLoading(true); setError('')
+    try {
+      const r = await window.api.auth.elyLogin(elyUser.trim(), elyPass, elyTotp)
+      const id = `ely:${r.uuid}`
+      const acc: Account = { id, username: r.name, type: 'ely', uuid: r.uuid, accessToken: r.accessToken, clientToken: r.clientToken }
+      await persist([...accounts.filter(a => a.id !== id), acc], id)
+      setElyForm(false); setElyUser(''); setElyPass(''); setElyTotp(''); setOpen(false)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setElyLoading(false)
+    }
   }
 
   const toggleSkins = async (id: string, e: React.MouseEvent) => {
@@ -131,8 +154,8 @@ export default function AccountPanel() {
               </div>
               <div className={styles.accInfo}>
                 <div className={styles.accName}>{acc.username}</div>
-                <div className={`${styles.accType} ${acc.type === 'microsoft' ? styles.typeMs : ''}`}>
-                  {acc.type === 'microsoft' ? 'MICROSOFT' : 'ОФФЛАЙН'}
+                <div className={`${styles.accType} ${acc.type !== 'offline' ? styles.typeMs : ''}`}>
+                  {acc.type === 'microsoft' ? 'MICROSOFT' : acc.type === 'ely' ? 'ELY.BY' : 'ОФФЛАЙН'}
                 </div>
               </div>
               {acc.type === 'offline' && (
@@ -168,10 +191,29 @@ export default function AccountPanel() {
                 Скины по нику (TLauncher / Ely.by)
               </label>
             </div>
+          ) : elyForm ? (
+            <div className={styles.addForm}>
+              <input className={styles.input} style={{ width: '100%' }} placeholder="Email или ник Ely.by" value={elyUser}
+                onChange={e => { setElyUser(e.target.value); setError('') }} autoFocus />
+              <input className={styles.input} style={{ width: '100%' }} type="password" placeholder="Пароль" value={elyPass}
+                onChange={e => { setElyPass(e.target.value); setError('') }}
+                onKeyDown={e => e.key === 'Enter' && loginEly()} />
+              <input className={styles.input} style={{ width: '100%' }} placeholder="Код 2FA (если включён)" value={elyTotp}
+                onChange={e => setElyTotp(e.target.value)} />
+              <div style={{ display: 'flex', gap: 6, width: '100%' }}>
+                <button className={styles.offlineBtn} style={{ flex: 1 }} onClick={() => { setElyForm(false); setError('') }}>Назад</button>
+                <button className={styles.addBtn} style={{ flex: 1 }} onClick={loginEly} disabled={elyLoading}>
+                  {elyLoading ? 'Вход…' : 'Войти'}
+                </button>
+              </div>
+            </div>
           ) : (
             <div className={styles.actions}>
               <button className={styles.msBtn} disabled title="Будет доступно после одобрения Microsoft">
                 Войти через Microsoft (скоро)
+              </button>
+              <button className={styles.offlineBtn} onClick={() => { setElyForm(true); setError('') }}>
+                Войти через Ely.by
               </button>
               <button className={styles.offlineBtn} onClick={() => { setAdding(true); setError('') }}>
                 + Офлайн-аккаунт

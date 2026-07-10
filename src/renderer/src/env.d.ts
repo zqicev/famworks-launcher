@@ -64,6 +64,7 @@ interface Window {
     }
     auth: {
       microsoftLogin: () => Promise<{ username: string; uuid: string; refreshToken: string; mclc: unknown }>
+      elyLogin: (username: string, password: string, totp?: string) => Promise<{ accessToken: string; clientToken: string; uuid: string; name: string }>
     }
     launch: {
       start: (id: string, quickPlay?: { type: 'singleplayer' | 'multiplayer'; identifier: string }) => Promise<boolean>

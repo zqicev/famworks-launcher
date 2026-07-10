@@ -39,7 +39,8 @@ export async function launchGame(
   installPath: string,
   memoryMB: number,
   win: BrowserWindow,
-  quickPlay?: QuickPlay
+  quickPlay?: QuickPlay,
+  authlibArgs: string[] = []
 ): Promise<void> {
   gameSpawned = false
   launchAborted = false
@@ -67,7 +68,7 @@ export async function launchGame(
   const loaderVersionId = await setupLoader(modpack, gameRoot, win)
   // Forge/NeoForge держат module-path и прочие JVM-аргументы в профиле, а mclc их не читает —
   // передаём вручную через customArgs. Плюс dev-аргументы (отладка/hot-swap).
-  const extraJvmArgs = [...loaderJvmArgs(modpack, gameRoot), ...dev.jvmArgs]
+  const extraJvmArgs = [...loaderJvmArgs(modpack, gameRoot), ...dev.jvmArgs, ...authlibArgs]
   for (const n of dev.notes) win.webContents.send('launch:log', { id: modpack.id, text: n })
 
   // 3. Серверы сборки → servers.dat. Сеем один раз: если набор серверов не менялся,
