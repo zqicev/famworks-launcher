@@ -241,13 +241,13 @@ export default function AccountPanel() {
       )}
 
       <button className={styles.trigger} onClick={() => setOpen(o => !o)}>
-        <div className={`${styles.avatar} ${!activeAcc ? styles.avatarEmpty : ''} ${activeAcc?.type === 'microsoft' ? styles.avatarMs : ''}`}>
+        <div className={`${styles.avatar} ${!activeAcc ? styles.avatarEmpty : ''} ${activeAcc && activeAcc.type !== 'offline' ? styles.avatarMs : ''}`}>
           {activeAcc ? activeAcc.username[0].toUpperCase() : '?'}
         </div>
         <div className={styles.info}>
           <div className={styles.name}>{activeAcc?.username ?? 'Нет аккаунта'}</div>
-          <div className={`${styles.type} ${activeAcc?.type === 'microsoft' ? styles.typeMs : ''}`}>
-            {activeAcc ? (activeAcc.type === 'microsoft' ? 'MICROSOFT' : 'ОФФЛАЙН') : '—'}
+          <div className={`${styles.type} ${activeAcc && activeAcc.type !== 'offline' ? styles.typeMs : ''}`}>
+            {activeAcc ? (activeAcc.type === 'microsoft' ? 'MICROSOFT' : activeAcc.type === 'ely' ? 'ELY.BY' : 'ОФФЛАЙН') : '—'}
           </div>
         </div>
         <span className={styles.chevron}>{open ? '∧' : '∨'}</span>
