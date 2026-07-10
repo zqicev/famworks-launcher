@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import styles from '../styles/AccountPanel.module.css'
 
 interface Account {
@@ -43,6 +43,22 @@ export default function AccountPanel() {
   const [elyPass, setElyPass] = useState('')
   const [elyTotp, setElyTotp] = useState('')
   const [elyLoading, setElyLoading] = useState(false)
+  const wrapperRef = useRef<HTMLDivElement>(null)
+
+  // Закрытие выпадающего меню по клику вне него
+  useEffect(() => {
+    if (!open) return
+    const onDown = (e: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
+        setOpen(false)
+        setAdding(false)
+        setElyForm(false)
+        setError('')
+      }
+    }
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [open])
 
   useEffect(() => {
     Promise.all([
@@ -138,7 +154,7 @@ export default function AccountPanel() {
   const activeAcc = accounts.find(a => a.id === activeId)
 
   return (
-    <div className={styles.wrapper}>
+    <div className={styles.wrapper} ref={wrapperRef}>
       {open && (
         <div className={styles.dropdown}>
           <div className={styles.dropTitle}>АККАУНТЫ</div>
@@ -185,6 +201,7 @@ export default function AccountPanel() {
                   maxLength={16}
                 />
               </div>
+              <button className={styles.offlineBtn} onClick={() => { setAdding(false); setNewName(''); setError('') }}>Назад</button>
               <button className={styles.addBtn} onClick={addOffline}>OK</button>
               <label className={styles.skinCheck}>
                 <input type="checkbox" checked={newSkins} onChange={e => setNewSkins(e.target.checked)} />
