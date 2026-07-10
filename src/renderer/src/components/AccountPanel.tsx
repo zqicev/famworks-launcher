@@ -7,6 +7,7 @@ interface Account {
   type: 'offline' | 'microsoft'
   uuid?: string
   refreshToken?: string
+  customSkins?: boolean // офлайн: подгружать скины по нику (TLauncher/Ely.by) через CustomSkinLoader
 }
 
 function validateUsername(name: string): string | null {
@@ -32,6 +33,7 @@ export default function AccountPanel() {
   const [open, setOpen] = useState(false)
   const [adding, setAdding] = useState(false)
   const [newName, setNewName] = useState('')
+  const [newSkins, setNewSkins] = useState(true)
   const [error, setError] = useState('')
   const [msLoading, setMsLoading] = useState(false)
 
@@ -71,11 +73,17 @@ export default function AccountPanel() {
     if (err) { setError(err); return }
     const id = `offline:${name}`
     if (accounts.find(a => a.id === id)) { setError('Такой аккаунт уже есть'); return }
-    const acc: Account = { id, username: name, type: 'offline' }
+    const acc: Account = { id, username: name, type: 'offline', customSkins: newSkins }
     await persist([...accounts, acc], id)
     setNewName('')
     setError('')
     setAdding(false)
+  }
+
+  const toggleSkins = async (id: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    const list = accounts.map(a => a.id === id ? { ...a, customSkins: !a.customSkins } : a)
+    await persist(list, activeId)
   }
 
   const loginMicrosoft = async () => {
@@ -127,6 +135,13 @@ export default function AccountPanel() {
                   {acc.type === 'microsoft' ? 'MICROSOFT' : 'ОФФЛАЙН'}
                 </div>
               </div>
+              {acc.type === 'offline' && (
+                <button
+                  className={`${styles.skinToggle} ${acc.customSkins ? styles.skinOn : ''}`}
+                  onClick={(e) => toggleSkins(acc.id, e)}
+                  title={acc.customSkins ? 'Скины TLauncher/Ely.by по нику: вкл' : 'Скины по нику: выкл'}
+                >СКИНЫ</button>
+              )}
               {acc.id === activeId && <span className={styles.check}>✓</span>}
               <button className={styles.deleteAcc} onClick={(e) => deleteAccount(acc.id, e)} title="Удалить">✕</button>
             </button>
@@ -148,6 +163,10 @@ export default function AccountPanel() {
                 />
               </div>
               <button className={styles.addBtn} onClick={addOffline}>OK</button>
+              <label className={styles.skinCheck}>
+                <input type="checkbox" checked={newSkins} onChange={e => setNewSkins(e.target.checked)} />
+                Скины по нику (TLauncher / Ely.by)
+              </label>
             </div>
           ) : (
             <div className={styles.actions}>

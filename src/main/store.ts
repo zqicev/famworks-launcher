@@ -7,6 +7,7 @@ export interface Account {
   type: 'offline' | 'microsoft'
   uuid?: string                 // для microsoft
   refreshToken?: string         // для microsoft
+  customSkins?: boolean         // офлайн: скины по нику (TLauncher/Ely.by) через CustomSkinLoader
 }
 
 interface StoreSchema {

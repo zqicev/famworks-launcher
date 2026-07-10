@@ -111,6 +111,40 @@
   gap: 6px;
   padding: 8px 12px;
   align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.skinCheck {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  margin-top: 2px;
+}
+.skinCheck input { accent-color: var(--accent); }
+
+.skinToggle {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  padding: 3px 6px;
+  border-radius: 4px;
+  color: var(--text-dim);
+  background: var(--bg-active);
+  border: 1px solid var(--border);
+  opacity: 0;
+  transition: opacity 0.15s, color 0.15s, background 0.15s, border-color 0.15s;
+  flex-shrink: 0;
+}
+.accRow:hover .skinToggle { opacity: 1; }
+.skinOn {
+  opacity: 1;
+  color: #0a0a0a;
+  background: var(--accent);
+  border-color: var(--accent);
 }
 
 .addInputWrap {

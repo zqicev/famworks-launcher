@@ -123,7 +123,7 @@ export function diagnoseCrash(modpack: Modpack, gameRoot: string, logTail: strin
     return {
       category: 'conflict',
       title: 'Конфликт мода (mixin)',
-      detail: `Мод «${mod}» не смог применить свои изменения — обычно это несовместимость с версией игры или с другим модом. Попробуйте обновить или отключить его.`,
+      detail: `Мод «${mod}» не смог применить свои изменения - обычно это несовместимость с версией игры или с другим модом. Попробуйте обновить или отключить его.`,
       culprit: mod,
       fix: { kind: 'disable-mod', label: `Отключить ${mod}`, mod },
       ...base
@@ -136,7 +136,7 @@ export function diagnoseCrash(modpack: Modpack, gameRoot: string, logTail: strin
     return {
       category: 'conflict',
       title: 'Несовпадение версий модов',
-      detail: `Мод обращается к коду, которого нет — обычно он собран под другую версию игры или зависимости.${c ? ` Вероятный виновник: ${c}.` : ''}`,
+      detail: `Мод обращается к коду, которого нет - обычно он собран под другую версию игры или зависимости.${c ? ` Вероятный виновник: ${c}.` : ''}`,
       culprit: c,
       ...base
     }
