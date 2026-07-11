@@ -92,7 +92,8 @@ export async function launchGame(
   const options: ILauncherOptions = {
     authorization,
     root: gameRoot,
-    version: { number: modpack.mc_version, type: 'release', custom: loaderVersionId },
+    // Vanilla: setupLoader вернул '' → custom не задаём, mclc запускает чистый клиент.
+    version: { number: modpack.mc_version, type: 'release', ...(loaderVersionId ? { custom: loaderVersionId } : {}) },
     memory: { max: `${memoryMB}M`, min: '512M' },
     javaPath,
     overrides: { detached: true },

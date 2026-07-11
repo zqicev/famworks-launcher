@@ -10,7 +10,7 @@ interface Props {
 export default function CreateModpackModal({ onCreate, onClose }: Props) {
   const [name, setName] = useState('')
   const [mc, setMc] = useState('1.21.1')
-  const [loader, setLoader] = useState<'fabric' | 'forge' | 'neoforge' | 'quilt'>('fabric')
+  const [loader, setLoader] = useState<'fabric' | 'forge' | 'neoforge' | 'quilt' | 'vanilla'>('fabric')
   const [loaderVer, setLoaderVer] = useState('')
   const [fabricApi, setFabricApi] = useState('')
   const [busy, setBusy] = useState(false)
@@ -18,6 +18,7 @@ export default function CreateModpackModal({ onCreate, onClose }: Props) {
   const [mcOpen, setMcOpen] = useState(false)
 
   const usesFabricApi = loader === 'fabric' || loader === 'quilt'
+  const needsLoaderVer = loader !== 'vanilla' // Vanilla — без загрузчика, версия загрузчика не нужна
 
   useEffect(() => { window.api.mcVersions().then(setVersions).catch(() => {}) }, [])
 
@@ -33,7 +34,7 @@ export default function CreateModpackModal({ onCreate, onClose }: Props) {
   }, [mc, loader])
 
   const create = async () => {
-    if (!name.trim() || !mc.trim() || !loaderVer.trim()) return
+    if (!name.trim() || !mc.trim() || (needsLoaderVer && !loaderVer.trim())) return
     setBusy(true)
     const id = `custom-${name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}-${Date.now().toString(36)}`
     const mp: Modpack = {
@@ -92,12 +93,15 @@ export default function CreateModpackModal({ onCreate, onClose }: Props) {
                 <option value="quilt">Quilt</option>
                 <option value="forge">Forge</option>
                 <option value="neoforge">NeoForge</option>
+                <option value="vanilla">Без загрузчика (Vanilla)</option>
               </select>
             </Field>
           </div>
-          <Field label="ВЕРСИЯ ЗАГРУЗЧИКА">
-            <input className={styles.cinput} value={loaderVer} onChange={e => setLoaderVer(e.target.value)} placeholder="подтянется автоматически" />
-          </Field>
+          {needsLoaderVer && (
+            <Field label="ВЕРСИЯ ЗАГРУЗЧИКА">
+              <input className={styles.cinput} value={loaderVer} onChange={e => setLoaderVer(e.target.value)} placeholder="подтянется автоматически" />
+            </Field>
+          )}
           {usesFabricApi && (
             <Field label="ВЕРСИЯ FABRIC API (необязательно)">
               <input className={styles.cinput} value={fabricApi} onChange={e => setFabricApi(e.target.value)} placeholder="напр. 0.116.0+1.21.1" />
@@ -108,7 +112,7 @@ export default function CreateModpackModal({ onCreate, onClose }: Props) {
         </div>
         <div className={styles.footer}>
           <button className={styles.cancelBtn} onClick={onClose}>Отмена</button>
-          <button className={styles.saveBtn} onClick={create} disabled={busy || !name.trim() || !loaderVer.trim() || !mcValid}>Создать</button>
+          <button className={styles.saveBtn} onClick={create} disabled={busy || !name.trim() || (needsLoaderVer && !loaderVer.trim()) || !mcValid}>Создать</button>
         </div>
       </div>
     </div>

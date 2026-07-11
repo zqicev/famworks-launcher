@@ -3,7 +3,7 @@ export interface ModpackSummary {
   name: string
   description: string
   mc_version: string
-  loader: 'fabric' | 'forge' | 'neoforge' | 'quilt'
+  loader: 'fabric' | 'forge' | 'neoforge' | 'quilt' | 'vanilla'
   loader_version: string
   updated_at: string
 }

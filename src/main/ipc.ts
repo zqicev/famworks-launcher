@@ -177,7 +177,7 @@ export function setupIpcHandlers() {
       // Скины по нику: у офлайн-аккаунта с галочкой подкидываем/убираем CustomSkinLoader
       try {
         const { ensureSkinMod } = await import('./skins')
-        const wantSkins = account?.type === 'offline' && !!account.customSkins
+        const wantSkins = account?.type === 'offline' && !!account.customSkins && modpack.loader !== 'vanilla'
         await ensureSkinMod(modpack, pathJoin(installPath, modpackId), wantSkins, win)
       } catch (e) {
         win.webContents.send('launch:log', { id: modpackId, text: `[skins] ${String(e)}` })

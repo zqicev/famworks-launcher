@@ -8,9 +8,9 @@ import { Modpack } from '../types/modpack'
 import { ensureJava } from './java'
 import { opSignal } from './abort'
 
-export type LoaderId = 'fabric' | 'quilt' | 'forge' | 'neoforge'
+export type LoaderId = 'fabric' | 'quilt' | 'forge' | 'neoforge' | 'vanilla'
 
-const LABELS: Record<LoaderId, string> = { fabric: 'Fabric', quilt: 'Quilt', forge: 'Forge', neoforge: 'NeoForge' }
+const LABELS: Record<LoaderId, string> = { fabric: 'Fabric', quilt: 'Quilt', forge: 'Forge', neoforge: 'NeoForge', vanilla: 'Vanilla' }
 
 function emit(win: BrowserWindow, e: ProgressEvent): void {
   win.webContents.send('install:progress', e)
@@ -31,6 +31,7 @@ export function requiredJavaMajor(mc: string): number {
 export function versionIdFor(mp: Modpack): string {
   const { loader, mc_version: mc, loader_version: lv } = mp
   switch (loader) {
+    case 'vanilla': return mc
     case 'quilt': return `quilt-loader-${lv}-${mc}`
     case 'forge': return `${mc}-forge-${lv}`
     case 'neoforge': return `neoforge-${lv}`
@@ -40,6 +41,8 @@ export function versionIdFor(mp: Modpack): string {
 
 /** Установлен ли загрузчик — есть ли готовый version-профиль (для определения статуса без запуска). */
 export function loaderInstalled(mp: Modpack, gameRoot: string): boolean {
+  // Vanilla: отдельного загрузчика нет — сам клиент mclc докачает при запуске, считаем «готово».
+  if (mp.loader === 'vanilla') return true
   const id = versionIdFor(mp)
   return existsSync(join(gameRoot, 'versions', id, `${id}.json`))
 }
@@ -80,6 +83,8 @@ export function loaderJvmArgs(mp: Modpack, gameRoot: string): string[] {
  *  Forge/NeoForge — скачивает официальный установщик и прогоняет --installClient (создаёт профиль). */
 export async function setupLoader(mp: Modpack, gameRoot: string, win: BrowserWindow): Promise<string> {
   const loader = mp.loader as LoaderId
+  // Vanilla: загрузчика нет — версию клиента mclc скачает сам при запуске (custom не задаём).
+  if (loader === 'vanilla') return ''
   const id = versionIdFor(mp)
   const versionFile = join(gameRoot, 'versions', id, `${id}.json`)
   if (existsSync(versionFile)) return id
@@ -141,13 +146,16 @@ async function runClientInstaller(javaPath: string, installer: string, gameRoot:
   })
 }
 
-// Список релизных версий Minecraft (для автоподсказки при создании сборки)
+// Полный список релизных версий Minecraft из манифеста Mojang (не привязан к загрузчику —
+// у Forge и vanilla есть версии, которых нет у Fabric). Порядок — от новых к старым.
 let mcCache: string[] | null = null
 export async function mcVersions(): Promise<string[]> {
   if (mcCache) return mcCache
   try {
-    const { data } = await axios.get('https://meta.fabricmc.net/v2/versions/game', { timeout: 8000 })
-    mcCache = (data as { version: string; stable: boolean }[]).filter(v => v.stable).map(v => v.version)
+    const { data } = await axios.get('https://piston-meta.mojang.com/mc/game/version_manifest_v2.json', { timeout: 8000 })
+    mcCache = (data as { versions: { id: string; type: string }[] }).versions
+      .filter(v => v.type === 'release')
+      .map(v => v.id)
   } catch {
     mcCache = []
   }
@@ -156,6 +164,7 @@ export async function mcVersions(): Promise<string[]> {
 
 /** Последняя версия выбранного загрузчика под данную версию MC (для создания сборки). '' если не нашли. */
 export async function latestLoaderVersion(loader: LoaderId, mc: string): Promise<string> {
+  if (loader === 'vanilla') return '' // загрузчика нет — версия не нужна
   try {
     if (loader === 'fabric') {
       const { data } = await axios.get(`https://meta.fabricmc.net/v2/versions/loader/${mc}`, { timeout: 8000 })
