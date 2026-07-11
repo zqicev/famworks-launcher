@@ -55,23 +55,20 @@ export default function BrowserView({ installPath, packs, defaultTargetId, onImp
 
   const target = packs.find(p => p.id === targetId) ?? null
 
-  // Смена источника/типа сбрасывает выдачу
-  useEffect(() => { setResults([]); setPicker(null); setNotice('') }, [source, type])
-
-  const search = async () => {
-    if (!query.trim()) return
+  // Загрузка выдачи. Пустой запрос = популярное (список по умолчанию).
+  const load = async (q = query) => {
     setLoading(true); setPicker(null); setNotice('')
     const mc = type === 'modpack' ? '' : (target?.mc_version ?? '')
     const loader = type === 'modpack' ? '' : (target?.loader ?? '')
     try {
       if (source === 'modrinth') {
-        const hits = await window.api.modrinth.search(query, mc, loader, type) as any[]
+        const hits = await window.api.modrinth.search(q, mc, loader, type) as any[]
         setResults(hits.map(h => ({
           id: h.project_id, title: h.title, description: h.description, author: h.author,
           downloads: h.downloads, icon: h.icon_url ?? null, url: `https://modrinth.com/${type}/${h.slug}`
         })))
       } else {
-        const hits = await window.api.curseforge.search(query, mc, loader, type) as any[]
+        const hits = await window.api.curseforge.search(q, mc, loader, type) as any[]
         setResults(hits.map(h => ({
           id: String(h.id), title: h.name, description: h.summary, author: h.authors?.[0]?.name ?? '',
           downloads: h.downloadCount, icon: h.logo?.thumbnailUrl ?? null,
@@ -79,11 +76,18 @@ export default function BrowserView({ installPath, packs, defaultTargetId, onImp
         })))
       }
     } catch {
-      setNotice('Ошибка поиска. Проверьте соединение.')
+      setResults([])
+      setNotice('Ошибка загрузки. Проверьте соединение.')
     } finally {
       setLoading(false)
     }
   }
+
+  // При открытии и смене источника/типа/целевой сборки показываем популярное (или текущий запрос).
+  useEffect(() => {
+    load()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [source, type, targetId])
 
   // Сборки: Modrinth импортируем как кастомную, CurseForge открываем на сайте (импорт заблокирован прокси)
   const installModpack = async (hit: Hit) => {
@@ -168,8 +172,8 @@ export default function BrowserView({ installPath, packs, defaultTargetId, onImp
 
         <div className={styles.searchRow}>
           <input className={styles.input} placeholder={`Поиск на ${source === 'modrinth' ? 'Modrinth' : 'CurseForge'}…`}
-            value={query} onChange={e => setQuery(e.target.value)} onKeyDown={e => e.key === 'Enter' && search()} autoFocus />
-          <button className={styles.searchBtn} onClick={search}>Найти</button>
+            value={query} onChange={e => setQuery(e.target.value)} onKeyDown={e => e.key === 'Enter' && load()} autoFocus />
+          <button className={styles.searchBtn} onClick={() => load()}>Найти</button>
           {type !== 'modpack' && (
             <select className={styles.target} value={targetId ?? ''} onChange={e => setTargetId(e.target.value)} title="Куда установить">
               {packs.length === 0 && <option value="">нет сборок</option>}
@@ -181,15 +185,8 @@ export default function BrowserView({ installPath, packs, defaultTargetId, onImp
       </div>
 
       <div className={styles.results}>
-        {loading && <div className={styles.hint}>Поиск…</div>}
-        {!loading && results.length === 0 && query && <div className={styles.hint}>Ничего не найдено</div>}
-        {!loading && !query && (
-          <div className={styles.hint}>
-            {type === 'modpack'
-              ? 'Найдите сборку — Modrinth установится к вам, CurseForge откроется на сайте'
-              : 'Найдите контент и установите его в выбранную справа сборку'}
-          </div>
-        )}
+        {loading && <div className={styles.hint}>Загрузка…</div>}
+        {!loading && results.length === 0 && <div className={styles.hint}>Ничего не найдено</div>}
         {results.map(r => (
           <div key={r.id} className={styles.card}>
             <div className={styles.icon}><Icon src={r.icon} title={r.title} /></div>
