@@ -201,8 +201,10 @@ export default function AccountPanel() {
                   maxLength={16}
                 />
               </div>
-              <button className={styles.offlineBtn} onClick={() => { setAdding(false); setNewName(''); setError('') }}>Назад</button>
-              <button className={styles.addBtn} onClick={addOffline}>OK</button>
+              <div style={{ display: 'flex', gap: 6, width: '100%' }}>
+                <button className={styles.offlineBtn} style={{ flex: 1 }} onClick={() => { setAdding(false); setNewName(''); setError('') }}>Назад</button>
+                <button className={styles.addBtn} style={{ flex: 1 }} onClick={addOffline}>OK</button>
+              </div>
               <label className={styles.skinCheck}>
                 <input type="checkbox" checked={newSkins} onChange={e => setNewSkins(e.target.checked)} />
                 Скины по нику (TLauncher / Ely.by)

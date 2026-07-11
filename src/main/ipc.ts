@@ -372,4 +372,5 @@ export function setupIpcHandlers() {
     if (w?.isMaximized()) w.unmaximize(); else w?.maximize()
   })
   ipcMain.on('window:close', () => BrowserWindow.getFocusedWindow()?.close())
+  ipcMain.handle('window:is-maximized', () => getWindow()?.isMaximized() ?? false)
 }

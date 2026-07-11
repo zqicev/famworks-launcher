@@ -123,6 +123,8 @@ interface Window {
       minimize: () => void
       maximize: () => void
       close: () => void
+      isMaximized: () => Promise<boolean>
+      onMaximized: (cb: (v: boolean) => void) => () => void
     }
     taskbarProgress: (value: number, mode: 'none' | 'normal' | 'indeterminate') => void
   }

@@ -57,6 +57,10 @@ function createWindow() {
     win.loadFile(join(__dirname, '../renderer/index.html'))
   }
 
+  // Сообщаем рендереру о смене состояния окна — для иконки «развернуть/восстановить»
+  win.on('maximize', () => win.webContents.send('window:maximized', true))
+  win.on('unmaximize', () => win.webContents.send('window:maximized', false))
+
   win.maximize() // по умолчанию открываем на весь экран
   return win
 }

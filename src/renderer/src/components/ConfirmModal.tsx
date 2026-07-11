@@ -11,7 +11,7 @@ interface Props {
 
 export default function ConfirmModal({ title, message, confirmLabel = 'Удалить', danger, onConfirm, onClose }: Props) {
   return (
-    <div className={styles.overlay} onClick={onClose}>
+    <div className={styles.overlay} onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}>
       <div className={styles.modal} style={{ width: 420 }} onClick={e => e.stopPropagation()}>
         <div className={styles.header}>
           <h2 className={styles.title}>{title}</h2>

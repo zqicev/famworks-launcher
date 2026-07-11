@@ -123,7 +123,9 @@ contextBridge.exposeInMainWorld('api', {
   window: {
     minimize: () => ipcRenderer.send('window:minimize'),
     maximize: () => ipcRenderer.send('window:maximize'),
-    close: () => ipcRenderer.send('window:close')
+    close: () => ipcRenderer.send('window:close'),
+    isMaximized: () => ipcRenderer.invoke('window:is-maximized'),
+    onMaximized: (cb: (v: boolean) => void) => subscribe('window:maximized', cb)
   },
   taskbarProgress: (value: number, mode: 'none' | 'normal' | 'indeterminate') =>
     ipcRenderer.send('taskbar:progress', value, mode)

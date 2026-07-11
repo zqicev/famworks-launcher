@@ -42,7 +42,7 @@ export default function CrashModal({ data, onClose }: { data: CrashData; onClose
   const relaunch = () => { window.api.launch.start(data.modpackId); onClose() }
 
   return (
-    <div className={styles.overlay} onClick={onClose}>
+    <div className={styles.overlay} onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}>
       <div className={styles.modal} onClick={e => e.stopPropagation()}>
         <div className={styles.top}>
           <span className={`${styles.badge} ${styles[cat.cls]}`}>{cat.label}</span>

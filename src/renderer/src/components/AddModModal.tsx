@@ -146,7 +146,7 @@ export default function AddModModal({ modpack, modsDir, kind = 'mod', onClose }:
   const optValue = (item: any) => source === 'modrinth' ? item.id : String(item.id)
 
   return (
-    <div className={styles.overlay} onClick={onClose}>
+    <div className={styles.overlay} onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}>
       <div className={styles.modal} onClick={e => e.stopPropagation()}>
         <div className={styles.header}>
           <h2 className={styles.title}>{kind === 'resourcepack' ? 'Добавить ресурспак' : kind === 'shader' ? 'Добавить шейдер' : 'Добавить мод'}</h2>

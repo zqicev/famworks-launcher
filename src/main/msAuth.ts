@@ -31,13 +31,13 @@ function friendlyError(e: unknown): Error {
 
   // Заявка на доступ к Minecraft API ещё не одобрена → 403 на login_with_xbox
   if (err?.ts === 'error.auth.minecraft.login' && status === 403) {
-    return new Error('Доступ к Minecraft API ещё не одобрен Microsoft. Заявка на рассмотрении — пока используйте офлайн-аккаунт.')
+    return new Error('Доступ к Minecraft API ещё не одобрен Microsoft. Заявка на рассмотрении - пока используйте офлайн-аккаунт.')
   }
   if (err?.ts === 'error.gui.closed') {
     return new Error('Вход отменён')
   }
   if (err?.ts === 'error.auth.minecraft.profile' || err?.ts === 'error.auth.minecraft.entitlements') {
-    return new Error('На этом аккаунте не куплен Minecraft.')
+    return new Error('На этом аккаунте не куплен Minecraft: Java Edition.')
   }
   if (err?.ts === 'error.auth.xsts.userNotFound') {
     return new Error('У этого Microsoft-аккаунта нет Xbox-профиля.')

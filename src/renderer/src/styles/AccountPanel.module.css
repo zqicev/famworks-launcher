@@ -8,6 +8,7 @@
   align-items: center;
   gap: 10px;
   width: 100%;
+  min-height: 71px; /* высота = нижней панели (BottomBar), чтобы верхние линии совпадали */
   padding: 14px 16px;
   background: none;
   text-align: left;
