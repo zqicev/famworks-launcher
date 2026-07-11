@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import styles from '../styles/AccountPanel.module.css'
 
 interface Account {
@@ -11,6 +11,8 @@ interface Account {
   clientToken?: string
   customSkins?: boolean // офлайн: подгружать скины по нику (TLauncher/Ely.by) через CustomSkinLoader
 }
+
+const TYPE_LABEL: Record<Account['type'], string> = { offline: 'ОФФЛАЙН', ely: 'ELY.BY', microsoft: 'MICROSOFT' }
 
 function validateUsername(name: string): string | null {
   if (!name.trim()) return 'Ник не может быть пустым'
@@ -37,27 +39,19 @@ export default function AccountPanel() {
   const [newName, setNewName] = useState('')
   const [newSkins, setNewSkins] = useState(true)
   const [error, setError] = useState('')
-  const [msLoading, setMsLoading] = useState(false)
   const [elyForm, setElyForm] = useState(false)
   const [elyUser, setElyUser] = useState('')
   const [elyPass, setElyPass] = useState('')
   const [elyTotp, setElyTotp] = useState('')
   const [elyLoading, setElyLoading] = useState(false)
-  const wrapperRef = useRef<HTMLDivElement>(null)
 
-  // Закрытие выпадающего меню по клику вне него
+  const closeAll = (): void => { setOpen(false); setAdding(false); setElyForm(false); setError('') }
+
   useEffect(() => {
     if (!open) return
-    const onDown = (e: MouseEvent) => {
-      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) {
-        setOpen(false)
-        setAdding(false)
-        setElyForm(false)
-        setError('')
-      }
-    }
-    document.addEventListener('mousedown', onDown)
-    return () => document.removeEventListener('mousedown', onDown)
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') closeAll() }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
   }, [open])
 
   useEffect(() => {
@@ -69,9 +63,7 @@ export default function AccountPanel() {
       const list = normalize(accs)
       setAccounts(list)
       let active = (actId as string) ?? null
-      if (!active && legacyActive) {
-        active = `offline:${legacyActive}`
-      }
+      if (!active && legacyActive) active = `offline:${legacyActive}`
       if (!active && list.length) active = list[0].id
       setActiveId(active)
     })
@@ -87,7 +79,7 @@ export default function AccountPanel() {
   const selectAccount = async (id: string) => {
     setActiveId(id)
     await window.api.store.set('activeAccountId', id)
-    setOpen(false)
+    closeAll()
   }
 
   const addOffline = async () => {
@@ -98,9 +90,7 @@ export default function AccountPanel() {
     if (accounts.find(a => a.id === id)) { setError('Такой аккаунт уже есть'); return }
     const acc: Account = { id, username: name, type: 'offline', customSkins: newSkins }
     await persist([...accounts, acc], id)
-    setNewName('')
-    setError('')
-    setAdding(false)
+    setNewName(''); setError(''); setAdding(false)
   }
 
   const loginEly = async () => {
@@ -121,27 +111,7 @@ export default function AccountPanel() {
 
   const toggleSkins = async (id: string, e: React.MouseEvent) => {
     e.stopPropagation()
-    const list = accounts.map(a => a.id === id ? { ...a, customSkins: !a.customSkins } : a)
-    await persist(list, activeId)
-  }
-
-  const loginMicrosoft = async () => {
-    setMsLoading(true)
-    setError('')
-    try {
-      const res = await window.api.auth.microsoftLogin()
-      const id = `msa:${res.uuid}`
-      const acc: Account = {
-        id, username: res.username, type: 'microsoft', uuid: res.uuid, refreshToken: res.refreshToken
-      }
-      const list = accounts.filter(a => a.id !== id) // обновляем если уже был
-      await persist([...list, acc], id)
-      setOpen(false)
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e))
-    } finally {
-      setMsLoading(false)
-    }
+    await persist(accounts.map(a => a.id === id ? { ...a, customSkins: !a.customSkins } : a), activeId)
   }
 
   const deleteAccount = async (id: string, e: React.MouseEvent) => {
@@ -152,93 +122,96 @@ export default function AccountPanel() {
   }
 
   const activeAcc = accounts.find(a => a.id === activeId)
+  const avatarAccent = (t: Account['type']) => t !== 'offline'
 
   return (
-    <div className={styles.wrapper} ref={wrapperRef}>
+    <div className={styles.wrapper}>
       {open && (
-        <div className={styles.dropdown}>
-          <div className={styles.dropTitle}>АККАУНТЫ</div>
+        <div className={styles.overlay} onMouseDown={e => { if (e.target === e.currentTarget) closeAll() }}>
+          <div className={styles.modal}>
+            <div className={styles.mHeader}>
+              <h2 className={styles.mTitle}>Аккаунты</h2>
+              <button className={styles.mClose} onClick={closeAll}>✕</button>
+            </div>
 
-          {accounts.map(acc => (
-            <button
-              key={acc.id}
-              className={`${styles.accRow} ${acc.id === activeId ? styles.accActive : ''}`}
-              onClick={() => selectAccount(acc.id)}
-            >
-              <div className={`${styles.avatar} ${acc.type === 'microsoft' ? styles.avatarMs : ''}`}>
-                {acc.username[0].toUpperCase()}
-              </div>
-              <div className={styles.accInfo}>
-                <div className={styles.accName}>{acc.username}</div>
-                <div className={`${styles.accType} ${acc.type !== 'offline' ? styles.typeMs : ''}`}>
-                  {acc.type === 'microsoft' ? 'MICROSOFT' : acc.type === 'ely' ? 'ELY.BY' : 'ОФФЛАЙН'}
+            <div className={styles.mBody}>
+              {error && <div className={styles.errorRow}>{error}</div>}
+
+              {adding ? (
+                <div className={styles.form}>
+                  <input
+                    className={`${styles.finput} ${error ? styles.inputError : ''}`}
+                    placeholder="Ник (a-z, 0-9, _)"
+                    value={newName}
+                    onChange={e => { setNewName(e.target.value); setError('') }}
+                    onKeyDown={e => e.key === 'Enter' && addOffline()}
+                    autoFocus
+                    maxLength={16}
+                  />
+                  <label className={styles.skinCheck}>
+                    <input type="checkbox" checked={newSkins} onChange={e => setNewSkins(e.target.checked)} />
+                    Скины по нику (TLauncher / Ely.by)
+                  </label>
+                  <div className={styles.formRow}>
+                    <button className={styles.btnGhost} onClick={() => { setAdding(false); setNewName(''); setError('') }}>Назад</button>
+                    <button className={styles.btnAccent} onClick={addOffline}>Добавить</button>
+                  </div>
                 </div>
-              </div>
-              {acc.type === 'offline' && (
-                <button
-                  className={`${styles.skinToggle} ${acc.customSkins ? styles.skinOn : ''}`}
-                  onClick={(e) => toggleSkins(acc.id, e)}
-                  title={acc.customSkins ? 'Скины TLauncher/Ely.by по нику: вкл' : 'Скины по нику: выкл'}
-                >СКИНЫ</button>
+              ) : elyForm ? (
+                <div className={styles.form}>
+                  <input className={styles.finput} placeholder="Email или ник Ely.by" value={elyUser}
+                    onChange={e => { setElyUser(e.target.value); setError('') }} autoFocus />
+                  <input className={styles.finput} type="password" placeholder="Пароль" value={elyPass}
+                    onChange={e => { setElyPass(e.target.value); setError('') }}
+                    onKeyDown={e => e.key === 'Enter' && loginEly()} />
+                  <input className={styles.finput} placeholder="Код 2FA (если включён)" value={elyTotp}
+                    onChange={e => setElyTotp(e.target.value)} />
+                  <div className={styles.formRow}>
+                    <button className={styles.btnGhost} onClick={() => { setElyForm(false); setError('') }}>Назад</button>
+                    <button className={styles.btnAccent} onClick={loginEly} disabled={elyLoading}>{elyLoading ? 'Вход…' : 'Войти'}</button>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {accounts.length === 0 && <div className={styles.empty}>Пока нет аккаунтов — добавьте ниже</div>}
+                  <div className={styles.list}>
+                    {accounts.map(acc => (
+                      <div
+                        key={acc.id}
+                        className={`${styles.card} ${acc.id === activeId ? styles.cardActive : ''}`}
+                        onClick={() => selectAccount(acc.id)}
+                      >
+                        <div className={`${styles.cAvatar} ${avatarAccent(acc.type) ? styles.cAvatarAccent : ''}`}>
+                          {acc.username[0].toUpperCase()}
+                        </div>
+                        <div className={styles.cInfo}>
+                          <div className={styles.cName}>{acc.username}</div>
+                          <span className={`${styles.cBadge} ${acc.type !== 'offline' ? styles.cBadgeAccent : ''}`}>{TYPE_LABEL[acc.type]}</span>
+                        </div>
+                        {acc.type === 'offline' && (
+                          <button
+                            className={`${styles.cSkin} ${acc.customSkins ? styles.cSkinOn : ''}`}
+                            onClick={e => toggleSkins(acc.id, e)}
+                            title={acc.customSkins ? 'Скины по нику: вкл' : 'Скины по нику: выкл'}
+                          >СКИНЫ</button>
+                        )}
+                        {acc.id === activeId && <span className={styles.cCheck}>✓</span>}
+                        <button className={styles.cDel} onClick={e => deleteAccount(acc.id, e)} title="Удалить">✕</button>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className={styles.addSection}>
+                    <button className={styles.addEly} onClick={() => { setElyForm(true); setError('') }}>Войти через Ely.by</button>
+                    <div className={styles.addRow}>
+                      <button className={styles.addBtn2} onClick={() => { setAdding(true); setError('') }}>+ Офлайн-аккаунт</button>
+                      <button className={styles.addBtn2} disabled title="Будет доступно после одобрения Microsoft">Microsoft (скоро)</button>
+                    </div>
+                  </div>
+                </>
               )}
-              {acc.id === activeId && <span className={styles.check}>✓</span>}
-              <button className={styles.deleteAcc} onClick={(e) => deleteAccount(acc.id, e)} title="Удалить">✕</button>
-            </button>
-          ))}
-
-          {error && <div className={styles.errorRow}>{error}</div>}
-
-          {adding ? (
-            <div className={styles.addForm}>
-              <div className={styles.addInputWrap}>
-                <input
-                  className={`${styles.input} ${error ? styles.inputError : ''}`}
-                  placeholder="Ник (a-z, 0-9, _)"
-                  value={newName}
-                  onChange={e => { setNewName(e.target.value); setError('') }}
-                  onKeyDown={e => e.key === 'Enter' && addOffline()}
-                  autoFocus
-                  maxLength={16}
-                />
-              </div>
-              <div style={{ display: 'flex', gap: 6, width: '100%' }}>
-                <button className={styles.offlineBtn} style={{ flex: 1 }} onClick={() => { setAdding(false); setNewName(''); setError('') }}>Назад</button>
-                <button className={styles.addBtn} style={{ flex: 1 }} onClick={addOffline}>OK</button>
-              </div>
-              <label className={styles.skinCheck}>
-                <input type="checkbox" checked={newSkins} onChange={e => setNewSkins(e.target.checked)} />
-                Скины по нику (TLauncher / Ely.by)
-              </label>
             </div>
-          ) : elyForm ? (
-            <div className={styles.addForm}>
-              <input className={styles.input} style={{ width: '100%' }} placeholder="Email или ник Ely.by" value={elyUser}
-                onChange={e => { setElyUser(e.target.value); setError('') }} autoFocus />
-              <input className={styles.input} style={{ width: '100%' }} type="password" placeholder="Пароль" value={elyPass}
-                onChange={e => { setElyPass(e.target.value); setError('') }}
-                onKeyDown={e => e.key === 'Enter' && loginEly()} />
-              <input className={styles.input} style={{ width: '100%' }} placeholder="Код 2FA (если включён)" value={elyTotp}
-                onChange={e => setElyTotp(e.target.value)} />
-              <div style={{ display: 'flex', gap: 6, width: '100%' }}>
-                <button className={styles.offlineBtn} style={{ flex: 1 }} onClick={() => { setElyForm(false); setError('') }}>Назад</button>
-                <button className={styles.addBtn} style={{ flex: 1 }} onClick={loginEly} disabled={elyLoading}>
-                  {elyLoading ? 'Вход…' : 'Войти'}
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className={styles.actions}>
-              <button className={styles.msBtn} disabled title="Будет доступно после одобрения Microsoft">
-                Войти через Microsoft (скоро)
-              </button>
-              <button className={styles.offlineBtn} onClick={() => { setElyForm(true); setError('') }}>
-                Войти через Ely.by
-              </button>
-              <button className={styles.offlineBtn} onClick={() => { setAdding(true); setError('') }}>
-                + Офлайн-аккаунт
-              </button>
-            </div>
-          )}
+          </div>
         </div>
       )}
 
@@ -249,10 +222,10 @@ export default function AccountPanel() {
         <div className={styles.info}>
           <div className={styles.name}>{activeAcc?.username ?? 'Нет аккаунта'}</div>
           <div className={`${styles.type} ${activeAcc && activeAcc.type !== 'offline' ? styles.typeMs : ''}`}>
-            {activeAcc ? (activeAcc.type === 'microsoft' ? 'MICROSOFT' : activeAcc.type === 'ely' ? 'ELY.BY' : 'ОФФЛАЙН') : '—'}
+            {activeAcc ? TYPE_LABEL[activeAcc.type] : '—'}
           </div>
         </div>
-        <span className={styles.chevron}>{open ? '∧' : '∨'}</span>
+        <span className={styles.chevron}>∨</span>
       </button>
     </div>
   )
