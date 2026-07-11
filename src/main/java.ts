@@ -18,6 +18,50 @@ function platformInfo() {
   return { os, arch, isWin }
 }
 
+/** Сетевые сбои, при которых имеет смысл повторить загрузку или сменить источник. */
+function isTransientNetErr(e: unknown): boolean {
+  const code = String((e as { code?: string })?.code ?? '')
+  const msg = String((e as { message?: string })?.message ?? e)
+  return /ECONNRESET|ETIMEDOUT|ECONNABORTED|EAI_AGAIN|ENETUNREACH|EPIPE|ECONNREFUSED|socket hang up|network|timeout/i.test(code + ' ' + msg)
+}
+
+function netMsg(e: unknown): string {
+  const code = (e as { code?: string })?.code
+  if (code) return String(code)
+  const msg = (e as { message?: string })?.message
+  return msg ? String(msg).slice(0, 80) : 'сеть недоступна'
+}
+
+/** Источники JRE по приоритету: Adoptium (редиректит на github), затем Azul Zulu CDN.
+ *  cdn.azul.com обычно доступен там, где github режется (актуально для РФ). */
+async function resolveJavaSources(major: number, os: string, arch: string, isWin: boolean): Promise<string[]> {
+  const sources = [
+    `https://api.adoptium.net/v3/binary/latest/${major}/ga/${os}/${arch}/jre/hotspot/normal/eclipse`
+  ]
+  try {
+    const { data } = await axios.get('https://api.azul.com/metadata/v1/zulu/packages/', {
+      params: {
+        java_version: major,
+        os: os === 'mac' ? 'macos' : os,
+        arch,
+        archive_type: isWin ? 'zip' : 'tar.gz',
+        java_package_type: 'jre',
+        javafx_bundled: false,
+        latest: true,
+        release_status: 'ga',
+        page: 1,
+        page_size: 1
+      },
+      timeout: 12000
+    })
+    const dl = Array.isArray(data) && data[0]?.download_url
+    if (typeof dl === 'string') sources.push(dl)
+  } catch {
+    // метаданные Azul недоступны - остаёмся только на Adoptium
+  }
+  return sources
+}
+
 /** Рекурсивно ищет bin/java(.exe) внутри распакованной JRE. */
 function findJavaBin(dir: string): string | null {
   if (!existsSync(dir)) return null
@@ -87,20 +131,33 @@ export async function ensureJava(installPath: string, win: BrowserWindow, major 
   mkdirSync(javaDir, { recursive: true })
 
   const { os, arch, isWin } = platformInfo()
-  const url = `https://api.adoptium.net/v3/binary/latest/${major}/ga/${os}/${arch}/jre/hotspot/normal/eclipse`
 
   emit(win, { phase: 'download', message: `Загрузка Java ${major}...`, bytesDownloaded: 0, bytesTotal: 0, speedBps: 0 })
 
   const archivePath = join(runtimeRoot, isWin ? `jre-${major}.zip` : `jre-${major}.tar.gz`)
-  await downloadFile(url, archivePath, (bytes, total, speed) => {
-    emit(win, {
-      phase: 'download',
-      message: `Загрузка Java ${major}`,
-      bytesDownloaded: bytes,
-      bytesTotal: total,
-      speedBps: speed
-    })
-  })
+  const sources = await resolveJavaSources(major, os, arch, isWin)
+
+  // Перебираем источники; на транзиентном сбое (напр. ECONNRESET) — второй заход, затем следующий источник.
+  let lastErr: unknown = null
+  let downloaded = false
+  for (const src of sources) {
+    for (let attempt = 1; attempt <= 2 && !downloaded; attempt++) {
+      try {
+        await downloadFile(src, archivePath, (bytes, total, speed) => {
+          emit(win, { phase: 'download', message: `Загрузка Java ${major}`, bytesDownloaded: bytes, bytesTotal: total, speedBps: speed })
+        })
+        downloaded = true
+      } catch (e) {
+        lastErr = e
+        if ((e as { name?: string })?.name === 'AbortError') throw e // отмена пользователем - не повторяем
+        if (!isTransientNetErr(e)) break // не сетевой сбой - сразу к следующему источнику
+      }
+    }
+    if (downloaded) break
+  }
+  if (!downloaded) {
+    throw new Error(`не удалось скачать дистрибутив (${netMsg(lastErr)}). Проверьте интернет или включите VPN и попробуйте снова.`)
+  }
 
   emit(win, { phase: 'download', message: 'Распаковка Java...' })
 
