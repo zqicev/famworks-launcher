@@ -315,9 +315,9 @@ export function setupIpcHandlers() {
 
   // Последняя версия выбранного загрузчика под версию MC (для создания кастомной сборки)
   ipcMain.handle('loader:latest', (_, loader: LoaderId, mc: string) => latestLoaderVersion(loader, mc))
-  ipcMain.handle('mc:versions', async () => {
-    const { mcVersions } = await import('./loaders')
-    return mcVersions()
+  ipcMain.handle('mc:versions', async (_, loader?: LoaderId) => {
+    const { loaderMcVersions } = await import('./loaders')
+    return loaderMcVersions(loader)
   })
 
   // Кастомные (локальные) сборки

@@ -146,8 +146,8 @@ async function runClientInstaller(javaPath: string, installer: string, gameRoot:
   })
 }
 
-// Полный список релизных версий Minecraft из манифеста Mojang (не привязан к загрузчику —
-// у Forge и vanilla есть версии, которых нет у Fabric). Порядок — от новых к старым.
+// Полный список релизных версий Minecraft из манифеста Mojang (для Vanilla — загрузчик не нужен).
+// Порядок — от новых к старым.
 let mcCache: string[] | null = null
 export async function mcVersions(): Promise<string[]> {
   if (mcCache) return mcCache
@@ -160,6 +160,58 @@ export async function mcVersions(): Promise<string[]> {
     mcCache = []
   }
   return mcCache
+}
+
+// Сравнение версий «1.21.1» по компонентам, по убыванию (новые — первыми).
+function cmpVersionDesc(a: string, b: string): number {
+  const pa = a.split('.').map(n => parseInt(n, 10) || 0)
+  const pb = b.split('.').map(n => parseInt(n, 10) || 0)
+  const len = Math.max(pa.length, pb.length)
+  for (let i = 0; i < len; i++) {
+    const d = (pb[i] ?? 0) - (pa[i] ?? 0)
+    if (d) return d
+  }
+  return 0
+}
+
+// Версии Minecraft, под которые РЕАЛЬНО есть выбранный загрузчик (для автоподсказки при создании).
+// Так пользователь не выберет, например, версию без Fabric. Пустой список = не смогли получить (сеть).
+const loaderMcCache = new Map<string, string[]>()
+export async function loaderMcVersions(loader?: LoaderId): Promise<string[]> {
+  const key = loader ?? 'vanilla'
+  const cached = loaderMcCache.get(key)
+  if (cached) return cached
+  let list: string[] = []
+  try {
+    if (!loader || loader === 'vanilla') {
+      list = await mcVersions()
+    } else if (loader === 'fabric' || loader === 'quilt') {
+      const url = loader === 'fabric'
+        ? 'https://meta.fabricmc.net/v2/versions/game'
+        : 'https://meta.quiltmc.org/v3/versions/game'
+      const { data } = await axios.get(url, { timeout: 8000 })
+      // stable === true — это релизы (снапшоты помечены false); порядок API уже новые→старые
+      list = (data as { version: string; stable: boolean }[]).filter(v => v.stable).map(v => v.version)
+    } else if (loader === 'forge') {
+      const { data } = await axios.get('https://files.minecraftforge.net/net/minecraftforge/forge/promotions_slim.json', { timeout: 8000 })
+      const promos = (data as any).promos ?? {}
+      const set = new Set<string>()
+      for (const k of Object.keys(promos)) {
+        const mc = k.replace(/-(recommended|latest)$/, '')
+        if (mc) set.add(mc)
+      }
+      list = [...set].sort(cmpVersionDesc)
+    } else {
+      // neoforge: у NeoForged нет эндпоинта «поддерживаемые версии MC», а из версии загрузчика
+      // (напр. 21.1.169, но и новые 4-компонентные) её однозначно не вывести — показываем полный
+      // список релизов, а реальную совместимость всё равно проверяет latestLoaderVersion (см. ниже).
+      list = await mcVersions()
+    }
+  } catch {
+    list = []
+  }
+  loaderMcCache.set(key, list)
+  return list
 }
 
 /** Последняя версия выбранного загрузчика под данную версию MC (для создания сборки). '' если не нашли. */

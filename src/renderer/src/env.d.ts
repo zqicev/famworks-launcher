@@ -43,7 +43,7 @@ interface Window {
     onBusyChanged: (cb: (id: string | null) => void) => () => void
     appVersion: () => Promise<string>
     loaderLatest: (loader: string, mc: string) => Promise<string>
-    mcVersions: () => Promise<string[]>
+    mcVersions: (loader?: string) => Promise<string[]>
     custom: {
       list: () => Promise<import('../../types/modpack').Modpack[]>
       save: (mp: import('../../types/modpack').Modpack) => Promise<boolean>

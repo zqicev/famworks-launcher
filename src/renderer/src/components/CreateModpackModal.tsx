@@ -16,25 +16,42 @@ export default function CreateModpackModal({ onCreate, onClose }: Props) {
   const [busy, setBusy] = useState(false)
   const [versions, setVersions] = useState<string[]>([])
   const [mcOpen, setMcOpen] = useState(false)
+  const [loaderChecking, setLoaderChecking] = useState(false)
 
   const usesFabricApi = loader === 'fabric' || loader === 'quilt'
   const needsLoaderVer = loader !== 'vanilla' // Vanilla — без загрузчика, версия загрузчика не нужна
+  const loaderLabel = { fabric: 'Fabric', quilt: 'Quilt', forge: 'Forge', neoforge: 'NeoForge', vanilla: 'Vanilla' }[loader]
 
-  useEffect(() => { window.api.mcVersions().then(setVersions).catch(() => {}) }, [])
+  // Список версий MC под выбранный загрузчик (только те, где загрузчик реально есть). Перезагружаем при смене.
+  useEffect(() => {
+    let active = true
+    setVersions([])
+    window.api.mcVersions(loader).then(v => { if (active) setVersions(v) }).catch(() => {})
+    return () => { active = false }
+  }, [loader])
 
   const mcMatches = versions.filter(v => v.startsWith(mc.trim())).slice(0, 8)
   const mcValid = versions.length === 0 || versions.includes(mc.trim())
 
-  // Подтягиваем последнюю версию выбранного загрузчика под выбранную версию MC
+  // Подтягиваем последнюю версию выбранного загрузчика под выбранную версию MC.
+  // Итог — авторитетная проверка совместимости: пустой ответ = под этот загрузчик такой версии нет.
   useEffect(() => {
+    if (!needsLoaderVer) { setLoaderVer(''); setLoaderChecking(false); return }
     let active = true
     setLoaderVer('')
-    window.api.loaderLatest(loader, mc).then(v => { if (active && v) setLoaderVer(v) })
+    setLoaderChecking(true)
+    window.api.loaderLatest(loader, mc)
+      .then(v => { if (active) setLoaderVer(v || '') })
+      .catch(() => {})
+      .finally(() => { if (active) setLoaderChecking(false) })
     return () => { active = false }
-  }, [mc, loader])
+  }, [mc, loader, needsLoaderVer])
+
+  // Версия существует, но под выбранный загрузчик её нет (loaderLatest вернул пусто).
+  const loaderMissing = needsLoaderVer && mcValid && !loaderChecking && !!mc.trim() && !loaderVer.trim()
 
   const create = async () => {
-    if (!name.trim() || !mc.trim() || (needsLoaderVer && !loaderVer.trim())) return
+    if (!name.trim() || !mc.trim() || !mcValid || (needsLoaderVer && !loaderVer.trim())) return
     setBusy(true)
     const id = `custom-${name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}-${Date.now().toString(36)}`
     const mp: Modpack = {
@@ -99,7 +116,9 @@ export default function CreateModpackModal({ onCreate, onClose }: Props) {
           </div>
           {needsLoaderVer && (
             <Field label="ВЕРСИЯ ЗАГРУЗЧИКА">
-              <input className={styles.cinput} value={loaderVer} onChange={e => setLoaderVer(e.target.value)} placeholder="подтянется автоматически" />
+              <input className={`${styles.cinput} ${loaderMissing ? styles.cinputBad : ''}`} value={loaderVer}
+                onChange={e => setLoaderVer(e.target.value)}
+                placeholder={loaderChecking ? 'проверяем…' : 'подтянется автоматически'} />
             </Field>
           )}
           {usesFabricApi && (
@@ -107,7 +126,18 @@ export default function CreateModpackModal({ onCreate, onClose }: Props) {
               <input className={styles.cinput} value={fabricApi} onChange={e => setFabricApi(e.target.value)} placeholder="напр. 0.116.0+1.21.1" />
             </Field>
           )}
-          {!mcValid && mc.trim() && <p className={styles.hint} style={{ color: 'var(--red)' }}>Такой версии Minecraft нет — выберите из подсказки.</p>}
+          {!mcValid && mc.trim() && (
+            <p className={styles.hint} style={{ color: 'var(--red)' }}>
+              {loader === 'vanilla'
+                ? 'Такой версии Minecraft нет — выберите из подсказки.'
+                : `Под ${loaderLabel} нет версии для Minecraft ${mc.trim()} — выберите из подсказки.`}
+            </p>
+          )}
+          {loaderMissing && (
+            <p className={styles.hint} style={{ color: 'var(--red)' }}>
+              Под {loaderLabel} нет версии для Minecraft {mc.trim()} — выберите другую версию или загрузчик.
+            </p>
+          )}
           <p className={styles.hint}>Моды, ресурспаки и шейдеры добавишь после создания во вкладках.</p>
         </div>
         <div className={styles.footer}>
