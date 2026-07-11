@@ -53,6 +53,14 @@
   border-radius: 4px;
 }
 
+.pending {
+  font-size: 10px;
+  color: var(--text-dim);
+  border: 1px dashed var(--border);
+  padding: 2px 7px;
+  border-radius: 4px;
+}
+
 .meta {
   font-size: 11px;
   color: var(--text-dim);

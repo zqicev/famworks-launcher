@@ -12,6 +12,7 @@ interface Props {
 
 interface LocalMod extends Mod {
   _local?: boolean
+  _notInstalled?: boolean // заявлен в сборке, но файла ещё нет на диске (скачается при установке)
 }
 
 export default function ModsTab({ modpack, modsDir, onCount }: Props) {
@@ -83,10 +84,11 @@ export default function ModsTab({ modpack, modsDir, onCount }: Props) {
     return off
   }, [modsDir])
 
-  // Показываем моды сборки только если их файл реально есть на диске (после первого скана).
-  const packMods = presentBases
-    ? modpack.mods.filter(m => presentBases.has(m.filename))
-    : modpack.mods
+  // Показываем все заявленные моды сборки сразу (в т.ч. до установки); ещё не скачанные помечаем.
+  const packMods: LocalMod[] = modpack.mods.map(m => ({
+    ...m,
+    _notInstalled: presentBases ? !presentBases.has(m.filename) : false
+  }))
   const allMods: LocalMod[] = [...packMods, ...extraMods].filter(m => !deletedIds.has(m.id))
   const enabledCount = allMods.filter(m => !disabled.has(m.id)).length
 
@@ -101,7 +103,7 @@ export default function ModsTab({ modpack, modsDir, onCount }: Props) {
   )
 
   const handleToggle = async (mod: LocalMod, enabled: boolean) => {
-    if (mod.required) return
+    if (mod.required || mod._notInstalled) return
     await window.api.mods.toggle(modsDir, mod.filename, enabled)
     setDisabled(prev => {
       const next = new Set(prev)
@@ -111,7 +113,7 @@ export default function ModsTab({ modpack, modsDir, onCount }: Props) {
   }
 
   const handleDelete = async (mod: LocalMod) => {
-    if (mod.required) return
+    if (mod.required || mod._notInstalled) return
     await window.api.mods.delete(modsDir, mod.filename)
     setDeletedIds(prev => new Set(prev).add(mod.id))
     setExtraMods(prev => prev.filter(m => m.id !== mod.id))
@@ -171,6 +173,7 @@ export default function ModsTab({ modpack, modsDir, onCount }: Props) {
             key={mod.id}
             mod={mod}
             enabled={!disabled.has(mod.id)}
+            notInstalled={mod._notInstalled}
             onToggle={(v) => handleToggle(mod, v)}
             onDelete={() => handleDelete(mod)}
           />
