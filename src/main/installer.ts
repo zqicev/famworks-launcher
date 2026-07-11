@@ -74,7 +74,7 @@ export async function checkAndInstallModpack(
     if (isCancelled()) throw new DOMException('Aborted', 'AbortError')
     const resolved = await resolveModUrl(mod, modpack.mc_version, modpack.loader)
     if (!resolved) {
-      emit(win, { phase: 'download', message: `Пропуск ${mod.name} — нет URL`, current: done, total: missing.length })
+      emit(win, { phase: 'download', message: `Пропуск ${mod.name} - нет URL`, current: done, total: missing.length })
       done++
       continue
     }
@@ -135,7 +135,7 @@ async function installConfigs(modpack: Modpack, gameRoot: string, win: BrowserWi
     if (isCancelled()) throw new DOMException('Aborted', 'AbortError')
     const dest = safeJoin(gameRoot, cfg.path)
     if (!dest) {
-      emit(win, { phase: 'download', message: `Пропуск конфига ${cfg.path} — недопустимый путь` })
+      emit(win, { phase: 'download', message: `Пропуск конфига ${cfg.path} - недопустимый путь` })
       done++
       continue
     }
