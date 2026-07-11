@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Modpack } from '../../../types/modpack'
 import styles from '../styles/BrowserView.module.css'
 
@@ -52,34 +52,40 @@ export default function BrowserView({ installPath, packs, defaultTargetId, onImp
   const [picker, setPicker] = useState<{ id: string; items: any[] } | null>(null)
   const [chosen, setChosen] = useState('')
   const [busyId, setBusyId] = useState<string | null>(null)
+  const reqRef = useRef(0) // токен запроса — отбрасываем устаревшие ответы при быстром переключении
 
   const target = packs.find(p => p.id === targetId) ?? null
 
   // Загрузка выдачи. Пустой запрос = популярное (список по умолчанию).
   const load = async (q = query) => {
+    const my = ++reqRef.current
     setLoading(true); setPicker(null); setNotice('')
     const mc = type === 'modpack' ? '' : (target?.mc_version ?? '')
     const loader = type === 'modpack' ? '' : (target?.loader ?? '')
     try {
+      let mapped: Hit[]
       if (source === 'modrinth') {
         const hits = await window.api.modrinth.search(q, mc, loader, type) as any[]
-        setResults(hits.map(h => ({
+        mapped = hits.map(h => ({
           id: h.project_id, title: h.title, description: h.description, author: h.author,
           downloads: h.downloads, icon: h.icon_url ?? null, url: `https://modrinth.com/${type}/${h.slug}`
-        })))
+        }))
       } else {
         const hits = await window.api.curseforge.search(q, mc, loader, type) as any[]
-        setResults(hits.map(h => ({
+        mapped = hits.map(h => ({
           id: String(h.id), title: h.name, description: h.summary, author: h.authors?.[0]?.name ?? '',
           downloads: h.downloadCount, icon: h.logo?.thumbnailUrl ?? null,
           url: h.links?.websiteUrl ?? `https://www.curseforge.com/minecraft/${h.slug ?? ''}`
-        })))
+        }))
       }
+      if (my !== reqRef.current) return // пришёл более свежий запрос — этот отбрасываем
+      setResults(mapped)
     } catch {
+      if (my !== reqRef.current) return
       setResults([])
       setNotice('Ошибка загрузки. Проверьте соединение.')
     } finally {
-      setLoading(false)
+      if (my === reqRef.current) setLoading(false)
     }
   }
 

@@ -200,16 +200,16 @@ export async function installModrinthModpack(projectId: string): Promise<ImportR
     headers: { 'User-Agent': 'famworks-launcher/1.0' },
     timeout: 15000
   })
-  const versions = (data as { date_published: string; files: { url: string; filename: string; primary: boolean }[] }[])
+  type MrVersion = { date_published: string; version_type?: string; files: { url: string; filename: string; primary: boolean }[] }
+  const versions = (data as MrVersion[])
     .slice()
     .sort((a, b) => new Date(b.date_published).getTime() - new Date(a.date_published).getTime())
 
-  let file: { url: string; filename: string } | undefined
-  for (const v of versions) {
-    const files = v.files ?? []
-    file = files.find(f => f.primary && /\.mrpack$/i.test(f.filename)) ?? files.find(f => /\.mrpack$/i.test(f.filename))
-    if (file) break
-  }
+  const hasPack = (v: MrVersion) => (v.files ?? []).some(f => /\.mrpack$/i.test(f.filename))
+  // Предпочитаем последнюю релизную версию, иначе просто последнюю с .mrpack (beta/alpha).
+  const pick = versions.find(v => v.version_type === 'release' && hasPack(v)) ?? versions.find(hasPack)
+  const files = pick?.files ?? []
+  const file = files.find(f => f.primary && /\.mrpack$/i.test(f.filename)) ?? files.find(f => /\.mrpack$/i.test(f.filename))
   if (!file) throw new Error('У этой сборки нет файла .mrpack для установки')
 
   const tmp = join(app.getPath('temp'), `fw-${Date.now()}-${file.filename}`)
