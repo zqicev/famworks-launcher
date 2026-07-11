@@ -1,12 +1,12 @@
 import { dialog } from 'electron'
-import { join } from 'path'
-import { existsSync, mkdirSync, rmSync, statSync } from 'fs'
+import { join, dirname, sep } from 'path'
+import { existsSync, mkdirSync, rmSync, statSync, writeFileSync } from 'fs'
 import AdmZip from 'adm-zip'
 import { store } from './store'
 import { fetchModpack } from './modpacks'
-import { Modpack } from '../types/modpack'
+import { Modpack, Mod } from '../types/modpack'
 
-// Что кладём в .fwpack (worlds/logs/versions/assets не трогаем — они личные/восстановимые)
+// Что кладём в .fwpack (worlds/logs/versions/assets не трогаем - они личные/восстановимые)
 const CONTENT_DIRS = ['mods', 'resourcepacks', 'shaderpacks', 'config']
 
 export interface ExportResult { ok?: boolean; path?: string; cancelled?: boolean }
@@ -42,26 +42,31 @@ export async function exportModpack(id: string): Promise<ExportResult> {
   return { ok: true, path: res.filePath }
 }
 
-/** Импорт .fwpack через диалог выбора файла. */
+/** Импорт сборки через диалог: принимает .fwpack (FamWorks) и .mrpack (Modrinth). */
 export async function importModpack(): Promise<ImportResult> {
   const res = await dialog.showOpenDialog({
     title: 'Импорт сборки',
-    filters: [{ name: 'FamWorks сборка', extensions: ['fwpack'] }],
+    filters: [{ name: 'Сборка Minecraft (FamWorks, Modrinth)', extensions: ['fwpack', 'mrpack'] }],
     properties: ['openFile']
   })
   if (res.canceled || !res.filePaths[0]) return { cancelled: true }
   return importFromFile(res.filePaths[0])
 }
 
-/** Импорт .fwpack из конкретного файла (диалог или ассоциация файла) как новой кастомной сборки. */
+/** Импорт из файла: определяет формат (.mrpack или .fwpack) по содержимому и создаёт кастомную сборку. */
 export async function importFromFile(filePath: string): Promise<ImportResult> {
   const installPath = store.get('installPath') as string
   if (!installPath) throw new Error('Сначала завершите настройку лаунчера (выбор папки установки)')
 
   const zip = new AdmZip(filePath)
-  const entry = zip.getEntry('modpack.json')
-  if (!entry) throw new Error('Это не файл сборки FamWorks (нет modpack.json)')
-  const meta = JSON.parse(zip.readAsText(entry)) as Modpack
+  if (zip.getEntry('modrinth.index.json')) return importMrpack(zip, installPath)
+  if (zip.getEntry('modpack.json')) return importFwpack(zip, installPath)
+  throw new Error('Неизвестный формат: это не .fwpack и не .mrpack')
+}
+
+/** .fwpack → кастомная сборка (modpack.json + распаковка mods/config/... в папку игры). */
+function importFwpack(zip: AdmZip, installPath: string): ImportResult {
+  const meta = JSON.parse(zip.readAsText(zip.getEntry('modpack.json')!)) as Modpack
   if (!meta.mc_version || !meta.loader || !meta.loader_version) {
     throw new Error('Повреждённый файл сборки: не хватает данных о версии/загрузчике')
   }
@@ -81,8 +86,109 @@ export async function importFromFile(filePath: string): Promise<ImportResult> {
     mods: Array.isArray(meta.mods) ? meta.mods : [],
     changelog: Array.isArray(meta.changelog) ? meta.changelog : []
   }
-  const list = (store.get('customModpacks') as Modpack[]).filter(m => m.id !== id)
+  saveCustom(modpack)
+  return { ok: true, modpack }
+}
+
+interface MrpackIndex {
+  name?: string
+  summary?: string
+  dependencies?: Record<string, string>
+  files?: {
+    path: string
+    hashes?: { sha1?: string; sha512?: string }
+    downloads?: string[]
+    fileSize?: number
+    env?: { client?: string; server?: string }
+  }[]
+}
+
+/** .mrpack (Modrinth) → кастомная сборка: моды/пакеты качаются по URL из манифеста,
+ *  overrides (конфиги и прочие файлы) распаковываются прямо в папку игры. */
+function importMrpack(zip: AdmZip, installPath: string): ImportResult {
+  const idx = JSON.parse(zip.readAsText(zip.getEntry('modrinth.index.json')!)) as MrpackIndex
+  const deps = idx.dependencies ?? {}
+  const mc = deps.minecraft
+  if (!mc) throw new Error('В .mrpack не указана версия Minecraft')
+
+  let loader: Modpack['loader'] = 'vanilla'
+  let loaderVersion = ''
+  if (deps['fabric-loader']) { loader = 'fabric'; loaderVersion = deps['fabric-loader'] }
+  else if (deps['quilt-loader']) { loader = 'quilt'; loaderVersion = deps['quilt-loader'] }
+  else if (deps['forge']) { loader = 'forge'; loaderVersion = deps['forge'] }
+  else if (deps['neoforge']) { loader = 'neoforge'; loaderVersion = deps['neoforge'] }
+
+  const name = idx.name || 'Импортированная сборка'
+  const id = `custom-${slugify(name)}-${Date.now().toString(36)}`
+  const gameRoot = join(installPath, id)
+  mkdirSync(gameRoot, { recursive: true })
+
+  const mods: Mod[] = []
+  const resourcepacks: Mod[] = []
+  const shaders: Mod[] = []
+  for (const f of idx.files ?? []) {
+    if (f.env?.client === 'unsupported') continue // файл только для сервера - пропускаем
+    const url = f.downloads?.[0]
+    if (!url || !f.path) continue
+    const p = f.path.replace(/\\/g, '/')
+    const filename = p.split('/').pop() ?? ''
+    if (!filename) continue
+    const item: Mod = {
+      id: filename.replace(/\.(jar|zip)$/i, '') || filename,
+      name: filename,
+      filename,
+      version: '',
+      category: '',
+      size_mb: f.fileSize ? +(f.fileSize / 1048576).toFixed(2) : 0,
+      required: f.env?.client !== 'optional',
+      download_url: url,
+      sha512: f.hashes?.sha512,
+      sha1: f.hashes?.sha1
+    }
+    if (p.startsWith('resourcepacks/')) resourcepacks.push(item)
+    else if (p.startsWith('shaderpacks/')) shaders.push(item)
+    else mods.push(item) // mods/ и всё остальное
+  }
+
+  // overrides / client-overrides - статические файлы, кладём как есть в папку игры
+  extractOverrides(zip, gameRoot, 'overrides')
+  extractOverrides(zip, gameRoot, 'client-overrides')
+
+  const modpack: Modpack = {
+    id,
+    name,
+    description: idx.summary || 'Импортировано из Modrinth',
+    long_description: '',
+    mc_version: mc,
+    loader,
+    loader_version: loaderVersion,
+    fabric_api_version: '', // Fabric API уже входит в моды сборки - отдельно не тянем
+    updated_at: new Date().toISOString(),
+    changelog: [],
+    mods,
+    ...(resourcepacks.length ? { resourcepacks } : {}),
+    ...(shaders.length ? { shaders } : {})
+  }
+  saveCustom(modpack)
+  return { ok: true, modpack }
+}
+
+/** Распаковывает поддерево zip (напр. overrides/…) в gameRoot, защищаясь от zip-slip (выход за пределы). */
+function extractOverrides(zip: AdmZip, gameRoot: string, prefix: string): void {
+  const base = prefix + '/'
+  for (const e of zip.getEntries()) {
+    if (e.isDirectory || !e.entryName.startsWith(base)) continue
+    const rel = e.entryName.slice(base.length)
+    if (!rel) continue
+    const dest = join(gameRoot, rel)
+    if (dest !== gameRoot && !dest.startsWith(gameRoot + sep)) continue
+    mkdirSync(dirname(dest), { recursive: true })
+    writeFileSync(dest, e.getData())
+  }
+}
+
+function saveCustom(modpack: Modpack): void {
+  const list = (store.get('customModpacks') as Modpack[]).filter(m => m.id !== modpack.id)
   list.push(modpack)
   store.set('customModpacks', list)
-  return { ok: true, modpack }
 }
