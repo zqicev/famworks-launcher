@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { ModpackIndex, Modpack } from '../../types/modpack'
 import Sidebar from './components/Sidebar'
 import MainPanel from './components/MainPanel'
+import BrowserView from './components/BrowserView'
 import TitleBar from './components/TitleBar'
 import SetupModal from './components/SetupModal'
 import SettingsModal from './components/SettingsModal'
@@ -29,6 +30,7 @@ export default function App() {
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [devMode, setDevMode] = useState(false)
   const [crash, setCrash] = useState<CrashData | null>(null)
+  const [view, setView] = useState<'modpack' | 'browser'>('modpack')
 
   const showToast = useCallback((text: string, kind: 'info' | 'success' | 'error') => {
     if (toastTimer.current) clearTimeout(toastTimer.current)
@@ -188,23 +190,35 @@ export default function App() {
           <Sidebar
             index={modpackIndex}
             customPacks={customPacks}
-            selectedId={selectedId}
+            selectedId={view === 'browser' ? null : selectedId}
             seenUpdates={seenUpdates}
-            onSelect={setSelectedId}
+            onSelect={(id) => { setSelectedId(id); setView('modpack') }}
             onSettings={() => setSettingsOpen(true)}
             onRefresh={handleRefresh}
             onCreate={() => setCreateOpen(true)}
             onDeleteCustom={handleDeleteCustom}
             onImport={handleImport}
             onExportCustom={handleExportCustom}
+            browserActive={view === 'browser'}
+            onOpenBrowser={() => setView('browser')}
           />
-          <MainPanel
-            modpack={modpack}
-            installPath={installPath}
-            loading={loading}
-            error={error}
-            devMode={devMode}
-          />
+          {view === 'browser' ? (
+            <BrowserView
+              installPath={installPath}
+              packs={[...(modpackIndex?.modpacks ?? []), ...customPacks].map(p => ({ id: p.id, name: p.name, mc_version: p.mc_version, loader: p.loader }))}
+              defaultTargetId={selectedId}
+              onImported={(mp) => { loadCustom(); setSelectedId(mp.id); setView('modpack') }}
+              showToast={showToast}
+            />
+          ) : (
+            <MainPanel
+              modpack={modpack}
+              installPath={installPath}
+              loading={loading}
+              error={error}
+              devMode={devMode}
+            />
+          )}
           {settingsOpen && (
             <SettingsModal
               installPath={installPath}

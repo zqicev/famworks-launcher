@@ -15,7 +15,15 @@ interface Props {
   onDeleteCustom: (id: string) => void
   onImport: () => void
   onExportCustom: (id: string) => void
+  browserActive: boolean
+  onOpenBrowser: () => void
 }
+
+const BrowserIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+  </svg>
+)
 
 const ImportIcon = () => (
   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
@@ -28,7 +36,7 @@ const ExportIcon = () => (
   </svg>
 )
 
-export default function Sidebar({ index, customPacks, selectedId, seenUpdates, onSelect, onSettings, onRefresh, onCreate, onDeleteCustom, onImport, onExportCustom }: Props) {
+export default function Sidebar({ index, customPacks, selectedId, seenUpdates, onSelect, onSettings, onRefresh, onCreate, onDeleteCustom, onImport, onExportCustom, browserActive, onOpenBrowser }: Props) {
   const [version, setVersion] = useState('')
   useEffect(() => { window.api.appVersion().then(setVersion).catch(() => {}) }, [])
 
@@ -53,6 +61,16 @@ export default function Sidebar({ index, customPacks, selectedId, seenUpdates, o
       </div>
 
       <div className={styles.scroll}>
+        <div className={styles.navBlock}>
+          <button className={`${styles.navBtn} ${browserActive ? styles.navActive : ''}`} onClick={onOpenBrowser} title="Поиск и установка контента">
+            <span className={styles.navIcon}><BrowserIcon /></span>
+            <div className={styles.navText}>
+              <div className={styles.navTitle}>Браузер</div>
+              <div className={styles.navSub}>Моды, паки, сборки</div>
+            </div>
+          </button>
+        </div>
+
         <div className={styles.section}>
           <div className={styles.sectionHeader}>
             <span>СБОРКИ</span>

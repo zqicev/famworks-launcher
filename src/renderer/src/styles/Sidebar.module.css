@@ -193,6 +193,36 @@
 .createTitle { font-size: 13px; font-weight: 600; color: var(--text); }
 .createSub { font-size: 11px; color: var(--text-dim); margin-top: 1px; }
 
+/* Навигация: Браузер (поиск контента) */
+.navBlock { padding: 0 12px 10px; }
+.navBtn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--bg-surface);
+  text-align: left;
+  transition: border-color 0.15s, background 0.15s;
+}
+.navBtn:hover { border-color: #383838; background: var(--bg-hover); }
+.navActive {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 12%, var(--bg-surface));
+}
+.navIcon {
+  width: 34px; height: 34px; border-radius: 8px;
+  background: var(--bg-active); color: var(--accent);
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+  transition: background 0.15s, color 0.15s;
+}
+.navActive .navIcon { background: var(--accent); color: #0a0a0a; }
+.navText { min-width: 0; }
+.navTitle { font-size: 13px; font-weight: 600; color: var(--text); }
+.navSub { font-size: 11px; color: var(--text-dim); margin-top: 1px; }
+
 .headerActions { display: flex; align-items: center; gap: 4px; }
 .miniBtn {
   width: 18px; height: 18px; border-radius: 5px; background: var(--bg-active);

@@ -22,11 +22,10 @@ export async function searchModrinth(
   type = 'mod',
   limit = 20
 ): Promise<ModrinthSearchResult[]> {
-  const facets: string[][] = [
-    [`versions:${mcVersion}`],
-    [`project_type:${type}`]
-  ]
-  if (type === 'mod') facets.unshift([`categories:${loader}`])
+  const facets: string[][] = [[`project_type:${type}`]]
+  // Для сборок версия не задаётся (browser ищет по всем); для остального фильтруем по версии MC
+  if (mcVersion) facets.push([`versions:${mcVersion}`])
+  if (type === 'mod' && loader) facets.unshift([`categories:${loader}`])
 
   const res = await axios.get(`${BASE}/search`, {
     headers: HEADERS,

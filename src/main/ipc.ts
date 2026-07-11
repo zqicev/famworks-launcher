@@ -344,6 +344,16 @@ export function setupIpcHandlers() {
     return true
   })
 
+  // Браузер: установка сборки. Modrinth импортируем через .mrpack; CF заблокирован прокси - открываем сайт.
+  ipcMain.handle('browser:install-modpack', async (_, source: string, id: string) => {
+    if (source !== 'modrinth') {
+      return { ok: false, error: 'Установка сборок с CurseForge пока недоступна - откройте её на сайте.' }
+    }
+    const { installModrinthModpack } = await import('./packio')
+    return installModrinthModpack(id)
+  })
+  ipcMain.handle('shell:open-external', (_, url: string) => shell.openExternal(url))
+
   ipcMain.handle('shell:open-folder', (_, folderPath: string) => {
     try { mkdirSync(folderPath, { recursive: true }) } catch { /* игнорируем */ }
     return shell.openPath(folderPath)

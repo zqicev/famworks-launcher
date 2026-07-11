@@ -95,7 +95,11 @@ contextBridge.exposeInMainWorld('api', {
     pickFolder: () => ipcRenderer.invoke('dialog:pick-folder')
   },
   shell: {
-    openFolder: (path: string) => ipcRenderer.invoke('shell:open-folder', path)
+    openFolder: (path: string) => ipcRenderer.invoke('shell:open-folder', path),
+    openExternal: (url: string) => ipcRenderer.invoke('shell:open-external', url)
+  },
+  browser: {
+    installModpack: (source: string, id: string) => ipcRenderer.invoke('browser:install-modpack', source, id)
   },
   system: {
     totalMemoryMb: () => ipcRenderer.invoke('system:total-memory-mb')

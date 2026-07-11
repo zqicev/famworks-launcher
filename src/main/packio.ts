@@ -1,6 +1,7 @@
-import { dialog } from 'electron'
+import { dialog, app } from 'electron'
 import { join, dirname, sep } from 'path'
 import { existsSync, mkdirSync, rmSync, statSync, writeFileSync } from 'fs'
+import axios from 'axios'
 import AdmZip from 'adm-zip'
 import { store } from './store'
 import { fetchModpack } from './modpacks'
@@ -191,4 +192,32 @@ function saveCustom(modpack: Modpack): void {
   const list = (store.get('customModpacks') as Modpack[]).filter(m => m.id !== modpack.id)
   list.push(modpack)
   store.set('customModpacks', list)
+}
+
+/** Устанавливает сборку с Modrinth: качает последний .mrpack проекта и импортирует его. */
+export async function installModrinthModpack(projectId: string): Promise<ImportResult> {
+  const { data } = await axios.get(`https://api.modrinth.com/v2/project/${projectId}/version`, {
+    headers: { 'User-Agent': 'famworks-launcher/1.0' },
+    timeout: 15000
+  })
+  const versions = (data as { date_published: string; files: { url: string; filename: string; primary: boolean }[] }[])
+    .slice()
+    .sort((a, b) => new Date(b.date_published).getTime() - new Date(a.date_published).getTime())
+
+  let file: { url: string; filename: string } | undefined
+  for (const v of versions) {
+    const files = v.files ?? []
+    file = files.find(f => f.primary && /\.mrpack$/i.test(f.filename)) ?? files.find(f => /\.mrpack$/i.test(f.filename))
+    if (file) break
+  }
+  if (!file) throw new Error('У этой сборки нет файла .mrpack для установки')
+
+  const tmp = join(app.getPath('temp'), `fw-${Date.now()}-${file.filename}`)
+  const resp = await axios.get(file.url, { responseType: 'arraybuffer', timeout: 60000, maxRedirects: 5 })
+  writeFileSync(tmp, Buffer.from(resp.data))
+  try {
+    return await importFromFile(tmp)
+  } finally {
+    try { rmSync(tmp, { force: true }) } catch {}
+  }
 }

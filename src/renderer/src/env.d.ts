@@ -79,6 +79,10 @@ interface Window {
     }
     shell: {
       openFolder: (path: string) => Promise<void>
+      openExternal: (url: string) => Promise<void>
+    }
+    browser: {
+      installModpack: (source: string, id: string) => Promise<{ ok?: boolean; modpack?: import('../../types/modpack').Modpack; error?: string; cancelled?: boolean }>
     }
     system: {
       totalMemoryMb: () => Promise<number>
