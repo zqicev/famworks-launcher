@@ -180,6 +180,10 @@
 
 .cinputBad { border-color: var(--red) !important; }
 
+/* Модалка создания сборки: разрешаем автоподсказке версий вылезать за пределы окна
+   (по умолчанию .modal имеет overflow:hidden, который её обрезал). */
+.modalOverflow { overflow: visible; }
+
 .suggest {
   position: absolute;
   top: calc(100% + 4px);

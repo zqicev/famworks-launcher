@@ -72,7 +72,7 @@ export default function CreateModpackModal({ onCreate, onClose }: Props) {
 
   return (
     <div className={styles.overlay} onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}>
-      <div className={styles.modal} onClick={e => e.stopPropagation()}>
+      <div className={`${styles.modal} ${styles.modalOverflow}`} onClick={e => e.stopPropagation()}>
         <div className={styles.header}>
           <h2 className={styles.title}>Новая сборка</h2>
           <button className={styles.close} onClick={onClose}>✕</button>
@@ -130,15 +130,14 @@ export default function CreateModpackModal({ onCreate, onClose }: Props) {
             <p className={styles.hint} style={{ color: 'var(--red)' }}>
               {loader === 'vanilla'
                 ? 'Такой версии Minecraft нет — выберите из подсказки.'
-                : `Под ${loaderLabel} нет версии для Minecraft ${mc.trim()} — выберите из подсказки.`}
+                : `Под ${loaderLabel} нет версии для Minecraft ${mc.trim()} - выберите из подсказки.`}
             </p>
           )}
           {loaderMissing && (
             <p className={styles.hint} style={{ color: 'var(--red)' }}>
-              Под {loaderLabel} нет версии для Minecraft {mc.trim()} — выберите другую версию или загрузчик.
+              Под {loaderLabel} нет версии для Minecraft {mc.trim()} - выберите другую версию или загрузчик.
             </p>
           )}
-          <p className={styles.hint}>Моды, ресурспаки и шейдеры добавишь после создания во вкладках.</p>
         </div>
         <div className={styles.footer}>
           <button className={styles.cancelBtn} onClick={onClose}>Отмена</button>
