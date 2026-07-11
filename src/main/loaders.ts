@@ -141,6 +141,19 @@ async function runClientInstaller(javaPath: string, installer: string, gameRoot:
   })
 }
 
+// Список релизных версий Minecraft (для автоподсказки при создании сборки)
+let mcCache: string[] | null = null
+export async function mcVersions(): Promise<string[]> {
+  if (mcCache) return mcCache
+  try {
+    const { data } = await axios.get('https://meta.fabricmc.net/v2/versions/game', { timeout: 8000 })
+    mcCache = (data as { version: string; stable: boolean }[]).filter(v => v.stable).map(v => v.version)
+  } catch {
+    mcCache = []
+  }
+  return mcCache
+}
+
 /** Последняя версия выбранного загрузчика под данную версию MC (для создания сборки). '' если не нашли. */
 export async function latestLoaderVersion(loader: LoaderId, mc: string): Promise<string> {
   try {

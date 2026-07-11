@@ -177,3 +177,31 @@
   background: var(--text-dim); transition: transform 0.18s, background 0.18s;
 }
 .switchOn .knob { transform: translateX(16px); background: #0a0a0a; }
+
+.cinputBad { border-color: var(--red) !important; }
+
+.suggest {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 210px;
+  overflow-y: auto;
+  padding: 4px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
+  z-index: 30;
+}
+.suggestItem {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 7px 10px;
+  font-size: 13px;
+  color: var(--text-secondary);
+  border-radius: 6px;
+  transition: background 0.12s, color 0.12s;
+}
+.suggestItem:hover { background: var(--bg-hover); color: var(--text); }

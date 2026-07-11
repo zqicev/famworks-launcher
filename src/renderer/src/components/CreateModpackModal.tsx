@@ -14,8 +14,15 @@ export default function CreateModpackModal({ onCreate, onClose }: Props) {
   const [loaderVer, setLoaderVer] = useState('')
   const [fabricApi, setFabricApi] = useState('')
   const [busy, setBusy] = useState(false)
+  const [versions, setVersions] = useState<string[]>([])
+  const [mcOpen, setMcOpen] = useState(false)
 
   const usesFabricApi = loader === 'fabric' || loader === 'quilt'
+
+  useEffect(() => { window.api.mcVersions().then(setVersions).catch(() => {}) }, [])
+
+  const mcMatches = versions.filter(v => v.startsWith(mc.trim())).slice(0, 8)
+  const mcValid = versions.length === 0 || versions.includes(mc.trim())
 
   // Подтягиваем последнюю версию выбранного загрузчика под выбранную версию MC
   useEffect(() => {
@@ -58,7 +65,26 @@ export default function CreateModpackModal({ onCreate, onClose }: Props) {
           </Field>
           <div style={{ display: 'flex', gap: 10 }}>
             <Field label="ВЕРСИЯ MC">
-              <input className={styles.cinput} value={mc} onChange={e => setMc(e.target.value)} placeholder="1.21.1" />
+              <div style={{ position: 'relative' }}>
+                <input
+                  className={`${styles.cinput} ${!mcValid && mc.trim() ? styles.cinputBad : ''}`}
+                  value={mc}
+                  onChange={e => { setMc(e.target.value); setMcOpen(true) }}
+                  onFocus={() => setMcOpen(true)}
+                  onBlur={() => setMcOpen(false)}
+                  placeholder="1.21.1"
+                />
+                {mcOpen && mcMatches.length > 0 && !(mcMatches.length === 1 && mcMatches[0] === mc.trim()) && (
+                  <div className={styles.suggest}>
+                    {mcMatches.map(v => (
+                      <button key={v} type="button" className={styles.suggestItem}
+                        onMouseDown={e => { e.preventDefault(); setMc(v); setMcOpen(false) }}>
+                        {v}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </Field>
             <Field label="ЗАГРУЗЧИК">
               <select className={styles.cinput} value={loader} onChange={e => setLoader(e.target.value as any)}>
@@ -77,11 +103,12 @@ export default function CreateModpackModal({ onCreate, onClose }: Props) {
               <input className={styles.cinput} value={fabricApi} onChange={e => setFabricApi(e.target.value)} placeholder="напр. 0.116.0+1.21.1" />
             </Field>
           )}
+          {!mcValid && mc.trim() && <p className={styles.hint} style={{ color: 'var(--red)' }}>Такой версии Minecraft нет — выберите из подсказки.</p>}
           <p className={styles.hint}>Моды, ресурспаки и шейдеры добавишь после создания во вкладках.</p>
         </div>
         <div className={styles.footer}>
           <button className={styles.cancelBtn} onClick={onClose}>Отмена</button>
-          <button className={styles.saveBtn} onClick={create} disabled={busy || !name.trim() || !loaderVer.trim()}>Создать</button>
+          <button className={styles.saveBtn} onClick={create} disabled={busy || !name.trim() || !loaderVer.trim() || !mcValid}>Создать</button>
         </div>
       </div>
     </div>

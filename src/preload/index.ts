@@ -58,6 +58,7 @@ contextBridge.exposeInMainWorld('api', {
   onBusyChanged: (cb: (id: string | null) => void) => subscribe('busy:changed', cb),
   appVersion: () => ipcRenderer.invoke('app:version'),
   loaderLatest: (loader: string, mc: string) => ipcRenderer.invoke('loader:latest', loader, mc),
+  mcVersions: () => ipcRenderer.invoke('mc:versions'),
   custom: {
     list: () => ipcRenderer.invoke('custom:list'),
     save: (mp: unknown) => ipcRenderer.invoke('custom:save', mp),
