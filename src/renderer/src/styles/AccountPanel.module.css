@@ -9,7 +9,7 @@
   align-items: center;
   gap: 10px;
   width: 100%;
-  min-height: 71px; /* высота = нижней панели (BottomBar), чтобы верхние линии совпадали */
+  min-height: 85px; /* + 1px border wrapper = 86px = высота BottomBar (1 border + 3 progress + 82 inner), чтобы верхние линии совпадали */
   padding: 14px 16px;
   background: none;
   text-align: left;
