@@ -344,6 +344,12 @@ export function setupIpcHandlers() {
     return true
   })
 
+  // Браузер: установка контента в сборку вместе с обязательными зависимостями (рекурсивно).
+  ipcMain.handle('browser:install', async (_, source: string, type: string, projectId: string, refId: string, mc: string, loader: string, packRoot: string) => {
+    const { installFromBrowser } = await import('./browserInstall')
+    return installFromBrowser(source, type, projectId, refId, mc, loader, packRoot, getWindow())
+  })
+
   // Браузер: страница обзора проекта (описание, галерея, зависимости, авторы, лицензия).
   ipcMain.handle('browser:project', async (_, source: string, id: string, type: string) => {
     if (source === 'modrinth') {

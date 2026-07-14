@@ -94,11 +94,18 @@ export async function getModrinthDependencies(id: string): Promise<{ name: strin
   return out
 }
 
+export interface ModrinthDependency {
+  project_id?: string
+  version_id?: string
+  dependency_type: string // required | optional | incompatible | embedded
+}
+
 export interface ModrinthVersion {
   id: string
   name: string
   version_number: string
-  files: { url: string; filename: string; primary: boolean; size: number }[]
+  files: { url: string; filename: string; primary: boolean; size: number; hashes?: { sha512?: string } }[]
+  dependencies?: ModrinthDependency[]
 }
 
 export async function getModVersions(projectId: string, mcVersion: string, loader: string, type = 'mod'): Promise<ModrinthVersion[]> {
@@ -108,4 +115,14 @@ export async function getModVersions(projectId: string, mcVersion: string, loade
     params: { game_versions: JSON.stringify([mcVersion]), loaders: JSON.stringify(loaders) }
   })
   return res.data
+}
+
+/** Конкретная версия по её id (для установки запинованной зависимости). */
+export async function getModrinthVersion(id: string): Promise<ModrinthVersion | null> {
+  try {
+    const res = await axios.get(`${BASE}/version/${id}`, { headers: HEADERS })
+    return res.data
+  } catch {
+    return null
+  }
 }

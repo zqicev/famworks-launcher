@@ -33,8 +33,6 @@ const TYPES: { key: CType; label: string }[] = [
   { key: 'resourcepack', label: 'Ресурспаки' },
   { key: 'shader', label: 'Шейдеры' }
 ]
-const FOLDER: Record<Exclude<CType, 'modpack'>, string> = { mod: 'mods', resourcepack: 'resourcepacks', shader: 'shaderpacks' }
-
 function Icon({ src, title }: { src: string | null; title: string }) {
   const [broken, setBroken] = useState(false)
   if (!src || broken) return <span>{title[0]?.toUpperCase() ?? '?'}</span>
@@ -134,23 +132,22 @@ export default function BrowserView({ installPath, packs, defaultTargetId, onImp
     }
   }
 
-  const doInstall = (hit: Hit) => {
+  const doInstall = async (hit: Hit) => {
     if (!picker || !target || type === 'modpack') return
-    const dir = `${installPath}/${target.id}/${FOLDER[type]}`
-    if (source === 'modrinth') {
-      const v = picker.items.find(x => x.id === chosen) ?? picker.items[0]
-      const file = (v.files ?? []).find((f: any) => f.primary) ?? v.files?.[0]
-      if (!file) { setNotice('У версии нет файла для скачивания'); return }
-      setPicker(null)
-      window.api.modrinth.download(file.url, file.filename, dir, file.hashes?.sha512)
-    } else {
-      const f = picker.items.find(x => String(x.id) === chosen) ?? picker.items[0]
-      if (!f?.downloadUrl) { setNotice('У файла нет прямой ссылки'); return }
-      const sha1 = (f.hashes ?? []).find((h: any) => h.algo === 1)?.value
-      setPicker(null)
-      window.api.curseforge.download(f.downloadUrl, f.fileName, dir, sha1)
+    const packRoot = `${installPath}/${target.id}`
+    setPicker(null); setBusyId(hit.id)
+    showToast(`Установка «${hit.title}»…`, 'info')
+    try {
+      const res = await window.api.browser.install(source, type, hit.id, chosen, target.mc_version, target.loader, packRoot)
+      if (res.ok) {
+        const n = res.installed.length
+        showToast(n > 1 ? `«${hit.title}» и зависимости установлены (${n} файлов) в «${target.name}»` : `«${hit.title}» установлен в «${target.name}»`, 'success')
+      } else showToast(res.error || 'Не удалось установить', 'error')
+    } catch (e) {
+      showToast(`Ошибка: ${e instanceof Error ? e.message : String(e)}`, 'error')
+    } finally {
+      setBusyId(null)
     }
-    showToast(`«${hit.title}» добавляется в «${target.name}»`, 'success')
   }
 
   const fmt = (n: number) => n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(0)}K` : String(n)

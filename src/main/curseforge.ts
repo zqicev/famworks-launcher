@@ -34,6 +34,8 @@ export interface CfFile {
   fileLength: number
   hashes: { value: string; algo: number }[] // algo 1=sha1, 2=md5
   gameVersions: string[]
+  // relationType: 1=embedded, 2=optional, 3=required, 4=tool, 5=incompatible, 6=include
+  dependencies?: { modId: number; relationType: number }[]
 }
 
 export async function searchCurseforge(query: string, mcVersion: string, loader: string, type = 'mod'): Promise<CfHit[]> {

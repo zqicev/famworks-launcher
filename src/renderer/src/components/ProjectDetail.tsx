@@ -7,7 +7,6 @@ import styles from '../styles/ProjectDetail.module.css'
 type Source = 'modrinth' | 'curseforge'
 type CType = 'modpack' | 'mod' | 'resourcepack' | 'shader'
 interface TargetPack { id: string; name: string; mc_version: string; loader: string }
-const FOLDER: Record<Exclude<CType, 'modpack'>, string> = { mod: 'mods', resourcepack: 'resourcepacks', shader: 'shaderpacks' }
 
 type Detail = Awaited<ReturnType<typeof window.api.browser.project>>
 
@@ -76,22 +75,22 @@ export default function ProjectDetail({ source, type, id, target, installPath, o
     } catch { setBusy(false); setError('Ошибка загрузки версий') }
   }
 
-  const download = () => {
+  const download = async () => {
     if (!items || !target || type === 'modpack' || !data) return
-    const dir = `${installPath}/${target.id}/${FOLDER[type]}`
-    if (source === 'modrinth') {
-      const v = items.find(x => x.id === chosen) ?? items[0]
-      const file = (v.files ?? []).find((f: any) => f.primary) ?? v.files?.[0]
-      if (!file) { setError('У версии нет файла для скачивания'); return }
-      window.api.modrinth.download(file.url, file.filename, dir, file.hashes?.sha512)
-    } else {
-      const f = items.find(x => String(x.id) === chosen) ?? items[0]
-      if (!f?.downloadUrl) { setError('У файла нет прямой ссылки'); return }
-      const sha1 = (f.hashes ?? []).find((h: any) => h.algo === 1)?.value
-      window.api.curseforge.download(f.downloadUrl, f.fileName, dir, sha1)
+    const packRoot = `${installPath}/${target.id}`
+    setItems(null); setBusy(true)
+    showToast(`Установка «${data.title}»…`, 'info')
+    try {
+      const res = await window.api.browser.install(source, type, id, chosen, target.mc_version, target.loader, packRoot)
+      if (res.ok) {
+        const n = res.installed.length
+        showToast(n > 1 ? `«${data.title}» и зависимости установлены (${n} файлов)` : `«${data.title}» установлен в «${target.name}»`, 'success')
+      } else showToast(res.error || 'Не удалось установить', 'error')
+    } catch (e) {
+      showToast(`Ошибка: ${e instanceof Error ? e.message : String(e)}`, 'error')
+    } finally {
+      setBusy(false)
     }
-    setItems(null)
-    showToast(`«${data.title}» добавляется в «${target.name}»`, 'success')
   }
 
   const optLabel = (item: any, i: number) => source === 'modrinth'

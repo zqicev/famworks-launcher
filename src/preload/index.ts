@@ -100,7 +100,9 @@ contextBridge.exposeInMainWorld('api', {
   },
   browser: {
     installModpack: (source: string, id: string) => ipcRenderer.invoke('browser:install-modpack', source, id),
-    project: (source: string, id: string, type: string) => ipcRenderer.invoke('browser:project', source, id, type)
+    project: (source: string, id: string, type: string) => ipcRenderer.invoke('browser:project', source, id, type),
+    install: (source: string, type: string, projectId: string, refId: string, mc: string, loader: string, packRoot: string) =>
+      ipcRenderer.invoke('browser:install', source, type, projectId, refId, mc, loader, packRoot)
   },
   system: {
     totalMemoryMb: () => ipcRenderer.invoke('system:total-memory-mb')
