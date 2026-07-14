@@ -198,7 +198,7 @@ export default function ProjectDetail({ source, type, id, target, installPath, o
             )}
             {data.dependencies.length > 0 && (
               <div className={styles.sideBlock}>
-                <div className={styles.sideTitle}>Зависимости</div>
+                <div className={styles.sideTitle}>Зависит от</div>
                 {data.dependencies.map(d => (
                   <div key={d.slug} className={styles.dep}>
                     {d.icon && <img src={d.icon} alt="" />}<span>{d.name}</span>

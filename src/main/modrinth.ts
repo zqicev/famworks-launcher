@@ -68,11 +68,30 @@ export async function getModrinthMembers(id: string): Promise<string[]> {
   return (res.data as { user?: { username?: string } }[]).map(m => m.user?.username).filter((n): n is string => !!n)
 }
 
-/** Проекты-зависимости (для списка «Зависимости»). */
+/** Обязательные зависимости проекта — то, БЕЗ чего он не работает («от кого он зависит»).
+ *  Берём required-зависимости самой свежей версии и подтягиваем к ним названия/иконки. */
 export async function getModrinthDependencies(id: string): Promise<{ name: string; icon: string | null; slug: string }[]> {
-  const res = await axios.get(`${BASE}/project/${id}/dependencies`, { headers: HEADERS })
-  const projects = (res.data?.projects ?? []) as { title: string; icon_url: string | null; slug: string }[]
-  return projects.map(p => ({ name: p.title, icon: p.icon_url ?? null, slug: p.slug }))
+  const [depsRes, verRes] = await Promise.all([
+    axios.get(`${BASE}/project/${id}/dependencies`, { headers: HEADERS }),
+    axios.get(`${BASE}/project/${id}/version`, { headers: HEADERS })
+  ])
+  const projects = (depsRes.data?.projects ?? []) as { id: string; title: string; icon_url: string | null; slug: string }[]
+  const byId = new Map(projects.map(p => [p.id, p]))
+  const versions = ((verRes.data ?? []) as { date_published: string; dependencies?: { project_id?: string; dependency_type?: string }[] }[])
+    .slice()
+    .sort((a, b) => new Date(b.date_published).getTime() - new Date(a.date_published).getTime())
+
+  const required = (versions[0]?.dependencies ?? []).filter(d => d.dependency_type === 'required' && d.project_id)
+  const seen = new Set<string>()
+  const out: { name: string; icon: string | null; slug: string }[] = []
+  for (const d of required) {
+    const pid = d.project_id as string
+    if (seen.has(pid)) continue
+    seen.add(pid)
+    const p = byId.get(pid)
+    out.push({ name: p?.title ?? pid, icon: p?.icon_url ?? null, slug: p?.slug ?? '' })
+  }
+  return out
 }
 
 export interface ModrinthVersion {
