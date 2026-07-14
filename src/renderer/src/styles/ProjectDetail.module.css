@@ -134,20 +134,6 @@
 .installBtn:hover:not(:disabled) { background: var(--accent-dim); }
 .installBtn:disabled { opacity: 0.5; cursor: default; }
 
-.picker { display: flex; gap: 8px; align-items: center; }
-.select {
-  max-width: 220px;
-  background: var(--bg-active);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 9px 10px;
-  color: var(--text);
-  font-size: 12px;
-  cursor: pointer;
-}
-.select:focus { border-color: var(--accent); }
-.into { font-size: 11px; color: var(--text-dim); }
-
 .notice {
   font-size: 12px;
   color: var(--red);

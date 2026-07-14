@@ -97,18 +97,6 @@
 }
 .searchBtn:hover { background: var(--accent-dim); }
 
-.target {
-  max-width: 260px;
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 0 12px;
-  color: var(--text);
-  font-size: 13px;
-  cursor: pointer;
-}
-.target:focus { border-color: var(--accent); }
-
 .notice {
   margin-top: 12px;
   font-size: 12px;
@@ -209,21 +197,3 @@
 }
 .installBtn:hover:not(:disabled) { background: var(--accent-dim); }
 .installBtn:disabled { opacity: 0.5; cursor: default; }
-
-.picker {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-}
-
-.versionSelect {
-  max-width: 200px;
-  background: var(--bg-active);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  padding: 8px 10px;
-  color: var(--text);
-  font-size: 12px;
-  cursor: pointer;
-}
-.versionSelect:focus { border-color: var(--accent); }

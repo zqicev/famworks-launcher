@@ -14,6 +14,8 @@ interface Props {
   loading: boolean
   error: string | null
   devMode: boolean
+  selectedId: string | null
+  onOpenBrowser: (type: string) => void
 }
 
 function formatSize(mb: number) {
@@ -31,7 +33,7 @@ async function countDir(dir: string, ext: string): Promise<{ total: number; enab
   return { total, enabled }
 }
 
-export default function MainPanel({ modpack, installPath, loading, error, devMode }: Props) {
+export default function MainPanel({ modpack, installPath, loading, error, devMode, selectedId, onOpenBrowser }: Props) {
   const [tab, setTab] = useState<'mods' | 'resourcepacks' | 'shaders' | 'overview' | 'logs' | 'dev'>('overview')
   const [counts, setCounts] = useState({ modsTotal: 0, modsActive: 0, rp: 0, sh: 0 })
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -84,12 +86,17 @@ export default function MainPanel({ modpack, installPath, loading, error, devMod
   }
 
   if (!modpack) {
+    // Есть выбор, но данные ещё грузятся (особенно официальные сборки — тянутся из сети) — показываем спиннер
     return (
       <main className={styles.main}>
-        <div className={styles.center}><p className={styles.hint}>Выберите сборку</p></div>
+        <div className={styles.center}>
+          {selectedId ? <div className={styles.spinner} /> : <p className={styles.hint}>Выберите сборку</p>}
+        </div>
       </main>
     )
   }
+
+  const browseType = tab === 'resourcepacks' ? 'resourcepack' : tab === 'shaders' ? 'shader' : 'mod'
 
   const modsDir = `${installPath}/${modpack.id}/mods`
   const rpDir = `${installPath}/${modpack.id}/resourcepacks`
@@ -127,6 +134,13 @@ export default function MainPanel({ modpack, installPath, loading, error, devMod
             </button>
           )}
 
+          <button className={styles.browseBtn} onClick={() => onOpenBrowser(browseType)} title="Найти и установить контент">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
+            </svg>
+            ДОБАВИТЬ
+          </button>
+
           <div className={styles.stats}>
             <div className={styles.stat}>
               <span className={styles.statVal}>{formatSize(totalSizeMb)}</span>
@@ -138,8 +152,8 @@ export default function MainPanel({ modpack, installPath, loading, error, devMod
 
       <div className={styles.content} key={`${modpack.id}-${tab}`}>
         {tab === 'mods' && <ModsTab modpack={modpack} modsDir={modsDir} onCount={(total, active) => setCounts(c => ({ ...c, modsTotal: total, modsActive: active }))} />}
-        {tab === 'resourcepacks' && <PackTab modpack={modpack} dir={rpDir} items={modpack.resourcepacks ?? []} kind="resourcepack" noun="ресурспаков" onCount={n => setCounts(c => ({ ...c, rp: n }))} />}
-        {tab === 'shaders' && <PackTab modpack={modpack} dir={shDir} items={modpack.shaders ?? []} kind="shader" noun="шейдеров" onCount={n => setCounts(c => ({ ...c, sh: n }))} />}
+        {tab === 'resourcepacks' && <PackTab dir={rpDir} items={modpack.resourcepacks ?? []} noun="ресурспаков" onCount={n => setCounts(c => ({ ...c, rp: n }))} />}
+        {tab === 'shaders' && <PackTab dir={shDir} items={modpack.shaders ?? []} noun="шейдеров" onCount={n => setCounts(c => ({ ...c, sh: n }))} />}
         {tab === 'overview' && <OverviewTab modpack={modpack} busyId={busyId} />}
         {tab === 'logs' && <LogsTab modpackId={modpack.id} />}
         {tab === 'dev' && devMode && <DevTab modpackId={modpack.id} loader={modpack.loader} mcVersion={modpack.mc_version} />}

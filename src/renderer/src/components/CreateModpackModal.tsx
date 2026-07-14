@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Modpack } from '../../../types/modpack'
+import Dropdown from './Dropdown'
 import styles from '../styles/SettingsModal.module.css'
 
 interface Props {
@@ -105,13 +106,17 @@ export default function CreateModpackModal({ onCreate, onClose }: Props) {
               </div>
             </Field>
             <Field label="ЗАГРУЗЧИК">
-              <select className={styles.cinput} value={loader} onChange={e => setLoader(e.target.value as any)}>
-                <option value="fabric">Fabric</option>
-                <option value="quilt">Quilt</option>
-                <option value="forge">Forge</option>
-                <option value="neoforge">NeoForge</option>
-                <option value="vanilla">Без загрузчика (Vanilla)</option>
-              </select>
+              <Dropdown
+                value={loader}
+                onChange={v => setLoader(v as typeof loader)}
+                options={[
+                  { value: 'fabric', label: 'Fabric' },
+                  { value: 'quilt', label: 'Quilt' },
+                  { value: 'forge', label: 'Forge' },
+                  { value: 'neoforge', label: 'NeoForge' },
+                  { value: 'vanilla', label: 'Без загрузчика (Vanilla)' }
+                ]}
+              />
             </Field>
           </div>
           {needsLoaderVer && (

@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { Modpack, Mod } from '../../../types/modpack'
 import ModRow from './ModRow'
-import AddModModal from './AddModModal'
 import styles from '../styles/ModsTab.module.css'
 
 interface Props {
@@ -18,7 +17,6 @@ interface LocalMod extends Mod {
 export default function ModsTab({ modpack, modsDir, onCount }: Props) {
   const [search, setSearch] = useState('')
   const [disabled, setDisabled] = useState<Set<string>>(new Set())
-  const [addOpen, setAddOpen] = useState(false)
   const [extraMods, setExtraMods] = useState<LocalMod[]>([])
   const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set())
   const [presentBases, setPresentBases] = useState<Set<string> | null>(null)
@@ -119,11 +117,6 @@ export default function ModsTab({ modpack, modsDir, onCount }: Props) {
     setExtraMods(prev => prev.filter(m => m.id !== mod.id))
   }
 
-  const handleAddClose = () => {
-    setAddOpen(false)
-    setTimeout(scanMods, 600)
-  }
-
   const handleDrop = useCallback(async (e: React.DragEvent) => {
     e.preventDefault()
     setDragging(false)
@@ -157,9 +150,6 @@ export default function ModsTab({ modpack, modsDir, onCount }: Props) {
         <span className={styles.activeCount}>
           {enabledCount} / {allMods.length} активны
         </span>
-        <button className={styles.addBtn} onClick={() => setAddOpen(true)}>
-          + ДОБАВИТЬ МОД
-        </button>
         <button className={styles.folderBtn} onClick={openFolder} title="Открыть папку модов">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <path d="M4 5h5l2 2h9a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" />
@@ -179,14 +169,6 @@ export default function ModsTab({ modpack, modsDir, onCount }: Props) {
           />
         ))}
       </div>
-
-      {addOpen && (
-        <AddModModal
-          modpack={modpack}
-          modsDir={modsDir}
-          onClose={handleAddClose}
-        />
-      )}
     </div>
   )
 }

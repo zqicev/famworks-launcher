@@ -31,6 +31,14 @@ export default function App() {
   const [devMode, setDevMode] = useState(false)
   const [crash, setCrash] = useState<CrashData | null>(null)
   const [view, setView] = useState<'modpack' | 'browser'>('modpack')
+  const [browserKey, setBrowserKey] = useState(0) // remount браузера при каждом открытии — свежее состояние/контекст
+  const [browserInit, setBrowserInit] = useState<{ type: string; packId: string | null }>({ type: 'modpack', packId: null })
+
+  const openBrowser = useCallback((type: string, packId: string | null) => {
+    setBrowserInit({ type, packId })
+    setBrowserKey(k => k + 1)
+    setView('browser')
+  }, [])
 
   const showToast = useCallback((text: string, kind: 'info' | 'success' | 'error') => {
     if (toastTimer.current) clearTimeout(toastTimer.current)
@@ -99,9 +107,11 @@ export default function App() {
   }, [])
 
   useEffect(() => {
-    if (!selectedId) return
+    if (!selectedId) { setModpack(null); return }
+    let active = true // защита от гонки: медленная загрузка старой сборки не перезапишет новую
     setModpack(null)
     window.api.modpacks.get(selectedId).then(mp => {
+      if (!active) return
       setModpack(mp)
       // Обновляем seen после открытия сборки
       window.api.store.get('seenUpdates').then(stored => {
@@ -110,7 +120,8 @@ export default function App() {
         window.api.store.set('seenUpdates', next)
         setSeenUpdates(next)
       })
-    }).catch(() => setError('Не удалось загрузить сборку.'))
+    }).catch(() => { if (active) setError('Не удалось загрузить сборку.') })
+    return () => { active = false }
   }, [selectedId])
 
   const handleSetupComplete = async (path: string) => {
@@ -200,23 +211,31 @@ export default function App() {
             onImport={handleImport}
             onExportCustom={handleExportCustom}
             browserActive={view === 'browser'}
-            onOpenBrowser={() => setView('browser')}
+            onOpenBrowser={() => openBrowser('modpack', null)}
           />
-          {view === 'browser' ? (
-            <BrowserView
-              installPath={installPath}
-              packs={[...(modpackIndex?.modpacks ?? []), ...customPacks].map(p => ({ id: p.id, name: p.name, mc_version: p.mc_version, loader: p.loader }))}
-              defaultTargetId={selectedId}
-              onImported={(mp) => { loadCustom(); setSelectedId(mp.id); setView('modpack') }}
-              showToast={showToast}
-            />
-          ) : (
+          {view === 'browser' ? (() => {
+            const allPacks = [...(modpackIndex?.modpacks ?? []), ...customPacks].map(p => ({ id: p.id, name: p.name, mc_version: p.mc_version, loader: p.loader }))
+            const ctx = browserInit.packId ? allPacks.find(p => p.id === browserInit.packId) ?? null : null
+            return (
+              <BrowserView
+                key={browserKey}
+                installPath={installPath}
+                packs={allPacks}
+                contextPack={ctx}
+                initialType={browserInit.type as 'modpack' | 'mod' | 'resourcepack' | 'shader'}
+                onImported={(mp) => { loadCustom(); setSelectedId(mp.id); setView('modpack') }}
+                showToast={showToast}
+              />
+            )
+          })() : (
             <MainPanel
               modpack={modpack}
               installPath={installPath}
               loading={loading}
               error={error}
               devMode={devMode}
+              selectedId={selectedId}
+              onOpenBrowser={(type) => openBrowser(type, selectedId)}
             />
           )}
           {settingsOpen && (

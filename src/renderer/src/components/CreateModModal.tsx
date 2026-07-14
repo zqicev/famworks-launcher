@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import Dropdown from './Dropdown'
 import styles from '../styles/SettingsModal.module.css'
 
 interface Props {
@@ -56,10 +57,14 @@ export default function CreateModModal({ defaultLoader, defaultMc, onClose, onCr
           </Field>
           <div style={{ display: 'flex', gap: 10 }}>
             <Field label="ЗАГРУЗЧИК">
-              <select className={styles.cinput} value={loader} onChange={e => setLoader(e.target.value)}>
-                <option value="fabric">Fabric</option>
-                <option value="neoforge">NeoForge</option>
-              </select>
+              <Dropdown
+                value={loader}
+                onChange={setLoader}
+                options={[
+                  { value: 'fabric', label: 'Fabric' },
+                  { value: 'neoforge', label: 'NeoForge' }
+                ]}
+              />
             </Field>
             <Field label="ВЕРСИЯ MC">
               <input className={styles.cinput} value={mc} onChange={e => setMc(e.target.value)} placeholder="1.21.1" />

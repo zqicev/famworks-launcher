@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Modpack } from '../../../types/modpack'
+import InstallModal from './InstallModal'
 import styles from '../styles/ProjectDetail.module.css'
 
 type Source = 'modrinth' | 'curseforge'
@@ -14,7 +15,8 @@ interface Props {
   source: Source
   type: CType
   id: string
-  target: TargetPack | null
+  packs: TargetPack[]
+  preferredPackId: string | null
   installPath: string
   onBack: () => void
   onImported: (mp: Modpack) => void
@@ -23,19 +25,17 @@ interface Props {
 
 function fmt(n: number) { return n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(0)}K` : String(n) }
 
-export default function ProjectDetail({ source, type, id, target, installPath, onBack, onImported, showToast }: Props) {
+export default function ProjectDetail({ source, type, id, packs, preferredPackId, installPath, onBack, onImported, showToast }: Props) {
   const [data, setData] = useState<Detail | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const [items, setItems] = useState<any[] | null>(null) // версии (Modrinth) или файлы (CF) для выбора
-  const [chosen, setChosen] = useState('')
   const [busy, setBusy] = useState(false)
+  const [installOpen, setInstallOpen] = useState(false)
   const [lightbox, setLightbox] = useState<string | null>(null)
 
   useEffect(() => {
     let active = true
-    setLoading(true); setError(''); setData(null); setItems(null)
+    setLoading(true); setError(''); setData(null)
     window.api.browser.project(source, id, type)
       .then(d => { if (active) setData(d) })
       .catch(() => { if (active) setError('Не удалось загрузить страницу проекта') })
@@ -57,46 +57,11 @@ export default function ProjectDetail({ source, type, id, target, installPath, o
     finally { setBusy(false) }
   }
 
-  const loadVersions = async () => {
-    if (!target) { setError('Сначала выберите сборку для установки (в списке Браузера)'); return }
-    setBusy(true); setError('')
-    try {
-      if (source === 'modrinth') {
-        const vs = await window.api.modrinth.versions(id, target.mc_version, target.loader, type) as any[]
-        setBusy(false)
-        if (!vs.length) { setError(`Нет версий под ${target.loader} ${target.mc_version}`); return }
-        setItems(vs); setChosen(vs[0].id)
-      } else {
-        const fs = (await window.api.curseforge.files(Number(id), target.mc_version, target.loader, type) as any[]).filter(f => f.downloadUrl)
-        setBusy(false)
-        if (!fs.length) { setError(`Нет файлов под ${target.loader} ${target.mc_version} (возможно, автор закрыл стороннюю раздачу)`); return }
-        setItems(fs); setChosen(String(fs[0].id))
-      }
-    } catch { setBusy(false); setError('Ошибка загрузки версий') }
+  const onInstallClick = () => {
+    if (type === 'modpack') { installModpack(); return }
+    if (packs.length === 0) { setError('Сначала создайте или установите сборку — тогда будет куда ставить'); return }
+    setInstallOpen(true)
   }
-
-  const download = async () => {
-    if (!items || !target || type === 'modpack' || !data) return
-    const packRoot = `${installPath}/${target.id}`
-    setItems(null); setBusy(true)
-    showToast(`Установка «${data.title}»…`, 'info')
-    try {
-      const res = await window.api.browser.install(source, type, id, chosen, target.mc_version, target.loader, packRoot)
-      if (res.ok) {
-        const n = res.installed.length
-        showToast(n > 1 ? `«${data.title}» и зависимости установлены (${n} файлов)` : `«${data.title}» установлен в «${target.name}»`, 'success')
-      } else showToast(res.error || 'Не удалось установить', 'error')
-    } catch (e) {
-      showToast(`Ошибка: ${e instanceof Error ? e.message : String(e)}`, 'error')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const optLabel = (item: any, i: number) => source === 'modrinth'
-    ? `${item.version_number}${i === 0 ? ' (последняя)' : ''}`
-    : `${item.displayName || item.fileName}${i === 0 ? ' (последняя)' : ''}`
-  const optValue = (item: any) => source === 'modrinth' ? item.id : String(item.id)
 
   const backBtn = <button className={styles.back} onClick={onBack}>← Назад к списку</button>
 
@@ -131,25 +96,13 @@ export default function ProjectDetail({ source, type, id, target, installPath, o
             )}
           </div>
           <div className={styles.actions}>
-            {type === 'modpack' ? (
-              <button className={styles.installBtn} disabled={busy} onClick={installModpack}>
-                {busy ? '…' : source === 'curseforge' ? 'На CurseForge ↗' : 'Установить'}
-              </button>
-            ) : items ? (
-              <div className={styles.picker}>
-                <select className={styles.select} value={chosen} onChange={e => setChosen(e.target.value)}>
-                  {items.map((it, i) => <option key={optValue(it)} value={optValue(it)}>{optLabel(it, i)}</option>)}
-                </select>
-                <button className={styles.installBtn} onClick={download}>Скачать</button>
-              </div>
-            ) : (
-              <button className={styles.installBtn} disabled={busy} onClick={loadVersions}>{busy ? '…' : 'Установить'}</button>
-            )}
-            {target && type !== 'modpack' && <div className={styles.into}>в «{target.name}»</div>}
+            <button className={styles.installBtn} disabled={busy} onClick={onInstallClick}>
+              {busy ? '…' : type === 'modpack' && source === 'curseforge' ? 'На CurseForge ↗' : 'Установить'}
+            </button>
           </div>
         </div>
 
-        {error && <div className={styles.notice}>{error}</div>}
+        {error && data && <div className={styles.notice}>{error}</div>}
 
         {data.links.length > 0 && (
           <div className={styles.links}>
@@ -227,6 +180,20 @@ export default function ProjectDetail({ source, type, id, target, installPath, o
         <div className={styles.lightbox} onClick={() => setLightbox(null)}>
           <img src={lightbox} alt="" />
         </div>
+      )}
+
+      {installOpen && type !== 'modpack' && (
+        <InstallModal
+          source={source}
+          type={type}
+          projectId={id}
+          title={data.title}
+          packs={packs}
+          installPath={installPath}
+          preferredPackId={preferredPackId}
+          onClose={() => setInstallOpen(false)}
+          showToast={showToast}
+        />
       )}
     </main>
   )
