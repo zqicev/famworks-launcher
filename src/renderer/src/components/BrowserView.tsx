@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Modpack } from '../../../types/modpack'
+import ProjectDetail from './ProjectDetail'
 import styles from '../styles/BrowserView.module.css'
 
 type Source = 'modrinth' | 'curseforge'
@@ -52,6 +53,7 @@ export default function BrowserView({ installPath, packs, defaultTargetId, onImp
   const [picker, setPicker] = useState<{ id: string; items: any[] } | null>(null)
   const [chosen, setChosen] = useState('')
   const [busyId, setBusyId] = useState<string | null>(null)
+  const [detailId, setDetailId] = useState<string | null>(null) // открыта страница обзора этого проекта
   const reqRef = useRef(0) // токен запроса — отбрасываем устаревшие ответы при быстром переключении
 
   const target = packs.find(p => p.id === targetId) ?? null
@@ -157,6 +159,21 @@ export default function BrowserView({ installPath, packs, defaultTargetId, onImp
     : `${item.displayName || item.fileName}${i === 0 ? ' (последняя)' : ''}`
   const optValue = (item: any) => source === 'modrinth' ? item.id : String(item.id)
 
+  if (detailId) {
+    return (
+      <ProjectDetail
+        source={source}
+        type={type}
+        id={detailId}
+        target={target}
+        installPath={installPath}
+        onBack={() => setDetailId(null)}
+        onImported={onImported}
+        showToast={showToast}
+      />
+    )
+  }
+
   return (
     <main className={styles.main}>
       <div className={styles.header}>
@@ -194,14 +211,14 @@ export default function BrowserView({ installPath, packs, defaultTargetId, onImp
         {loading && <div className={styles.hint}>Загрузка…</div>}
         {!loading && results.length === 0 && <div className={styles.hint}>Ничего не найдено</div>}
         {results.map(r => (
-          <div key={r.id} className={styles.card}>
+          <div key={r.id} className={styles.card} onClick={() => setDetailId(r.id)} title="Открыть страницу">
             <div className={styles.icon}><Icon src={r.icon} title={r.title} /></div>
             <div className={styles.cardInfo}>
               <div className={styles.cardName}>{r.title}</div>
               <div className={styles.cardMeta}>{r.author && `${r.author} · `}{fmt(r.downloads)} загрузок</div>
               <div className={styles.cardDesc}>{r.description}</div>
             </div>
-            <div className={styles.actions}>
+            <div className={styles.actions} onClick={e => e.stopPropagation()}>
               {type === 'modpack' ? (
                 <button className={styles.installBtn} disabled={busyId === r.id} onClick={() => installModpack(r)}>
                   {busyId === r.id ? '…' : source === 'curseforge' ? 'На CurseForge ↗' : 'Установить'}

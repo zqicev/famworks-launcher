@@ -60,3 +60,23 @@ export async function getCurseforgeFiles(modId: number, mcVersion: string, loade
 export function cfSha1(file: CfFile): string | undefined {
   return file.hashes.find(h => h.algo === 1)?.value
 }
+
+export interface CfMod {
+  id: number
+  name: string
+  slug: string
+  summary: string
+  downloadCount: number
+  authors: { name: string; url?: string }[]
+  categories: { name: string }[]
+  logo?: { thumbnailUrl?: string; url?: string }
+  screenshots?: { thumbnailUrl?: string; url?: string; title?: string }[]
+  links?: { websiteUrl?: string; wikiUrl?: string; issuesUrl?: string; sourceUrl?: string }
+  latestFilesIndexes?: { gameVersion: string }[]
+}
+
+// Детали проекта (для страницы обзора). Полное описание (/description) прокси не отдаёт — только summary.
+export async function getCurseforgeMod(id: number): Promise<CfMod> {
+  const res = await axios.get(`${PROXY}/v1/mods/${id}`, { headers: headers(), timeout: 15000 })
+  return res.data.data
+}

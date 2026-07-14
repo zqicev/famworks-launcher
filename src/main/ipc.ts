@@ -344,6 +344,48 @@ export function setupIpcHandlers() {
     return true
   })
 
+  // Браузер: страница обзора проекта (описание, галерея, зависимости, авторы, лицензия).
+  ipcMain.handle('browser:project', async (_, source: string, id: string, type: string) => {
+    if (source === 'modrinth') {
+      const { getModrinthProject, getModrinthMembers, getModrinthDependencies } = await import('./modrinth')
+      const [p, authors, dependencies] = await Promise.all([
+        getModrinthProject(id),
+        getModrinthMembers(id).catch(() => [] as string[]),
+        getModrinthDependencies(id).catch(() => [] as { name: string; icon: string | null; slug: string }[])
+      ])
+      const links: { label: string; url: string }[] = []
+      if (p.source_url) links.push({ label: 'Исходники', url: p.source_url })
+      if (p.issues_url) links.push({ label: 'Баги', url: p.issues_url })
+      if (p.wiki_url) links.push({ label: 'Wiki', url: p.wiki_url })
+      if (p.discord_url) links.push({ label: 'Discord', url: p.discord_url })
+      return {
+        source: 'modrinth', id: p.id, title: p.title, description: p.description, body: p.body || '',
+        icon: p.icon_url ?? null, authors, downloads: p.downloads, followers: p.followers,
+        categories: p.categories ?? [], gallery: (p.gallery ?? []).map(g => ({ url: g.url, title: g.title })),
+        license: p.license ? { name: p.license.name || p.license.id, url: p.license.url } : null,
+        links, gameVersions: p.game_versions ?? [], loaders: p.loaders ?? [],
+        clientSide: p.client_side, serverSide: p.server_side, dependencies,
+        webUrl: `https://modrinth.com/${type}/${p.slug}`
+      }
+    }
+    const { getCurseforgeMod } = await import('./curseforge')
+    const m = await getCurseforgeMod(Number(id))
+    const links: { label: string; url: string }[] = []
+    if (m.links?.sourceUrl) links.push({ label: 'Исходники', url: m.links.sourceUrl })
+    if (m.links?.issuesUrl) links.push({ label: 'Баги', url: m.links.issuesUrl })
+    if (m.links?.wikiUrl) links.push({ label: 'Wiki', url: m.links.wikiUrl })
+    return {
+      source: 'curseforge', id: String(m.id), title: m.name, description: m.summary, body: '',
+      icon: m.logo?.thumbnailUrl ?? m.logo?.url ?? null, authors: (m.authors ?? []).map(a => a.name),
+      downloads: m.downloadCount, categories: (m.categories ?? []).map(c => c.name),
+      gallery: (m.screenshots ?? []).map(s => ({ url: s.url || s.thumbnailUrl || '', title: s.title })).filter(g => g.url),
+      license: null, links,
+      gameVersions: [...new Set((m.latestFilesIndexes ?? []).map(f => f.gameVersion))],
+      loaders: [], clientSide: '', serverSide: '', dependencies: [],
+      webUrl: m.links?.websiteUrl ?? `https://www.curseforge.com/minecraft/${m.slug}`
+    }
+  })
+
   // Браузер: установка сборки. Modrinth импортируем через .mrpack; CF заблокирован прокси - открываем сайт.
   ipcMain.handle('browser:install-modpack', async (_, source: string, id: string) => {
     if (source !== 'modrinth') {

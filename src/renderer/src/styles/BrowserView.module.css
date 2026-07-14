@@ -145,6 +145,7 @@
   background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: 12px;
+  cursor: pointer;
   transition: border-color 0.15s, transform 0.12s;
 }
 .card:hover { border-color: #383838; transform: translateY(-1px); }

@@ -83,6 +83,27 @@ interface Window {
     }
     browser: {
       installModpack: (source: string, id: string) => Promise<{ ok?: boolean; modpack?: import('../../types/modpack').Modpack; error?: string; cancelled?: boolean }>
+      project: (source: string, id: string, type: string) => Promise<{
+        source: 'modrinth' | 'curseforge'
+        id: string
+        title: string
+        description: string
+        body: string
+        icon: string | null
+        authors: string[]
+        downloads: number
+        followers?: number
+        categories: string[]
+        gallery: { url: string; title?: string }[]
+        license: { name: string; url: string | null } | null
+        links: { label: string; url: string }[]
+        gameVersions: string[]
+        loaders: string[]
+        clientSide?: string
+        serverSide?: string
+        dependencies: { name: string; icon: string | null; slug: string }[]
+        webUrl: string
+      }>
     }
     system: {
       totalMemoryMb: () => Promise<number>

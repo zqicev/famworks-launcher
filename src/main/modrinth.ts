@@ -35,6 +35,46 @@ export async function searchModrinth(
   return res.data.hits
 }
 
+export interface ModrinthProject {
+  id: string
+  slug: string
+  title: string
+  description: string
+  body: string
+  icon_url: string | null
+  downloads: number
+  followers: number
+  categories: string[]
+  game_versions: string[]
+  loaders: string[]
+  client_side: string
+  server_side: string
+  source_url?: string | null
+  issues_url?: string | null
+  wiki_url?: string | null
+  discord_url?: string | null
+  license?: { id: string; name: string; url: string | null } | null
+  gallery: { url: string; title?: string; description?: string; featured?: boolean }[]
+}
+
+export async function getModrinthProject(id: string): Promise<ModrinthProject> {
+  const res = await axios.get(`${BASE}/project/${id}`, { headers: HEADERS })
+  return res.data
+}
+
+/** Авторы проекта (ники участников команды). */
+export async function getModrinthMembers(id: string): Promise<string[]> {
+  const res = await axios.get(`${BASE}/project/${id}/members`, { headers: HEADERS })
+  return (res.data as { user?: { username?: string } }[]).map(m => m.user?.username).filter((n): n is string => !!n)
+}
+
+/** Проекты-зависимости (для списка «Зависимости»). */
+export async function getModrinthDependencies(id: string): Promise<{ name: string; icon: string | null; slug: string }[]> {
+  const res = await axios.get(`${BASE}/project/${id}/dependencies`, { headers: HEADERS })
+  const projects = (res.data?.projects ?? []) as { title: string; icon_url: string | null; slug: string }[]
+  return projects.map(p => ({ name: p.title, icon: p.icon_url ?? null, slug: p.slug }))
+}
+
 export interface ModrinthVersion {
   id: string
   name: string
