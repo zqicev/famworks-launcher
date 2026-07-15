@@ -110,6 +110,7 @@ export default function App() {
     if (!selectedId) { setModpack(null); return }
     let active = true // защита от гонки: медленная загрузка старой сборки не перезапишет новую
     setModpack(null)
+    setError(null) // сбрасываем возможную ошибку индекса — она не относится к выбранной сборке
     window.api.modpacks.get(selectedId).then(mp => {
       if (!active) return
       setModpack(mp)

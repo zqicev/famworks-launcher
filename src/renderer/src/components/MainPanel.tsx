@@ -65,28 +65,17 @@ export default function MainPanel({ modpack, installPath, loading, error, devMod
     return off
   }, [mpId, refreshCounts])
 
-  if (loading) {
-    return (
-      <main className={styles.main}>
-        <div className={styles.center}><div className={styles.spinner} /></div>
-      </main>
-    )
-  }
-
-  if (error) {
-    return (
-      <main className={styles.main}>
-        <div className={styles.center}><p className={styles.error}>{error}</p></div>
-      </main>
-    )
-  }
-
+  // Если сборка уже загружена — показываем её сразу. Локальные берутся из store мгновенно и
+  // НЕ должны ждать глобальную загрузку индекса официальных сборок из сети.
   if (!modpack) {
-    // Есть выбор, но данные ещё грузятся (особенно официальные сборки — тянутся из сети) — показываем спиннер
     return (
       <main className={styles.main}>
         <div className={styles.center}>
-          {selectedId ? <div className={styles.spinner} /> : <p className={styles.hint}>Выберите сборку</p>}
+          {error
+            ? <p className={styles.error}>{error}</p>
+            : (loading || selectedId)
+              ? <div className={styles.spinner} />
+              : <p className={styles.hint}>Выберите сборку</p>}
         </div>
       </main>
     )
