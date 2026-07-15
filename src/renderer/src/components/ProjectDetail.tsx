@@ -25,6 +25,16 @@ interface Props {
 
 function fmt(n: number) { return n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(0)}K` : String(n) }
 
+// Человеческое описание стороны вместо required/unsupported
+function sideLabel(client?: string, server?: string): string | null {
+  const c = client === 'required' || client === 'optional'
+  const s = server === 'required' || server === 'optional'
+  if (c && s) return 'Клиент и сервер'
+  if (c) return 'Клиентский мод'
+  if (s) return 'Серверный мод'
+  return null
+}
+
 export default function ProjectDetail({ source, type, id, packs, preferredPackId, installPath, onBack, onImported, showToast }: Props) {
   const [data, setData] = useState<Detail | null>(null)
   const [loading, setLoading] = useState(true)
@@ -166,10 +176,10 @@ export default function ProjectDetail({ source, type, id, packs, preferredPackId
                   : <div className={styles.sideRow}>{data.license.name}</div>}
               </div>
             )}
-            {(data.clientSide || data.serverSide) && (
+            {sideLabel(data.clientSide, data.serverSide) && (
               <div className={styles.sideBlock}>
-                <div className={styles.sideTitle}>Сторона</div>
-                <div className={styles.sideDim}>Клиент: {data.clientSide || '—'} · Сервер: {data.serverSide || '—'}</div>
+                <div className={styles.sideTitle}>Где нужен</div>
+                <div className={styles.sideRow}>{sideLabel(data.clientSide, data.serverSide)}</div>
               </div>
             )}
           </aside>
