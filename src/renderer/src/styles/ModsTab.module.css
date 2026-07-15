@@ -41,20 +41,6 @@
   white-space: nowrap;
 }
 
-.addBtn {
-  padding: 9px 16px;
-  background: var(--accent);
-  color: #0a0a0a;
-  border-radius: 8px;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  white-space: nowrap;
-  transition: background 0.15s;
-}
-
-.addBtn:hover { background: var(--accent-dim); }
-
 .list { display: flex; flex-direction: column; gap: 4px; }
 
 .dragging {

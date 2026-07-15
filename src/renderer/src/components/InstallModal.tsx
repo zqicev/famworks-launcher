@@ -1,14 +1,11 @@
 import { useState, useEffect } from 'react'
 import Dropdown from './Dropdown'
+import { Source, InstallableType, TargetPack } from '../lib/browser'
 import styles from '../styles/InstallModal.module.css'
-
-type Source = 'modrinth' | 'curseforge'
-type CType = 'mod' | 'resourcepack' | 'shader'
-interface TargetPack { id: string; name: string; mc_version: string; loader: string }
 
 interface Props {
   source: Source
-  type: CType
+  type: InstallableType
   projectId: string
   title: string
   packs: TargetPack[]

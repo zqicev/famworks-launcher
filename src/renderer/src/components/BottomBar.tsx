@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Modpack } from '../../../types/modpack'
 import MemorySelect from './MemorySelect'
+import { formatBytes, formatSpeed } from '../lib/format'
 import styles from '../styles/BottomBar.module.css'
 
 // Базовые варианты ОЗУ (МБ); реальные опции фильтруются по объёму системы
@@ -26,19 +27,6 @@ interface ProgressState {
 
 const EMPTY_PROGRESS: ProgressState = {
   message: '', countCurrent: 0, countTotal: 0, bytesDownloaded: 0, bytesTotal: 0, speedBps: 0
-}
-
-function formatBytes(b: number) {
-  if (b < 1024) return `${b} Б`
-  if (b < 1024 * 1024) return `${(b / 1024).toFixed(0)} КБ`
-  if (b < 1024 * 1024 * 1024) return `${(b / 1024 / 1024).toFixed(1)} МБ`
-  return `${(b / 1024 / 1024 / 1024).toFixed(2)} ГБ`
-}
-
-function formatSpeed(bps: number) {
-  if (bps < 1024) return `${bps.toFixed(0)} Б/с`
-  if (bps < 1024 * 1024) return `${(bps / 1024).toFixed(0)} КБ/с`
-  return `${(bps / 1024 / 1024).toFixed(1)} МБ/с`
 }
 
 export default function BottomBar({ modpack, installPath, activeMods = 0, totalMods = 0 }: Props) {

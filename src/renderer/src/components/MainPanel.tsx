@@ -6,6 +6,7 @@ import OverviewTab from './OverviewTab'
 import LogsTab from './LogsTab'
 import DevTab from './DevTab'
 import BottomBar from './BottomBar'
+import { formatSizeMb } from '../lib/format'
 import styles from '../styles/MainPanel.module.css'
 
 interface Props {
@@ -16,11 +17,6 @@ interface Props {
   devMode: boolean
   selectedId: string | null
   onOpenBrowser: (type: string) => void
-}
-
-function formatSize(mb: number) {
-  if (mb >= 1024) return `${(mb / 1024).toFixed(1)} ГБ`
-  return `${mb.toFixed(0)} МБ`
 }
 
 async function countDir(dir: string, ext: string): Promise<{ total: number; enabled: number }> {
@@ -143,7 +139,7 @@ export default function MainPanel({ modpack, installPath, loading, error, devMod
 
           <div className={styles.stats}>
             <div className={styles.stat}>
-              <span className={styles.statVal}>{formatSize(totalSizeMb)}</span>
+              <span className={styles.statVal}>{formatSizeMb(totalSizeMb)}</span>
               <span className={styles.statLabel}>РАЗМЕР</span>
             </div>
           </div>

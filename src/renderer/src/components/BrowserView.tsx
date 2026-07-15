@@ -2,17 +2,15 @@ import { useState, useEffect, useRef } from 'react'
 import { Modpack } from '../../../types/modpack'
 import ProjectDetail from './ProjectDetail'
 import InstallModal from './InstallModal'
+import { formatCount } from '../lib/format'
+import { Source, ContentType, TargetPack } from '../lib/browser'
 import styles from '../styles/BrowserView.module.css'
-
-type Source = 'modrinth' | 'curseforge'
-type CType = 'modpack' | 'mod' | 'resourcepack' | 'shader'
-interface TargetPack { id: string; name: string; mc_version: string; loader: string }
 
 interface Props {
   installPath: string
   packs: TargetPack[]
   contextPack: TargetPack | null // если браузер открыт из сборки — фильтруем по её версии/загрузчику
-  initialType: CType
+  initialType: ContentType
   onImported: (mp: Modpack) => void
   showToast: (text: string, kind: 'info' | 'success' | 'error') => void
 }
@@ -27,7 +25,7 @@ interface Hit {
   url: string
 }
 
-const TYPES: { key: CType; label: string }[] = [
+const TYPES: { key: ContentType; label: string }[] = [
   { key: 'modpack', label: 'Сборки' },
   { key: 'mod', label: 'Моды' },
   { key: 'resourcepack', label: 'Ресурспаки' },
@@ -42,7 +40,7 @@ function Icon({ src, title }: { src: string | null; title: string }) {
 
 export default function BrowserView({ installPath, packs, contextPack, initialType, onImported, showToast }: Props) {
   const [source, setSource] = useState<Source>('modrinth')
-  const [type, setType] = useState<CType>(initialType)
+  const [type, setType] = useState<ContentType>(initialType)
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<Hit[]>([])
   const [loading, setLoading] = useState(false)
@@ -112,8 +110,6 @@ export default function BrowserView({ installPath, packs, contextPack, initialTy
     setInstallItem({ id: hit.id, title: hit.title })
   }
 
-  const fmt = (n: number) => n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(0)}K` : String(n)
-
   if (detailId) {
     return (
       <ProjectDetail
@@ -169,7 +165,7 @@ export default function BrowserView({ installPath, packs, contextPack, initialTy
             <div className={styles.icon}><Icon src={r.icon} title={r.title} /></div>
             <div className={styles.cardInfo}>
               <div className={styles.cardName}>{r.title}</div>
-              <div className={styles.cardMeta}>{r.author && `${r.author} · `}{fmt(r.downloads)} загрузок</div>
+              <div className={styles.cardMeta}>{r.author && `${r.author} · `}{formatCount(r.downloads)} загрузок</div>
               <div className={styles.cardDesc}>{r.description}</div>
             </div>
             <div className={styles.actions} onClick={e => e.stopPropagation()}>

@@ -101,17 +101,6 @@
   color: var(--text);
 }
 
-.select {
-  background: none;
-  border: none;
-  color: var(--text);
-  font-size: 14px;
-  font-weight: 600;
-  font-family: var(--font-ui);
-  cursor: pointer;
-  padding: 0;
-}
-
 .divider {
   width: 1px;
   height: 28px;

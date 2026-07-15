@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Modpack } from '../../../types/modpack'
+import { formatSizeMb } from '../lib/format'
 import styles from '../styles/OverviewTab.module.css'
 
 interface Props { modpack: Modpack; busyId: string | null }
@@ -11,8 +12,7 @@ type PingResult = { online: number; max: number; favicon: string | null; ping: n
 type PingState = { loading: boolean; data: PingResult }
 
 export default function OverviewTab({ modpack, busyId }: Props) {
-  const totalMB = modpack.mods.reduce((s, m) => s + m.size_mb, 0)
-  const sizeFmt = totalMB >= 1000 ? `${(totalMB / 1024).toFixed(1)} ГБ` : `${totalMB.toFixed(0)} МБ`
+  const sizeFmt = formatSizeMb(modpack.mods.reduce((s, m) => s + m.size_mb, 0))
 
   const [entries, setEntries] = useState<Entry[]>([])
   const [pings, setPings] = useState<Record<string, PingState>>({})

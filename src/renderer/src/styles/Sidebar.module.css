@@ -146,7 +146,6 @@
 
 .dotActive { background: var(--accent); }
 
-.spacer { flex: 1; }
 
 .scroll { flex: 1; overflow-y: auto; display: flex; flex-direction: column; }
 .scroll .section + .section { margin-top: 8px; }

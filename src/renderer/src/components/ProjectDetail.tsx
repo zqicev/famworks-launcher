@@ -5,17 +5,15 @@ import rehypeRaw from 'rehype-raw'
 import rehypeSanitize from 'rehype-sanitize'
 import { Modpack } from '../../../types/modpack'
 import InstallModal from './InstallModal'
+import { formatCount } from '../lib/format'
+import { Source, ContentType, TargetPack } from '../lib/browser'
 import styles from '../styles/ProjectDetail.module.css'
-
-type Source = 'modrinth' | 'curseforge'
-type CType = 'modpack' | 'mod' | 'resourcepack' | 'shader'
-interface TargetPack { id: string; name: string; mc_version: string; loader: string }
 
 type Detail = Awaited<ReturnType<typeof window.api.browser.project>>
 
 interface Props {
   source: Source
-  type: CType
+  type: ContentType
   id: string
   packs: TargetPack[]
   preferredPackId: string | null
@@ -24,8 +22,6 @@ interface Props {
   onImported: (mp: Modpack) => void
   showToast: (text: string, kind: 'info' | 'success' | 'error') => void
 }
-
-function fmt(n: number) { return n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1e3 ? `${(n / 1e3).toFixed(0)}K` : String(n) }
 
 // Человеческое описание стороны вместо required/unsupported
 function sideLabel(client?: string, server?: string): string | null {
@@ -99,8 +95,8 @@ export default function ProjectDetail({ source, type, id, packs, preferredPackId
             <h1 className={styles.title}>{data.title}</h1>
             <div className={styles.meta}>
               {data.authors.length > 0 && <span>{data.authors.join(', ')}</span>}
-              <span className={styles.dl}>{fmt(data.downloads)} загрузок</span>
-              {data.followers != null && <span>{fmt(data.followers)} подписчиков</span>}
+              <span className={styles.dl}>{formatCount(data.downloads)} загрузок</span>
+              {data.followers != null && <span>{formatCount(data.followers)} подписчиков</span>}
             </div>
             <p className={styles.summary}>{data.description}</p>
             {data.categories.length > 0 && (
