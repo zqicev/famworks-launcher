@@ -181,7 +181,7 @@ export default function ProjectDetail({ source, type, id, packs, preferredPackId
             )}
             {type !== 'resourcepack' && type !== 'shader' && sideLabel(data.clientSide, data.serverSide) && (
               <div className={styles.sideBlock}>
-                <div className={styles.sideTitle}>Где нужен</div>
+                <div className={styles.sideTitle}>Сторона</div>
                 <div className={styles.sideRow}>{sideLabel(data.clientSide, data.serverSide)}</div>
               </div>
             )}
