@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import rehypeRaw from 'rehype-raw'
+import rehypeSanitize from 'rehype-sanitize'
 import { Modpack } from '../../../types/modpack'
 import InstallModal from './InstallModal'
 import styles from '../styles/ProjectDetail.module.css'
@@ -136,6 +138,7 @@ export default function ProjectDetail({ source, type, id, packs, preferredPackId
               <div className={styles.markdown}>
                 <ReactMarkdown
                   remarkPlugins={[remarkGfm]}
+                  rehypePlugins={[rehypeRaw, rehypeSanitize]}
                   components={{
                     a: ({ href, children }) => <a onClick={e => { e.preventDefault(); if (href) openExternal(href) }}>{children}</a>,
                     img: ({ src, alt }) => <img src={src as string} alt={alt ?? ''} />
@@ -178,7 +181,7 @@ export default function ProjectDetail({ source, type, id, packs, preferredPackId
             )}
             {sideLabel(data.clientSide, data.serverSide) && (
               <div className={styles.sideBlock}>
-                <div className={styles.sideTitle}>Где нужен</div>
+                <div className={styles.sideTitle}>Совместимость</div>
                 <div className={styles.sideRow}>{sideLabel(data.clientSide, data.serverSide)}</div>
               </div>
             )}
