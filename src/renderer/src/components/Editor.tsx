@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { LoadedModpack, Modpack, Mod, ServerEntry, ConfigFile } from '../../../types/modpack'
 import AddModrinthModal from './AddModrinthModal'
 import AddCurseforgeModal from './AddCurseforgeModal'
@@ -198,7 +198,9 @@ export default function Editor({ packKey, loaded, onSaved, onDeleted }: Props) {
             <Field label="Версия MC"><input className={styles.input} value={draft.mc_version} onChange={e => set('mc_version', e.target.value)} /></Field>
             <Field label="Версия загрузчика"><input className={styles.input} value={draft.loader_version} onChange={e => set('loader_version', e.target.value)} /></Field>
             {(draft.loader === 'fabric' || draft.loader === 'quilt') && (
-              <Field label="Версия Fabric API"><input className={styles.input} value={draft.fabric_api_version} onChange={e => set('fabric_api_version', e.target.value)} /></Field>
+              <Field label="Версия Fabric API">
+                <FabricApiField mcVersion={draft.mc_version} loader={draft.loader} value={draft.fabric_api_version} onChange={v => set('fabric_api_version', v)} />
+              </Field>
             )}
             <Field label="Краткое описание" full><input className={styles.input} value={draft.description} onChange={e => set('description', e.target.value)} /></Field>
             <Field label="Полное описание (вкладка Обзор)" full>
@@ -417,6 +419,30 @@ export default function Editor({ packKey, loaded, onSaved, onDeleted }: Props) {
       {cfRp && <AddCurseforgeModal kind="resourcepack" mcVersion={draft.mc_version} loader={draft.loader} existing={resourcepacks.map(m => m.id)} onAdd={addRp} onClose={() => setCfRp(false)} />}
       {cfSh && <AddCurseforgeModal kind="shader" mcVersion={draft.mc_version} loader={draft.loader} existing={shaders.map(m => m.id)} onAdd={addShader} onClose={() => setCfSh(false)} />}
     </div>
+  )
+}
+
+// Поле версии Fabric API с подсказками доступных версий (Modrinth), при этом ручной ввод сохраняется.
+const FABRIC_API_PROJECT = 'P7dR8mSH'
+function FabricApiField({ mcVersion, loader, value, onChange }: { mcVersion: string; loader: string; value: string; onChange: (v: string) => void }) {
+  const [versions, setVersions] = useState<string[]>([])
+  useEffect(() => {
+    let active = true
+    if (!mcVersion.trim()) { setVersions([]); return }
+    window.api.modrinth.versions(FABRIC_API_PROJECT, mcVersion, loader, 'mod')
+      .then(vs => { if (active) setVersions(vs.map(v => v.version_number)) })
+      .catch(() => { if (active) setVersions([]) })
+    return () => { active = false }
+  }, [mcVersion, loader])
+  return (
+    <>
+      <input className={styles.input} list="fabricApiVersions" value={value}
+        placeholder={versions[0] ? `напр. ${versions[0]} (последняя)` : '0.116.0+1.21.1'}
+        onChange={e => onChange(e.target.value)} />
+      <datalist id="fabricApiVersions">
+        {versions.map(v => <option key={v} value={v} />)}
+      </datalist>
+    </>
   )
 }
 
