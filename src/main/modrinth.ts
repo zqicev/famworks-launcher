@@ -45,14 +45,16 @@ export interface ModrinthVersion {
 /** Все совместимые версии проекта под нужные mc/loader (новые — первыми). */
 export async function getVersions(projectId: string, mcVersion: string, loader: string, type = 'mod'): Promise<ModrinthVersion[]> {
   // loader на Modrinth: моды — fabric/forge, ресурспаки — minecraft, шейдеры — iris
-  const loaders = type === 'mod' ? [loader] : type === 'shader' ? ['iris'] : ['minecraft']
-  const params = { game_versions: JSON.stringify([mcVersion]), loaders: JSON.stringify(loaders) }
-  // Modrinth иногда отдаёт 408/таймаут (особенно у крупных проектов вроде Fabric API) — ретраим.
+  const wantLoader = type === 'mod' ? loader : type === 'shader' ? 'iris' : 'minecraft'
+  // ВАЖНО: фильтрованный запрос (game_versions+loaders) у Modrinth для крупных проектов
+  // (напр. Fabric API) зависает и отдаёт 408. Без фильтра все версии тянутся нормально —
+  // забираем их и фильтруем на клиенте. Ретраи — на случай сетевого сбоя.
   let lastErr: unknown
   for (let attempt = 1; attempt <= 3; attempt++) {
     try {
-      const res = await axios.get(`${BASE}/project/${projectId}/version`, { headers: HEADERS, params, timeout: 15000 })
-      return res.data as ModrinthVersion[]
+      const res = await axios.get(`${BASE}/project/${projectId}/version`, { headers: HEADERS, timeout: 20000 })
+      const all = res.data as (ModrinthVersion & { game_versions?: string[]; loaders?: string[] })[]
+      return all.filter(v => v.game_versions?.includes(mcVersion) && v.loaders?.includes(wantLoader))
     } catch (e) {
       lastErr = e
       await new Promise(r => setTimeout(r, 500 * attempt))
