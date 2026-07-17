@@ -16,6 +16,8 @@ export interface Mod {
   id: string
   name: string
   modrinth_id?: string
+  /** Если задано — лаунчер берёт именно эту версию Modrinth (а не последнюю). */
+  modrinth_version_number?: string
   curseforge_id?: number
   filename: string
   version: string

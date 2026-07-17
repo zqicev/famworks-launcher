@@ -14,7 +14,8 @@ contextBridge.exposeInMainWorld('api', {
   },
   modrinth: {
     search: (q: string, mc: string, loader: string, type?: string) => ipcRenderer.invoke('modrinth:search', q, mc, loader, type),
-    latest: (projectId: string, mc: string, loader: string, type?: string) => ipcRenderer.invoke('modrinth:latest', projectId, mc, loader, type)
+    latest: (projectId: string, mc: string, loader: string, type?: string) => ipcRenderer.invoke('modrinth:latest', projectId, mc, loader, type),
+    versions: (projectId: string, mc: string, loader: string, type?: string) => ipcRenderer.invoke('modrinth:versions', projectId, mc, loader, type)
   },
   cf: {
     validate: () => ipcRenderer.invoke('cf:validate'),

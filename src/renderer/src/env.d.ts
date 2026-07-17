@@ -38,6 +38,7 @@ declare global {
       modrinth: {
         search: (q: string, mc: string, loader: string, type?: string) => Promise<ModrinthHit[]>
         latest: (projectId: string, mc: string, loader: string, type?: string) => Promise<ModrinthVersion | null>
+        versions: (projectId: string, mc: string, loader: string, type?: string) => Promise<ModrinthVersion[]>
       }
       cf: {
         validate: () => Promise<boolean>

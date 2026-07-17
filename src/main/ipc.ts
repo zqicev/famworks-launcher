@@ -2,7 +2,7 @@ import { ipcMain, dialog, BrowserWindow } from 'electron'
 import { store } from './store'
 import { validateToken } from './github'
 import { loadWorkspace, saveModpack, deleteModpack, uploadCustomJar, uploadConfig, uploadResourcepack } from './service'
-import { searchModrinth, getLatestVersion } from './modrinth'
+import { searchModrinth, getLatestVersion, getVersions } from './modrinth'
 import { searchCurseforge, getCurseforgeFiles, validateCfKey, cfDownloadUrl, cfSha1, CfFile } from './curseforge'
 import { Modpack } from '../types/modpack'
 
@@ -28,6 +28,8 @@ export function setupIpc() {
   ipcMain.handle('modrinth:search', (_, q: string, mc: string, loader: string, type?: string) => searchModrinth(q, mc, loader, type))
   ipcMain.handle('modrinth:latest', (_, projectId: string, mc: string, loader: string, type?: string) =>
     getLatestVersion(projectId, mc, loader, type))
+  ipcMain.handle('modrinth:versions', (_, projectId: string, mc: string, loader: string, type?: string) =>
+    getVersions(projectId, mc, loader, type))
 
   // CurseForge
   ipcMain.handle('cf:validate', () => validateCfKey())

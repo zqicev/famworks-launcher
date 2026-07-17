@@ -33,6 +33,9 @@ export default function AddModrinthModal({ mcVersion, loader, existing, kind = '
   const [loading, setLoading] = useState(false)
   const [adding, setAdding] = useState<string | null>(null)
   const [notice, setNotice] = useState('')
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [picker, setPicker] = useState<{ id: string; versions: any[] } | null>(null)
+  const [chosen, setChosen] = useState('')
 
   const search = async () => {
     if (!query.trim()) return
@@ -46,32 +49,44 @@ export default function AddModrinthModal({ mcVersion, loader, existing, kind = '
     }
   }
 
-  const add = async (hit: Hit) => {
+  // Загружаем список версий и показываем выбор (по образцу CurseForge-модалки)
+  const openPicker = async (hit: Hit) => {
     setAdding(hit.project_id); setNotice('')
     try {
-      const version = await window.api.modrinth.latest(hit.project_id, mcVersion, loader, kind)
-      if (!version) { setNotice(`Нет версии «${hit.title}» под ${loader} ${mcVersion}`); setAdding(null); return }
-      const file = version.files.find(f => f.primary) ?? version.files[0]
-      if (!file) { setNotice('У версии нет файла'); setAdding(null); return }
-
-      const mod: Mod = {
-        id: hit.slug,
-        name: hit.title,
-        modrinth_id: hit.project_id,
-        download_url: file.url,
-        filename: file.filename,
-        sha512: file.hashes?.sha512,
-        version: version.version_number,
-        category: hit.categories[0] ?? 'Мод',
-        size_mb: Math.round((file.size / 1024 / 1024) * 10) / 10,
-        required: false
-      }
-      onAdd(mod)
-      setAdding(null)
+      const versions = await window.api.modrinth.versions(hit.project_id, mcVersion, loader, kind)
+      if (!versions.length) { setNotice(`Нет версии «${hit.title}» под ${loader} ${mcVersion}`); return }
+      setPicker({ id: hit.project_id, versions })
+      setChosen(versions[0].id)
     } catch (e) {
-      setNotice(e instanceof Error ? e.message : 'Ошибка добавления')
+      setNotice(e instanceof Error ? e.message : 'Ошибка загрузки версий')
+    } finally {
       setAdding(null)
     }
+  }
+
+  const add = (hit: Hit) => {
+    if (!picker) return
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const version = picker.versions.find((v: any) => v.id === chosen) ?? picker.versions[0]
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const file = version.files.find((f: any) => f.primary) ?? version.files[0]
+    if (!file) { setNotice('У версии нет файла'); return }
+
+    const mod: Mod = {
+      id: hit.slug,
+      name: hit.title,
+      modrinth_id: hit.project_id,
+      modrinth_version_number: version.version_number,
+      download_url: file.url,
+      filename: file.filename,
+      sha512: file.hashes?.sha512,
+      version: version.version_number,
+      category: hit.categories[0] ?? 'Мод',
+      size_mb: Math.round((file.size / 1024 / 1024) * 10) / 10,
+      required: false
+    }
+    onAdd(mod)
+    setPicker(null)
   }
 
   return (
@@ -103,9 +118,20 @@ export default function AddModrinthModal({ mcVersion, loader, existing, kind = '
                   <div className={styles.meta}>{h.author} · {fmt(h.downloads)} загрузок</div>
                   <div className={styles.desc}>{h.description}</div>
                 </div>
-                <button className={styles.addBtn} disabled={added || adding === h.project_id} onClick={() => add(h)}>
-                  {added ? 'Добавлен' : adding === h.project_id ? '…' : 'Добавить'}
-                </button>
+                {picker?.id === h.project_id ? (
+                  <div style={{ display: 'flex', gap: 6 }}>
+                    <select className={styles.input} style={{ maxWidth: 150 }} value={chosen} onChange={e => setChosen(e.target.value)}>
+                      {picker.versions.map((v: { id: string; version_number: string }, i: number) => (
+                        <option key={v.id} value={v.id}>{v.version_number}{i === 0 ? ' (новый)' : ''}</option>
+                      ))}
+                    </select>
+                    <button className={styles.addBtn} onClick={() => add(h)}>OK</button>
+                  </div>
+                ) : (
+                  <button className={styles.addBtn} disabled={added || adding === h.project_id} onClick={() => openPicker(h)}>
+                    {added ? 'Добавлен' : adding === h.project_id ? '…' : 'Выбрать'}
+                  </button>
+                )}
               </div>
             )
           })}

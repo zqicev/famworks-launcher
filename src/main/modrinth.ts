@@ -42,14 +42,19 @@ export interface ModrinthVersion {
   files: ModrinthFile[]
 }
 
-/** Берёт последнюю совместимую версию проекта под нужные mc/loader. */
-export async function getLatestVersion(projectId: string, mcVersion: string, loader: string, type = 'mod'): Promise<ModrinthVersion | null> {
+/** Все совместимые версии проекта под нужные mc/loader (новые — первыми). */
+export async function getVersions(projectId: string, mcVersion: string, loader: string, type = 'mod'): Promise<ModrinthVersion[]> {
   // loader на Modrinth: моды — fabric/forge, ресурспаки — minecraft, шейдеры — iris
   const loaders = type === 'mod' ? [loader] : type === 'shader' ? ['iris'] : ['minecraft']
   const res = await axios.get(`${BASE}/project/${projectId}/version`, {
     headers: HEADERS,
     params: { game_versions: JSON.stringify([mcVersion]), loaders: JSON.stringify(loaders) }
   })
-  const versions: ModrinthVersion[] = res.data
+  return res.data as ModrinthVersion[]
+}
+
+/** Берёт последнюю совместимую версию проекта под нужные mc/loader. */
+export async function getLatestVersion(projectId: string, mcVersion: string, loader: string, type = 'mod'): Promise<ModrinthVersion | null> {
+  const versions = await getVersions(projectId, mcVersion, loader, type)
   return versions[0] ?? null
 }
