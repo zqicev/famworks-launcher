@@ -46,11 +46,19 @@ export interface ModrinthVersion {
 export async function getVersions(projectId: string, mcVersion: string, loader: string, type = 'mod'): Promise<ModrinthVersion[]> {
   // loader на Modrinth: моды — fabric/forge, ресурспаки — minecraft, шейдеры — iris
   const loaders = type === 'mod' ? [loader] : type === 'shader' ? ['iris'] : ['minecraft']
-  const res = await axios.get(`${BASE}/project/${projectId}/version`, {
-    headers: HEADERS,
-    params: { game_versions: JSON.stringify([mcVersion]), loaders: JSON.stringify(loaders) }
-  })
-  return res.data as ModrinthVersion[]
+  const params = { game_versions: JSON.stringify([mcVersion]), loaders: JSON.stringify(loaders) }
+  // Modrinth иногда отдаёт 408/таймаут (особенно у крупных проектов вроде Fabric API) — ретраим.
+  let lastErr: unknown
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    try {
+      const res = await axios.get(`${BASE}/project/${projectId}/version`, { headers: HEADERS, params, timeout: 15000 })
+      return res.data as ModrinthVersion[]
+    } catch (e) {
+      lastErr = e
+      await new Promise(r => setTimeout(r, 500 * attempt))
+    }
+  }
+  throw lastErr
 }
 
 /** Берёт последнюю совместимую версию проекта под нужные mc/loader. */
