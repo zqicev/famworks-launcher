@@ -210,7 +210,7 @@ export default function App() {
             onCreate={() => setCreateOpen(true)}
             onDeleteCustom={handleDeleteCustom}
             onImport={handleImport}
-            onExportCustom={handleExportCustom}
+            onExport={handleExportCustom}
             browserActive={view === 'browser'}
             onOpenBrowser={() => openBrowser('modpack', null)}
           />

@@ -14,7 +14,7 @@ interface Props {
   onCreate: () => void
   onDeleteCustom: (id: string) => void
   onImport: () => void
-  onExportCustom: (id: string) => void
+  onExport: (id: string) => void
   browserActive: boolean
   onOpenBrowser: () => void
 }
@@ -36,7 +36,7 @@ const ExportIcon = () => (
   </svg>
 )
 
-export default function Sidebar({ index, customPacks, selectedId, seenUpdates, onSelect, onSettings, onRefresh, onCreate, onDeleteCustom, onImport, onExportCustom, browserActive, onOpenBrowser }: Props) {
+export default function Sidebar({ index, customPacks, selectedId, seenUpdates, onSelect, onSettings, onRefresh, onCreate, onDeleteCustom, onImport, onExport, browserActive, onOpenBrowser }: Props) {
   const [version, setVersion] = useState('')
   useEffect(() => { window.api.appVersion().then(setVersion).catch(() => {}) }, [])
 
@@ -87,6 +87,9 @@ export default function Sidebar({ index, customPacks, selectedId, seenUpdates, o
                     <div className={styles.name}>{pack.name}{hasUpdate && <span className={styles.updateBadge}>ОБНОВЛЕНО</span>}</div>
                     <div className={styles.meta}>{pack.loader.charAt(0).toUpperCase() + pack.loader.slice(1)} · {pack.mc_version}</div>
                   </div>
+                  <div className={styles.itemActions}>
+                    <button className={styles.actBtn} onClick={(e) => { e.stopPropagation(); onExport(pack.id) }} title="Экспорт сборки в .fwpack"><ExportIcon /></button>
+                  </div>
                   <div className={`${styles.dot} ${active ? styles.dotActive : ''}`} />
                 </button>
               )
@@ -122,7 +125,7 @@ export default function Sidebar({ index, customPacks, selectedId, seenUpdates, o
                     <div className={styles.meta}>{pack.loader.charAt(0).toUpperCase() + pack.loader.slice(1)} · {pack.mc_version}</div>
                   </div>
                   <div className={styles.itemActions}>
-                    <button className={styles.actBtn} onClick={(e) => { e.stopPropagation(); onExportCustom(pack.id) }} title="Экспорт сборки в файл"><ExportIcon /></button>
+                    <button className={styles.actBtn} onClick={(e) => { e.stopPropagation(); onExport(pack.id) }} title="Экспорт сборки в файл"><ExportIcon /></button>
                     <button className={styles.actBtn} onClick={(e) => { e.stopPropagation(); onDeleteCustom(pack.id) }} title="Удалить сборку"><span className={styles.del}>✕</span></button>
                   </div>
                 </button>
