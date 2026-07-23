@@ -1,11 +1,28 @@
 import { BrowserWindow } from 'electron'
 import { join } from 'path'
+import { readdirSync } from 'fs'
 import { getModVersions, getModrinthVersion, ModrinthVersion } from './modrinth'
 import { getCurseforgeFiles, cfSha1, CfFile } from './curseforge'
 import { downloadModToDir } from './installer'
 
 const FOLDER: Record<string, string> = { mod: 'mods', resourcepack: 'resourcepacks', shader: 'shaderpacks' }
 const MAX_DEPTH = 8 // страховка от слишком длинных цепочек зависимостей
+
+/** «Основа» имени файла без версии: fabric-api-0.116.7+1.21.1.jar → fabric-api */
+function modStem(filename: string): string {
+  const base = filename.replace(/\.disabled$/i, '').replace(/\.(jar|zip)$/i, '')
+  const m = base.match(/^(.+?)[-_]v?\d/)
+  return (m ? m[1] : base).toLowerCase()
+}
+
+/** Уже есть файл того же мода (любой версии) в папке? Чтобы не ставить зависимость дважды. */
+function alreadyInstalled(dir: string, filename: string): boolean {
+  const stem = modStem(filename)
+  if (!stem) return false
+  let files: string[]
+  try { files = readdirSync(dir) } catch { return false }
+  return files.some(f => /\.(jar|zip)(\.disabled)?$/i.test(f) && modStem(f) === stem)
+}
 
 /**
  * Ставит выбранный контент из браузера в сборку вместе с его обязательными зависимостями
@@ -56,6 +73,8 @@ async function walkModrinth(
 
   const file = (version.files ?? []).find(f => f.primary) ?? version.files?.[0]
   if (!file) return
+  // Зависимость уже установлена (пусть и другой версии) — оставляем её, дубль не ставим
+  if (!isRoot && alreadyInstalled(modsDir, file.filename)) return
   await downloadModToDir(file.url, file.filename, isRoot ? mainDir : modsDir, win, file.hashes?.sha512)
   installed.push(file.filename)
 
@@ -78,6 +97,7 @@ async function walkCurseforge(
   let file = fileId ? files.find(f => f.id === fileId) : undefined
   if (!file) file = files.find(f => f.downloadUrl)
   if (!file?.downloadUrl) return
+  if (!isRoot && alreadyInstalled(modsDir, file.fileName)) return
   await downloadModToDir(file.downloadUrl, file.fileName, isRoot ? mainDir : modsDir, win, undefined, cfSha1(file))
   installed.push(file.fileName)
 
