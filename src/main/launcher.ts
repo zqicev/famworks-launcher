@@ -89,6 +89,11 @@ export async function launchGame(
 
   emit(win, { phase: 'download', message: 'Подготовка Minecraft...' })
 
+  // Предзагружаем ванильные ассеты сами (с прогрессом и лимитом параллельности) в общий кэш,
+  // чтобы mclc не качал их своим безлимитным способом (прогресс «стоит», выглядит как зависание).
+  const { ensureAssets } = await import('./assets')
+  await ensureAssets(modpack.mc_version, installPath, win)
+
   const options: ILauncherOptions = {
     authorization,
     root: gameRoot,
