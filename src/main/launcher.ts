@@ -48,6 +48,10 @@ export async function launchGame(
   spawnedAt = 0
   userKilled = false
 
+  // Новый запуск — вкладка «Логи» начинает с чистого (чистим ПО СТАРТУ, а не по спавну,
+  // иначе логи запуска/ошибки стирались бы в момент старта игры).
+  win.webContents.send('launch:starting', modpack.id)
+
   // Dev-режим: отладка (JDWP) и hot-swap (JVM от JetBrains Runtime + enhanced redefinition)
   const dev = devLaunchOverrides(modpack.id)
   // Метки этапов в «Логи» — чтобы видеть, докуда дошёл запуск, даже если mclc молчит.

@@ -49,7 +49,8 @@ export function ensureLogCapture(): void {
   if (started) return
   started = true
   window.api.launch.onLog(({ id, text }) => { if (id) pushLog(id, text) })
-  window.api.launch.onSpawned((id: string) => { buffers.set(id, []); bump() }) // новый запуск сборки — её лог с чистого
+  // Чистим лог по СТАРТУ запуска (а не по спавну) — иначе логи подготовки/ошибки стирались бы в момент старта игры.
+  window.api.launch.onStarting((id: string) => { buffers.set(id, []); bump() })
 }
 
 export function clearLog(id: string): void { buffers.set(id, []); bump() }
