@@ -16,14 +16,39 @@ function emit(win: BrowserWindow, e: ProgressEvent): void {
   win.webContents.send('install:progress', e)
 }
 
-/** Требуемая мажорная версия Java по версии Minecraft (одинакова для всех загрузчиков). */
-export function requiredJavaMajor(mc: string): number {
-  const parts = mc.split('.').map(n => parseInt(n, 10))
-  const minor = parts[1] || 0
-  const patch = parts[2] || 0
-  if (minor > 20 || (minor === 20 && patch >= 5)) return 21 // 1.20.5+ и 1.21+
-  if (minor >= 17) return 17 // 1.17–1.20.4
-  return 8 // 1.16.5 и старше
+const javaMajorCache = new Map<string, number>()
+
+/** Эвристика по номеру версии — fallback, когда метаданные Mojang недоступны. */
+function heuristicJavaMajor(mc: string): number {
+  const p = mc.split('.').map(n => parseInt(n, 10) || 0)
+  if (p[0] === 1) {
+    const minor = p[1] || 0
+    const patch = p[2] || 0
+    if (minor > 20 || (minor === 20 && patch >= 5)) return 21 // 1.20.5+ и 1.21+
+    if (minor >= 17) return 17 // 1.17–1.20.4
+    return 8 // 1.16.5 и старше
+  }
+  return 25 // новая схема (26.x и новее) — актуальная LTS
+}
+
+/** Требуемая мажорная версия Java по версии Minecraft.
+ *  Берём точное значение из метаданных Mojang (javaVersion.majorVersion) — так корректно
+ *  учитываются новые версии (напр. 26.x → Java 25). Fallback — эвристика по номеру версии. */
+export async function requiredJavaMajor(mc: string): Promise<number> {
+  const cached = javaMajorCache.get(mc)
+  if (cached) return cached
+  try {
+    const { data: manifest } = await axios.get('https://piston-meta.mojang.com/mc/game/version_manifest_v2.json', { timeout: 8000 })
+    const entry = (manifest.versions as { id: string; url: string }[]).find(v => v.id === mc)
+    if (entry) {
+      const { data: ver } = await axios.get(entry.url, { timeout: 8000 })
+      const major = ver?.javaVersion?.majorVersion
+      if (typeof major === 'number' && major > 0) { javaMajorCache.set(mc, major); return major }
+    }
+  } catch {
+    // Mojang недоступен — падаем на эвристику (в оффлайне Java всё равно не скачать)
+  }
+  return heuristicJavaMajor(mc)
 }
 
 /** Имя vanilla-style version-профиля (папка versions/<id>/<id>.json) для каждого загрузчика.
@@ -112,7 +137,7 @@ export async function setupLoader(mp: Modpack, gameRoot: string, win: BrowserWin
   }
 
   emit(win, { phase: 'download', message: `Установка ${LABELS[loader]} (может занять минуту)...` })
-  const javaPath = await ensureJava(dirname(gameRoot), win, requiredJavaMajor(mp.mc_version))
+  const javaPath = await ensureJava(dirname(gameRoot), win, await requiredJavaMajor(mp.mc_version))
   await runClientInstaller(javaPath, installer, gameRoot, win, mp.id)
   if (!existsSync(versionFile)) {
     throw new Error(`${LABELS[loader]}: установщик не создал профиль ${id}. Проверьте версию загрузчика (${mp.loader_version}).`)

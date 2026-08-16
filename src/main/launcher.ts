@@ -56,7 +56,7 @@ export async function launchGame(
     javaPath = dev.javaPath
   } else {
     try {
-      javaPath = await ensureJava(installPath, win, requiredJavaMajor(modpack.mc_version))
+      javaPath = await ensureJava(installPath, win, await requiredJavaMajor(modpack.mc_version))
     } catch (e) {
       win.webContents.send('launch:error', `Не удалось установить Java: ${String(e)}`)
       return
