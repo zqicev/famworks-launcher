@@ -96,7 +96,9 @@ export async function launchGame(
     version: { number: modpack.mc_version, type: 'release', ...(loaderVersionId ? { custom: loaderVersionId } : {}) },
     memory: { max: `${memoryMB}M`, min: '512M' },
     javaPath,
-    overrides: { detached: true },
+    // Общий кэш ванильных ассетов на все сборки (как в Modrinth): первая сборка их качает,
+    // остальные переиспользуют. Ассеты качает только mclc, загрузчики их не трогают — безопасно.
+    overrides: { detached: true, assetRoot: join(installPath, 'assets') },
     ...(extraJvmArgs.length ? { customArgs: extraJvmArgs } : {}),
     ...(quickPlay ? { quickPlay: { type: quickPlay.type, identifier: quickPlay.identifier } } : {})
   } as ILauncherOptions
