@@ -57,6 +57,12 @@ parentPort.on('message', async (e) => {
     logTail = (logTail + s).slice(-8000) // храним хвост вывода на случай падения
     send({ t: 'win', channel: 'launch:log', payload: s })
   })
+  // Внутренние логи mclc (скачивание/распаковка/аргументы) — чтобы видеть причину сбоя до запуска
+  client.on('debug', (d: any) => {
+    const s = `[mclc] ${String(d)}`
+    logTail = (logTail + s + '\n').slice(-8000)
+    send({ t: 'win', channel: 'launch:log', payload: s })
+  })
   client.on('close', (code: number) => { send({ t: 'close', code, tail: logTail }); process.exit(0) })
 
   try {

@@ -148,6 +148,10 @@ export async function launchGame(
         win.webContents.send('install:progress', { phase: 'done', message: '' })
         setIdle()
       } else if (msg.t === 'error') {
+        // Раньше ошибка запуска глушилась (статус просто откатывался в «Играть») — теперь показываем
+        win.webContents.send('launch:error', `Не удалось запустить: ${msg.message}`)
+        win.webContents.send('install:progress', { phase: 'done', message: '' })
+        setBusy(null)
         reject(new Error(msg.message))
       }
     })
