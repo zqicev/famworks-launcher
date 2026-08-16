@@ -98,6 +98,7 @@ contextBridge.exposeInMainWorld('api', {
     openFolder: (path: string) => ipcRenderer.invoke('shell:open-folder', path),
     openExternal: (url: string) => ipcRenderer.invoke('shell:open-external', url)
   },
+  cleanupJunk: () => ipcRenderer.invoke('cleanup:junk'),
   browser: {
     installModpack: (source: string, id: string) => ipcRenderer.invoke('browser:install-modpack', source, id),
     project: (source: string, id: string, type: string) => ipcRenderer.invoke('browser:project', source, id, type),

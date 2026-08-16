@@ -402,6 +402,12 @@ export function setupIpcHandlers() {
   })
   ipcMain.handle('shell:open-external', (_, url: string) => shell.openExternal(url))
 
+  // Очистка сборок от лишнего (per-pack ассеты + installer-jar'ы загрузчиков)
+  ipcMain.handle('cleanup:junk', async () => {
+    const { cleanupJunk } = await import('./cleanup')
+    return cleanupJunk(store.get('installPath') as string)
+  })
+
   ipcMain.handle('shell:open-folder', (_, folderPath: string) => {
     try { mkdirSync(folderPath, { recursive: true }) } catch { /* игнорируем */ }
     return shell.openPath(folderPath)

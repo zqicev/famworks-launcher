@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { formatBytes } from '../lib/format'
 import styles from '../styles/SettingsModal.module.css'
 
 interface Props {
@@ -11,6 +12,22 @@ interface Props {
 
 export default function SettingsModal({ installPath, onPathChange, devMode, onDevModeChange, onClose }: Props) {
   const [path, setPath] = useState(installPath)
+  const [cleaning, setCleaning] = useState(false)
+  const [cleanMsg, setCleanMsg] = useState('')
+
+  const cleanup = async () => {
+    setCleaning(true); setCleanMsg('')
+    try {
+      const r = await window.api.cleanupJunk()
+      setCleanMsg(r.freedBytes > 0
+        ? `Освобождено ${formatBytes(r.freedBytes)} (сборок: ${r.instances})`
+        : 'Мусора не найдено — всё чисто')
+    } catch {
+      setCleanMsg('Не удалось очистить')
+    } finally {
+      setCleaning(false)
+    }
+  }
 
   const toggleDev = () => {
     const v = !devMode
@@ -55,6 +72,19 @@ export default function SettingsModal({ installPath, onPathChange, devMode, onDe
             </div>
             <p className={styles.hint}>
               Сборки устанавливаются в отдельные подпапки внутри этой директории.
+            </p>
+          </div>
+
+          <div className={styles.field}>
+            <label className={styles.label}>ОЧИСТКА МЕСТА</label>
+            <div className={styles.pathRow}>
+              <button className={styles.browseBtn} onClick={cleanup} disabled={cleaning}>
+                {cleaning ? 'Очистка…' : 'Очистить мусор сборок'}
+              </button>
+              {cleanMsg && <span className={styles.hint} style={{ margin: 0, alignSelf: 'center' }}>{cleanMsg}</span>}
+            </div>
+            <p className={styles.hint}>
+              Удаляет из сборок лишнее: старые копии игровых ассетов (теперь общие) и установщики загрузчиков. Моды, миры и настройки не затрагиваются.
             </p>
           </div>
 
