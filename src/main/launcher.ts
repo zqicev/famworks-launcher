@@ -8,6 +8,7 @@ import { devLaunchOverrides } from './dev'
 import { diagnoseCrash } from './crash'
 import { ensureJava } from './java'
 import { writeServers } from './servers'
+import { isCancelError } from './abort'
 import { setPlaying, setIdle } from './discord'
 import { setBusy } from './busy'
 import { store } from './store'
@@ -49,12 +50,15 @@ export async function launchGame(
 
   // Dev-режим: отладка (JDWP) и hot-swap (JVM от JetBrains Runtime + enhanced redefinition)
   const dev = devLaunchOverrides(modpack.id)
+  // Метки этапов в «Логи» — чтобы видеть, докуда дошёл запуск, даже если mclc молчит.
+  const stage = (m: string): void => win.webContents.send('launch:log', { id: modpack.id, text: `[launcher] ${m}` })
 
   // 1. Java: hot-swap использует JBR; иначе гарантируем Java нужной мажорной версии (по версии MC)
   let javaPath: string
   if (dev.javaPath) {
     javaPath = dev.javaPath
   } else {
+    stage('Проверка Java')
     try {
       javaPath = await ensureJava(installPath, win, await requiredJavaMajor(modpack.mc_version))
     } catch (e) {
@@ -65,6 +69,7 @@ export async function launchGame(
 
   // 2. Загрузчик (Fabric/Quilt — meta-профиль, Forge/NeoForge — установщик). Все дают version-профиль.
   const gameRoot = join(installPath, modpack.id)
+  stage('Подготовка загрузчика')
   const loaderVersionId = await setupLoader(modpack, gameRoot, win)
   // Forge/NeoForge держат module-path и прочие JVM-аргументы в профиле, а mclc их не читает —
   // передаём вручную через customArgs. Плюс dev-аргументы (отладка/hot-swap).
@@ -89,10 +94,22 @@ export async function launchGame(
 
   emit(win, { phase: 'download', message: 'Подготовка Minecraft...' })
 
-  // Предзагружаем ванильные ассеты сами (с прогрессом и лимитом параллельности) в общий кэш,
-  // чтобы mclc не качал их своим безлимитным способом (прогресс «стоит», выглядит как зависание).
-  const { ensureAssets } = await import('./assets')
-  await ensureAssets(modpack.mc_version, installPath, win)
+  // 4. Предзагрузка ванильных ассетов в общий кэш (с прогрессом и лимитом параллельности).
+  //    Пуленепробиваемо: любые ошибки/таймаут не блокируют запуск — mclc дотянет своё сам.
+  stage('Проверка ресурсов Minecraft')
+  try {
+    const { ensureAssets } = await import('./assets')
+    // Жёсткий предохранитель: даже если предзагрузка зависнет — не держим запуск дольше 3 минут.
+    await Promise.race([
+      ensureAssets(modpack.mc_version, installPath, win),
+      new Promise((_, rej) => setTimeout(() => rej(new Error('assets-timeout')), 180000))
+    ])
+  } catch (e) {
+    if (isCancelError(e)) throw e // отмена пользователем — пробрасываем
+    win.webContents.send('launch:log', { id: modpack.id, text: `[launcher] предзагрузка ресурсов пропущена: ${String(e)}` })
+  }
+
+  stage('Запуск Minecraft (mclc)')
 
   const options: ILauncherOptions = {
     authorization,
@@ -101,8 +118,7 @@ export async function launchGame(
     version: { number: modpack.mc_version, type: 'release', ...(loaderVersionId ? { custom: loaderVersionId } : {}) },
     memory: { max: `${memoryMB}M`, min: '512M' },
     javaPath,
-    // Общий кэш ванильных ассетов на все сборки (как в Modrinth): первая сборка их качает,
-    // остальные переиспользуют. Ассеты качает только mclc, загрузчики их не трогают — безопасно.
+    // Общий кэш ванильных ассетов на все сборки — чтобы не перекачивать их для каждой сборки.
     overrides: { detached: true, assetRoot: join(installPath, 'assets') },
     ...(extraJvmArgs.length ? { customArgs: extraJvmArgs } : {}),
     ...(quickPlay ? { quickPlay: { type: quickPlay.type, identifier: quickPlay.identifier } } : {})

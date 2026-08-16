@@ -23,10 +23,12 @@ async function download(url: string, dest: string): Promise<void> {
   const res = await axios.get(url, { responseType: 'stream', maxRedirects: 5, timeout: 30000 })
   await new Promise<void>((resolve, reject) => {
     const s = createWriteStream(tmp)
+    // axios timeout не покрывает передачу тела для stream — свой предохранитель от зависшего соединения
+    const timer = setTimeout(() => { try { res.data.destroy() } catch { /* noop */ } try { s.destroy() } catch { /* noop */ } reject(new Error('body-timeout')) }, 30000)
     res.data.pipe(s)
-    s.on('finish', () => resolve())
-    s.on('error', reject)
-    res.data.on('error', reject)
+    s.on('finish', () => { clearTimeout(timer); resolve() })
+    s.on('error', (e: unknown) => { clearTimeout(timer); reject(e) })
+    res.data.on('error', (e: unknown) => { clearTimeout(timer); reject(e) })
   })
   renameSync(tmp, dest)
 }
