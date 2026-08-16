@@ -18,7 +18,9 @@ async function getJson<T>(url: string): Promise<T> {
 
 async function download(url: string, dest: string): Promise<void> {
   const tmp = dest + '.tmp'
-  const res = await axios.get(url, { responseType: 'stream', signal: opSignal(), maxRedirects: 5, timeout: 30000 })
+  // Без signal: отмену ловим в цикле через isCancelled() (иначе тысячи запросов вешают
+  // слушатели на один AbortSignal → MaxListenersExceededWarning). Файлы ассетов крошечные.
+  const res = await axios.get(url, { responseType: 'stream', maxRedirects: 5, timeout: 30000 })
   await new Promise<void>((resolve, reject) => {
     const s = createWriteStream(tmp)
     res.data.pipe(s)

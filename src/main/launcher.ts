@@ -113,6 +113,7 @@ export async function launchGame(
     const worker = utilityProcess.fork(join(__dirname, 'launchWorker.js'))
     currentWorker = worker
     let spawned = false
+    let errored = false
 
     worker.on('message', (msg: any) => {
       if (msg.t === 'win') {
@@ -149,6 +150,7 @@ export async function launchGame(
         setIdle()
       } else if (msg.t === 'error') {
         // Раньше ошибка запуска глушилась (статус просто откатывался в «Играть») — теперь показываем
+        errored = true
         win.webContents.send('launch:error', `Не удалось запустить: ${msg.message}`)
         win.webContents.send('install:progress', { phase: 'done', message: '' })
         setBusy(null)
@@ -160,8 +162,14 @@ export async function launchGame(
       currentWorker = null
       if (!spawned) {
         // воркер умер до запуска игры — отмена или сбой
-        if (launchAborted) reject(new DOMException('Aborted', 'AbortError'))
-        else resolve()
+        if (launchAborted) { reject(new DOMException('Aborted', 'AbortError')); return }
+        // Жёсткий выход без t:error (mclc уронил процесс) — не молчим
+        if (!errored) {
+          win.webContents.send('launch:error', 'Запуск прервался до старта игры. Смотрите вкладку «Логи».')
+          win.webContents.send('install:progress', { phase: 'done', message: '' })
+          setBusy(null)
+        }
+        resolve()
       }
     })
 
