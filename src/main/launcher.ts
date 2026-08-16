@@ -103,9 +103,11 @@ export async function launchGame(
   stage('Проверка ресурсов Minecraft')
   try {
     const { ensureAssets } = await import('./assets')
+    // assetId = имя, под которым mclc читает индекс: version.custom (профиль загрузчика) || версия MC
+    const assetId = loaderVersionId || modpack.mc_version
     // Жёсткий предохранитель: даже если предзагрузка зависнет — не держим запуск дольше 3 минут.
     await Promise.race([
-      ensureAssets(modpack.mc_version, installPath, win),
+      ensureAssets(modpack.mc_version, installPath, win, assetId),
       new Promise((_, rej) => setTimeout(() => rej(new Error('assets-timeout')), 180000))
     ])
   } catch (e) {

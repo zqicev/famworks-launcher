@@ -1,5 +1,5 @@
-import { join } from 'path'
-import { existsSync, mkdirSync, createWriteStream, renameSync, writeFileSync } from 'fs'
+import { join, dirname } from 'path'
+import { existsSync, mkdirSync, createWriteStream, renameSync, writeFileSync, readFileSync } from 'fs'
 import axios from 'axios'
 import { BrowserWindow } from 'electron'
 import type { ProgressEvent } from './installer'
@@ -33,16 +33,27 @@ async function download(url: string, dest: string): Promise<void> {
   renameSync(tmp, dest)
 }
 
+/** Валиден ли уже лежащий файл asset-index (не битый/не усечённый). */
+function indexValid(indexPath: string): boolean {
+  try { JSON.parse(readFileSync(indexPath, 'utf8')); return true } catch { return false }
+}
+
 /**
  * Предзагрузка ванильных ассетов Minecraft в общий кэш (installPath/assets) до запуска mclc:
  * с ограниченной параллельностью и нормальным прогрессом. mclc потом найдёт их готовыми
  * и не будет качать сам (у него безлимитный параллелизм, из-за чего прогресс «стоит»).
+ *
+ * Также пишем валидный asset-index АТОМАРНО туда, где его читает mclc (indexes/<assetId>.json,
+ * где assetId = version.custom загрузчика || версия MC). Это чинит битый/усечённый индекс,
+ * оставшийся от прерванных запусков (иначе mclc падает: «Unterminated string in JSON»).
  * Маркер .assets-<версия> помечает, что всё скачано — повторные запуски мгновенны.
  */
-export async function ensureAssets(mcVersion: string, installPath: string, win: BrowserWindow): Promise<void> {
+export async function ensureAssets(mcVersion: string, installPath: string, win: BrowserWindow, assetId: string): Promise<void> {
   const assetRoot = join(installPath, 'assets')
+  const indexPath = join(assetRoot, 'indexes', `${assetId}.json`)
   const marker = join(assetRoot, `.assets-${mcVersion}`)
-  if (existsSync(marker)) return
+  // Быстрый путь: всё уже скачано И индекс на диске валиден
+  if (existsSync(marker) && indexValid(indexPath)) return
 
   let assetIndexUrl: string | undefined
   try {
@@ -56,19 +67,29 @@ export async function ensureAssets(mcVersion: string, installPath: string, win: 
   }
   if (isCancelled() || !assetIndexUrl) return
 
+  let indexText: string
   let objects: Record<string, { hash: string }>
   try {
-    const index = await getJson<{ objects: Record<string, { hash: string }> }>(assetIndexUrl)
-    objects = index.objects || {}
+    const { data } = await axios.get(assetIndexUrl, { timeout: 15000, signal: opSignal(), responseType: 'text', transformResponse: (r) => r })
+    indexText = String(data)
+    objects = (JSON.parse(indexText).objects) || {}
   } catch {
     return
   }
+
+  // Пишем валидный индекс атомарно (чинит битый/усечённый файл, который читает mclc)
+  try {
+    mkdirSync(dirname(indexPath), { recursive: true })
+    const tmp = indexPath + '.tmp'
+    writeFileSync(tmp, indexText)
+    renameSync(tmp, indexPath)
+  } catch { /* noop — mclc дотянет сам */ }
 
   // Уникальные хэши (несколько имён могут указывать на один объект)
   const hashes = [...new Set(Object.values(objects).map(o => o.hash))]
   const missing = hashes.filter(h => !existsSync(join(assetRoot, 'objects', h.slice(0, 2), h)))
   if (missing.length === 0) {
-    try { mkdirSync(assetRoot, { recursive: true }); writeFileSync(marker, '') } catch { /* noop */ }
+    try { writeFileSync(marker, '') } catch { /* noop */ }
     return
   }
 
