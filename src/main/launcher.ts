@@ -106,10 +106,16 @@ export async function launchGame(
     // assetId = имя, под которым mclc читает индекс: version.custom (профиль загрузчика) || версия MC
     const assetId = loaderVersionId || modpack.mc_version
     // Жёсткий предохранитель: даже если предзагрузка зависнет — не держим запуск дольше 3 минут.
-    await Promise.race([
-      ensureAssets(modpack.mc_version, installPath, win, assetId),
-      new Promise((_, rej) => setTimeout(() => rej(new Error('assets-timeout')), 180000))
-    ])
+    // clearTimeout обязателен, иначе после успешной предзагрузки таймер отклонит «ничей» промис (unhandled rejection).
+    let assetsTimer: ReturnType<typeof setTimeout> | undefined
+    try {
+      await Promise.race([
+        ensureAssets(modpack.mc_version, installPath, win, assetId),
+        new Promise((_, rej) => { assetsTimer = setTimeout(() => rej(new Error('assets-timeout')), 180000) })
+      ])
+    } finally {
+      if (assetsTimer) clearTimeout(assetsTimer)
+    }
   } catch (e) {
     if (isCancelError(e)) throw e // отмена пользователем — пробрасываем
     win.webContents.send('launch:log', { id: modpack.id, text: `[launcher] предзагрузка ресурсов пропущена: ${String(e)}` })

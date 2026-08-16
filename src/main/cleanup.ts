@@ -1,5 +1,6 @@
 import { join } from 'path'
-import { readdirSync, statSync, existsSync, rmSync } from 'fs'
+import { Dirent } from 'fs'
+import { readdir, stat, rm } from 'fs/promises'
 
 // Папки уровня installPath, которые НЕ являются сборками — не трогаем.
 const RESERVED = new Set(['assets', 'runtime'])
@@ -8,43 +9,45 @@ const RESERVED = new Set(['assets', 'runtime'])
 //  - .loader — installer-jar'ы Forge/NeoForge, нужны только в момент установки
 const JUNK_SUBDIRS = ['assets', '.loader']
 
-function dirSize(dir: string): number {
+/** Рекурсивный размер папки. Асинхронно — чтобы не блокировать главный процесс (иначе UI виснет). */
+async function dirSize(dir: string): Promise<number> {
   let total = 0
-  let entries: string[]
-  try { entries = readdirSync(dir) } catch { return 0 }
+  let entries: Dirent[]
+  try { entries = await readdir(dir, { withFileTypes: true }) } catch { return 0 }
   for (const e of entries) {
-    const p = join(dir, e)
-    let st: ReturnType<typeof statSync>
-    try { st = statSync(p) } catch { continue }
-    if (st.isDirectory()) total += dirSize(p)
-    else total += st.size
+    const p = join(dir, e.name)
+    if (e.isDirectory()) total += await dirSize(p)
+    else { try { total += (await stat(p)).size } catch { /* пропускаем */ } }
   }
   return total
 }
 
 /** Чистит сборки от заведомо лишнего (per-pack ассеты + installer-jar'ы загрузчиков).
  *  Не трогает моды, миры, конфиги, ресурспаки/шейдеры, version-профили, библиотеки,
- *  общий кэш ассетов и Java. Возвращает освобождённые байты и число затронутых сборок. */
-export function cleanupJunk(installPath: string): { freedBytes: number; instances: number } {
+ *  общий кэш ассетов и Java. Всё через async fs, чтобы не подвешивать интерфейс.
+ *  Возвращает освобождённые байты и число затронутых сборок. */
+export async function cleanupJunk(installPath: string): Promise<{ freedBytes: number; instances: number }> {
   let freedBytes = 0
   let instances = 0
-  let dirs: string[]
-  try { dirs = readdirSync(installPath) } catch { return { freedBytes: 0, instances: 0 } }
+  let dirs: Dirent[]
+  try { dirs = await readdir(installPath, { withFileTypes: true }) } catch { return { freedBytes: 0, instances: 0 } }
 
-  for (const name of dirs) {
-    if (RESERVED.has(name)) continue
-    const packDir = join(installPath, name)
-    try { if (!statSync(packDir).isDirectory()) continue } catch { continue }
+  for (const d of dirs) {
+    if (!d.isDirectory() || RESERVED.has(d.name)) continue
+    const packDir = join(installPath, d.name)
     // Похоже на папку сборки? (есть mods/versions/assets) — иначе не трогаем чужое.
-    const looksLikePack = existsSync(join(packDir, 'mods')) || existsSync(join(packDir, 'versions')) || existsSync(join(packDir, 'assets'))
+    let looksLikePack = false
+    for (const probe of ['mods', 'versions', 'assets']) {
+      try { await stat(join(packDir, probe)); looksLikePack = true; break } catch { /* нет — пробуем дальше */ }
+    }
     if (!looksLikePack) continue
 
     let touched = false
     for (const junk of JUNK_SUBDIRS) {
       const jd = join(packDir, junk)
-      if (!existsSync(jd)) continue
-      freedBytes += dirSize(jd)
-      try { rmSync(jd, { recursive: true, force: true }); touched = true } catch { /* залочено — пропускаем */ }
+      const size = await dirSize(jd) // 0, если папки нет
+      if (size === 0) continue
+      try { await rm(jd, { recursive: true, force: true }); freedBytes += size; touched = true } catch { /* залочено — пропускаем */ }
     }
     if (touched) instances++
   }

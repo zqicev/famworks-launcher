@@ -70,9 +70,10 @@ export async function ensureAssets(mcVersion: string, installPath: string, win: 
   let indexText: string
   let objects: Record<string, { hash: string }>
   try {
-    const { data } = await axios.get(assetIndexUrl, { timeout: 15000, signal: opSignal(), responseType: 'text', transformResponse: (r) => r })
-    indexText = String(data)
-    objects = (JSON.parse(indexText).objects) || {}
+    const index = await getJson<{ objects?: Record<string, { hash: string }> }>(assetIndexUrl)
+    objects = index.objects || {}
+    // Пишем валидный JSON (уже распарсен axios'ом) — mclc его только читает, хэш не сверяет.
+    indexText = JSON.stringify(index)
   } catch {
     return
   }
