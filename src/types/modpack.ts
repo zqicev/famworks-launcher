@@ -47,6 +47,7 @@ export interface ConfigFile {
   download_url: string
   sha512?: string
   overwrite?: boolean   // true — всегда перезаписывать, иначе только если файла нет
+  extract?: boolean     // download_url — zip-архив: распаковать в корень сборки (структура папок сохраняется), архив удалить
 }
 
 export interface Modpack extends ModpackSummary {

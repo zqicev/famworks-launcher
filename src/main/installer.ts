@@ -1,9 +1,10 @@
 import { join, dirname, resolve, sep } from 'path'
-import { createWriteStream, createReadStream, existsSync, mkdirSync, renameSync, unlinkSync, readdirSync, statSync } from 'fs'
+import { createWriteStream, createReadStream, existsSync, mkdirSync, renameSync, unlinkSync, readdirSync, statSync, writeFileSync } from 'fs'
 import { createHash } from 'crypto'
 import axios from 'axios'
+import AdmZip from 'adm-zip'
 import { BrowserWindow } from 'electron'
-import { Modpack, Mod } from '../types/modpack'
+import { Modpack, Mod, ConfigFile } from '../types/modpack'
 import { opSignal, isCancelled } from './abort'
 import { loaderInstalled } from './loaders'
 
@@ -126,6 +127,41 @@ function safeJoin(root: string, rel: string): string | null {
   return dest
 }
 
+/** Маркер «архив уже распакован» — по хэшу содержимого (sha512), иначе по URL/пути.
+ *  Смена содержимого архива → другой маркер → распаковка заново (учёт обновлений). */
+function extractMarkerPath(gameRoot: string, cfg: ConfigFile): string {
+  const id = createHash('sha1').update(cfg.sha512 || cfg.download_url || cfg.path).digest('hex')
+  return join(gameRoot, '.fwextracted', id)
+}
+
+/** Скачивает zip-конфиг и распаковывает его в корень сборки (структура папок сохраняется),
+ *  затем удаляет архив. Защита от zip-slip. Уважает overwrite. */
+async function extractConfig(cfg: ConfigFile, gameRoot: string, done: number, total: number, win: BrowserWindow): Promise<void> {
+  const marker = extractMarkerPath(gameRoot, cfg)
+  if (existsSync(marker) && !cfg.overwrite) return // уже распаковано, содержимое не менялось
+
+  const tmpZip = join(gameRoot, `.fwextract-${Date.now()}.zip`)
+  try {
+    await downloadWithProgress(cfg.download_url, tmpZip, (bytes, bTotal, speed) => {
+      emit(win, { phase: 'download', message: `Распаковка ${cfg.path || 'архива'}`, current: done, total, bytesDownloaded: bytes, bytesTotal: bTotal, speedBps: speed })
+    }, cfg.sha512)
+
+    const zip = new AdmZip(tmpZip)
+    for (const e of zip.getEntries()) {
+      if (e.isDirectory) continue
+      const outPath = safeJoin(gameRoot, e.entryName) // entryName хранит путь внутри архива → структура сохраняется
+      if (!outPath) continue // выход за пределы (zip-slip) — пропускаем
+      if (existsSync(outPath) && !cfg.overwrite) continue // не перетираем пользовательские файлы без overwrite
+      mkdirSync(dirname(outPath), { recursive: true })
+      writeFileSync(outPath, e.getData())
+    }
+    mkdirSync(dirname(marker), { recursive: true })
+    writeFileSync(marker, new Date().toISOString())
+  } finally {
+    try { unlinkSync(tmpZip) } catch { /* уже нет */ }
+  }
+}
+
 async function installConfigs(modpack: Modpack, gameRoot: string, win: BrowserWindow): Promise<void> {
   const configs = modpack.configs ?? []
   if (configs.length === 0) return
@@ -133,6 +169,14 @@ async function installConfigs(modpack: Modpack, gameRoot: string, win: BrowserWi
   let done = 0
   for (const cfg of configs) {
     if (isCancelled()) throw new DOMException('Aborted', 'AbortError')
+
+    // Архив с распаковкой в корень
+    if (cfg.extract) {
+      await extractConfig(cfg, gameRoot, done, configs.length, win)
+      done++
+      continue
+    }
+
     const dest = safeJoin(gameRoot, cfg.path)
     if (!dest) {
       emit(win, { phase: 'download', message: `Пропуск конфига ${cfg.path} - недопустимый путь` })
@@ -181,6 +225,10 @@ export async function getModpackStatus(
 
   // Если какой-то конфиг сборки ещё не установлен — нужно обновление
   for (const cfg of modpack.configs ?? []) {
+    if (cfg.extract) {
+      if (!existsSync(extractMarkerPath(gameRoot, cfg))) return 'outdated'
+      continue
+    }
     const dest = safeJoin(gameRoot, cfg.path)
     if (dest && !existsSync(dest)) return 'outdated'
   }
