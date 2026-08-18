@@ -95,11 +95,27 @@
 .checkMark { color: #0a0a0a; font-size: 12px; font-weight: 800; line-height: 1; }
 .checkDash { width: 9px; height: 2.5px; border-radius: 2px; background: #0a0a0a; }
 
-/* Строка статистики над кнопками */
-.summary {
-  font-size: 12px;
-  color: var(--text-dim);
+/* Переключатель формата экспорта */
+.segment {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  flex-shrink: 0;
 }
+.segBtn {
+  padding: 8px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--bg-active);
+  transition: background 0.12s, color 0.12s;
+}
+.segBtn:hover { color: var(--text); }
+.segBtn + .segBtn { border-left: 1px solid var(--border); }
+.segOn { background: var(--accent); color: #0a0a0a; }
+.segOn:hover { color: #0a0a0a; }
+
 .footerRow {
   display: flex;
   align-items: center;

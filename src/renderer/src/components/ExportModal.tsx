@@ -69,6 +69,7 @@ export default function ExportModal({ packId, packName, showToast, onClose }: Pr
   const [entries, setEntries] = useState<DirEntry[]>([])
   const [loading, setLoading] = useState(true)
   const [exporting, setExporting] = useState(false)
+  const [format, setFormat] = useState<'fwpack' | 'mrpack'>('fwpack')
 
   useEffect(() => {
     let alive = true
@@ -106,7 +107,9 @@ export default function ExportModal({ packId, packName, showToast, onClose }: Pr
   async function doExport(): Promise<void> {
     setExporting(true)
     try {
-      const res = await window.api.modpacks.exportSelected(packId, marks)
+      const res = format === 'mrpack'
+        ? await window.api.modpacks.exportMrpack(packId, marks)
+        : await window.api.modpacks.exportSelected(packId, marks)
       if (res.cancelled) { setExporting(false); return } // диалог сохранения отменён — остаёмся в модалке
       if (res.ok) { showToast('Сборка сохранена в файл', 'success'); onClose() }
       else { showToast('Не удалось сохранить сборку', 'error'); setExporting(false) }
@@ -181,9 +184,22 @@ export default function ExportModal({ packId, packName, showToast, onClose }: Pr
         </div>
 
         <div className={st.footerRow}>
-          <span className={st.summary}>
-            {anySelected ? 'modpack.json добавится автоматически' : 'Ничего не выбрано'}
-          </span>
+          <div className={st.segment} role="tablist">
+            <button
+              className={`${st.segBtn} ${format === 'fwpack' ? st.segOn : ''}`}
+              onClick={() => setFormat('fwpack')}
+              title="Формат FamWorks: файлы упаковываются в архив (работает без интернета при импорте)"
+            >
+              .fwpack
+            </button>
+            <button
+              className={`${st.segBtn} ${format === 'mrpack' ? st.segOn : ''}`}
+              onClick={() => setFormat('mrpack')}
+              title="Формат Modrinth: моды по ссылкам, конфиги в overrides. Откроется в Modrinth App, Prism и др."
+            >
+              .mrpack
+            </button>
+          </div>
           <div className={st.footerBtns}>
             <button className={sm.cancelBtn} onClick={onClose}>Отмена</button>
             <button className={sm.saveBtn} disabled={!anySelected || exporting} onClick={doExport}>

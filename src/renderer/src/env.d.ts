@@ -12,6 +12,7 @@ interface Window {
       status: (id: string) => Promise<'not_installed' | 'outdated' | 'ready'>
       listDir: (id: string, relPath: string) => Promise<{ name: string; isDir: boolean; size: number; mtime: number }[]>
       exportSelected: (id: string, marks: Record<string, 'in' | 'out'>) => Promise<{ ok?: boolean; path?: string; cancelled?: boolean }>
+      exportMrpack: (id: string, marks: Record<string, 'in' | 'out'>) => Promise<{ ok?: boolean; path?: string; cancelled?: boolean }>
       import: () => Promise<{ ok?: boolean; modpack?: import('../../types/modpack').Modpack; cancelled?: boolean }>
     }
     getPathForFile: (file: File) => string

@@ -1,6 +1,7 @@
 import { dialog, app } from 'electron'
 import { join, dirname, sep, resolve } from 'path'
-import { existsSync, mkdirSync, rmSync, statSync, writeFileSync, readdirSync } from 'fs'
+import { existsSync, mkdirSync, rmSync, statSync, writeFileSync, readFileSync, readdirSync } from 'fs'
+import { createHash } from 'crypto'
 import axios from 'axios'
 import AdmZip from 'adm-zip'
 import { store } from './store'
@@ -95,6 +96,112 @@ export async function exportModpackSelected(id: string, marks: Record<string, Ex
   const zip = new AdmZip()
   zip.addFile('modpack.json', Buffer.from(JSON.stringify(modpack, null, 2), 'utf8'))
   if (existsSync(gameRoot) && statSync(gameRoot).isDirectory()) collectSelected(gameRoot, '', marks, zip)
+
+  zip.writeZip(res.filePath)
+  return { ok: true, path: res.filePath }
+}
+
+/** Обходит все выбранные ФАЙЛЫ (per-file), отсекая целиком невыбранные поддеревья. */
+function eachSelectedFile(gameRoot: string, relDir: string, marks: Record<string, ExportMark>, cb: (rel: string, abs: string) => void): void {
+  const absDir = relDir ? join(gameRoot, relDir) : gameRoot
+  let names: string[]
+  try { names = readdirSync(absDir) } catch { return }
+  for (const name of names) {
+    const rel = relDir ? `${relDir}/${name}` : name
+    const abs = join(absDir, name)
+    let isDir: boolean
+    try { isDir = statSync(abs).isDirectory() } catch { continue }
+    if (isDir) {
+      // пропускаем целиком, только если папка исключена и внутри нет отдельных отметок
+      if (resolveMark(rel, marks) === 'out' && !hasDescendantMark(rel, marks)) continue
+      eachSelectedFile(gameRoot, rel, marks, cb)
+    } else if (resolveMark(rel, marks) === 'in') {
+      cb(rel, abs)
+    }
+  }
+}
+
+interface MrFile {
+  path: string
+  hashes: { sha1?: string; sha512?: string }
+  env: { client: string; server: string }
+  downloads: string[]
+  fileSize?: number
+}
+
+/** Экспорт в формат Modrinth (.mrpack): моды/пакеты с URL идут в манифест по ссылке,
+ *  остальные выбранные файлы (конфиги, локальные jar без ссылки) - в overrides/. */
+export async function exportModpackMrpack(id: string, marks: Record<string, ExportMark>): Promise<ExportResult> {
+  const modpack = await fetchModpack(id)
+  const installPath = store.get('installPath') as string
+  const gameRoot = join(installPath, id)
+
+  const res = await dialog.showSaveDialog({
+    title: 'Экспорт сборки (Modrinth)',
+    defaultPath: `${slugify(modpack.name)}.mrpack`,
+    filters: [{ name: 'Modrinth сборка', extensions: ['mrpack'] }]
+  })
+  if (res.canceled || !res.filePath) return { cancelled: true }
+
+  // Карта «путь в сборке → данные для ссылки» из определения (только у кого есть download_url).
+  interface Ref { url: string; sha1?: string; sha512?: string; optional: boolean; clientOnly: boolean }
+  const refMap = new Map<string, Ref>()
+  const addRefs = (items: Mod[] | undefined, dir: string, clientOnly: boolean): void => {
+    for (const m of items ?? []) {
+      if (!m.download_url || !m.filename) continue
+      refMap.set(`${dir}/${m.filename}`, { url: m.download_url, sha1: m.sha1, sha512: m.sha512, optional: m.required === false, clientOnly })
+    }
+  }
+  addRefs(modpack.mods, 'mods', false)
+  addRefs(modpack.resourcepacks, 'resourcepacks', true)
+  addRefs(modpack.shaders, 'shaderpacks', true)
+
+  const zip = new AdmZip()
+  const files: MrFile[] = []
+
+  if (existsSync(gameRoot) && statSync(gameRoot).isDirectory()) {
+    eachSelectedFile(gameRoot, '', marks, (rel, abs) => {
+      const ref = refMap.get(rel)
+      if (ref) {
+        // Хэши считаем с диска - так они гарантированно совпадают с тем, что ставится по ссылке.
+        let sha1 = ref.sha1
+        let sha512 = ref.sha512
+        let size = 0
+        try {
+          const buf = readFileSync(abs)
+          size = buf.length
+          sha1 = createHash('sha1').update(buf).digest('hex')
+          sha512 = createHash('sha512').update(buf).digest('hex')
+        } catch { /* нет файла на диске - используем объявленные хэши */ }
+        const hashes: MrFile['hashes'] = {}
+        if (sha1) hashes.sha1 = sha1
+        if (sha512) hashes.sha512 = sha512
+        const env = ref.clientOnly
+          ? { client: ref.optional ? 'optional' : 'required', server: 'unsupported' }
+          : { client: ref.optional ? 'optional' : 'required', server: ref.optional ? 'optional' : 'required' }
+        files.push({ path: rel, hashes, env, downloads: [ref.url], ...(size ? { fileSize: size } : {}) })
+      } else {
+        // Без ссылки - упаковываем как есть в overrides (Modrinth разложит их в корень игры).
+        try { zip.addFile(`overrides/${rel}`, readFileSync(abs)) } catch { /* пропускаем недоступный файл */ }
+      }
+    })
+  }
+
+  const deps: Record<string, string> = { minecraft: modpack.mc_version }
+  const loaderKey: Record<string, string> = { fabric: 'fabric-loader', quilt: 'quilt-loader', forge: 'forge', neoforge: 'neoforge' }
+  const lk = loaderKey[modpack.loader]
+  if (lk && modpack.loader_version) deps[lk] = modpack.loader_version
+
+  const index = {
+    formatVersion: 1,
+    game: 'minecraft',
+    versionId: modpack.changelog?.[0]?.version || '1.0.0',
+    name: modpack.name,
+    summary: modpack.description || '',
+    files,
+    dependencies: deps
+  }
+  zip.addFile('modrinth.index.json', Buffer.from(JSON.stringify(index, null, 2), 'utf8'))
 
   zip.writeZip(res.filePath)
   return { ok: true, path: res.filePath }

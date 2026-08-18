@@ -36,6 +36,10 @@ export function setupIpcHandlers() {
     const { exportModpackSelected } = await import('./packio')
     return exportModpackSelected(id, marks)
   })
+  ipcMain.handle('modpack:export-mrpack', async (_, id: string, marks: Record<string, 'in' | 'out'>) => {
+    const { exportModpackMrpack } = await import('./packio')
+    return exportModpackMrpack(id, marks)
+  })
   ipcMain.handle('modpack:import', async () => {
     const { importModpack } = await import('./packio')
     return importModpack()
