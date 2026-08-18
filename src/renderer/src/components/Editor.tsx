@@ -336,20 +336,39 @@ export default function Editor({ packKey, loaded, onSaved, onDeleted }: Props) {
           </div>
           <div className={styles.changelog}>
             {configs.length === 0 && <div className={styles.modsEmpty}>Конфигов нет</div>}
-            {configs.map((c, i) => (
-              <div key={i} className={styles.cfgRow}>
-                <input className={styles.cfgPath} value={c.path} placeholder="config/mod.json или options.txt"
-                  onChange={e => updateConfig(i, { path: e.target.value })} title="Путь относительно папки игры" />
-                <button
-                  className={`${styles.reqBtn} ${c.overwrite ? styles.reqOn : ''}`}
-                  onClick={() => updateConfig(i, { overwrite: !c.overwrite })}
-                  title={c.overwrite ? 'Всегда перезаписывать' : 'Только если файла нет'}
-                >
-                  {c.overwrite ? 'FORCE' : 'ONCE'}
-                </button>
-                <button className={styles.delMod} onClick={() => removeConfig(i)}>✕</button>
-              </div>
-            ))}
+            {configs.map((c, i) => {
+              const isZip = /\.zip($|[?#])/i.test(c.download_url) || /\.zip$/i.test(c.path)
+              return (
+                <div key={i} className={styles.cfgRow}>
+                  {c.extract ? (
+                    <span className={styles.cfgPath} style={{ opacity: 0.75, display: 'flex', alignItems: 'center' }}
+                      title="Архив распакуется в корень сборки, структура папок сохраняется">
+                      📦 распаковать в корень
+                    </span>
+                  ) : (
+                    <input className={styles.cfgPath} value={c.path} placeholder="config/mod.json или options.txt"
+                      onChange={e => updateConfig(i, { path: e.target.value })} title="Путь относительно папки игры" />
+                  )}
+                  {isZip && (
+                    <button
+                      className={`${styles.reqBtn} ${c.extract ? styles.reqOn : ''}`}
+                      onClick={() => updateConfig(i, { extract: !c.extract })}
+                      title={c.extract ? 'Распаковать zip в корень сборки (структура сохраняется), архив удалить' : 'Положить архив как есть по пути'}
+                    >
+                      {c.extract ? 'В КОРЕНЬ' : 'ФАЙЛ'}
+                    </button>
+                  )}
+                  <button
+                    className={`${styles.reqBtn} ${c.overwrite ? styles.reqOn : ''}`}
+                    onClick={() => updateConfig(i, { overwrite: !c.overwrite })}
+                    title={c.overwrite ? 'Всегда перезаписывать' : 'Только если файла нет'}
+                  >
+                    {c.overwrite ? 'FORCE' : 'ONCE'}
+                  </button>
+                  <button className={styles.delMod} onClick={() => removeConfig(i)}>✕</button>
+                </div>
+              )
+            })}
           </div>
         </section>
 
