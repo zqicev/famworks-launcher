@@ -349,7 +349,7 @@ export default function Editor({ packKey, loaded, onSaved, onDeleted }: Props) {
                       onClick={() => updateConfig(i, { extract: !c.extract })}
                       title={c.extract ? 'Распаковать zip в корень сборки (структура сохраняется), архив удалить' : 'Положить архив как есть по пути'}
                     >
-                      {c.extract ? '📦 В КОРЕНЬ' : 'ФАЙЛ'}
+                      {c.extract ? 'В КОРЕНЬ' : 'ФАЙЛ'}
                     </button>
                   )}
                   <button
