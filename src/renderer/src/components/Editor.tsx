@@ -340,22 +340,16 @@ export default function Editor({ packKey, loaded, onSaved, onDeleted }: Props) {
               const isZip = /\.zip($|[?#])/i.test(c.download_url) || /\.zip$/i.test(c.path)
               return (
                 <div key={i} className={styles.cfgRow}>
-                  {c.extract ? (
-                    <span className={styles.cfgPath} style={{ opacity: 0.75, display: 'flex', alignItems: 'center' }}
-                      title="Архив распакуется в корень сборки, структура папок сохраняется">
-                      📦 распаковать в корень
-                    </span>
-                  ) : (
-                    <input className={styles.cfgPath} value={c.path} placeholder="config/mod.json или options.txt"
-                      onChange={e => updateConfig(i, { path: e.target.value })} title="Путь относительно папки игры" />
-                  )}
+                  <input className={styles.cfgPath} value={c.path} placeholder="config/mod.json или options.txt"
+                    onChange={e => updateConfig(i, { path: e.target.value })}
+                    title={c.extract ? 'Архив распакуется в корень сборки (структура сохраняется), сам путь игнорируется' : 'Путь относительно папки игры'} />
                   {isZip && (
                     <button
-                      className={`${styles.reqBtn} ${c.extract ? styles.reqOn : ''}`}
+                      className={`${styles.reqBtn} ${styles.extractBtn} ${c.extract ? styles.reqOn : ''}`}
                       onClick={() => updateConfig(i, { extract: !c.extract })}
                       title={c.extract ? 'Распаковать zip в корень сборки (структура сохраняется), архив удалить' : 'Положить архив как есть по пути'}
                     >
-                      {c.extract ? 'В КОРЕНЬ' : 'ФАЙЛ'}
+                      {c.extract ? '📦 В КОРЕНЬ' : 'ФАЙЛ'}
                     </button>
                   )}
                   <button
