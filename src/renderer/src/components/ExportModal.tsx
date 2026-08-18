@@ -16,6 +16,22 @@ interface Props {
 // Отметки по умолчанию: игровой контент, который обычно и переносят между машинами.
 const DEFAULT_MARKS: Record<string, Mark> = { mods: 'in', resourcepacks: 'in', shaderpacks: 'in' }
 
+const FolderIcon = () => (
+  <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+  </svg>
+)
+const FileIcon = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M13 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z" /><polyline points="13 2 13 9 20 9" />
+  </svg>
+)
+const ChevronIcon = () => (
+  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <polyline points="9 18 15 12 9 6" />
+  </svg>
+)
+
 /** Эффективная отметка пути: ближайший предок-или-он-сам с явной отметкой; иначе 'out'. */
 function resolveMark(rel: string, marks: Record<string, Mark>): Mark {
   let p = rel
@@ -151,11 +167,13 @@ export default function ExportModal({ packId, packName, showToast, onClose }: Pr
                     {state === 'full' && <span className={st.checkMark}>✓</span>}
                     {state === 'partial' && <span className={st.checkDash} />}
                   </button>
-                  <span className={st.icon}>{e.isDir ? '📁' : '📄'}</span>
+                  <span className={`${st.icon} ${e.isDir ? st.iconDir : st.iconFile}`}>
+                    {e.isDir ? <FolderIcon /> : <FileIcon />}
+                  </span>
                   <span className={st.name}>{e.name}</span>
                   {!e.isDir && <span className={st.meta}>{formatBytes(e.size)}</span>}
                   <span className={st.meta}>{fmtDate(e.mtime)}</span>
-                  {e.isDir && <span className={st.chev}>›</span>}
+                  {e.isDir && <span className={st.chev}><ChevronIcon /></span>}
                 </div>
               )
             })

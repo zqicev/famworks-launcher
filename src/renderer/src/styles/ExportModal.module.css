@@ -51,7 +51,16 @@
 .row:hover { background: var(--bg-hover); }
 .rowDir { cursor: pointer; }
 
-.icon { font-size: 15px; flex-shrink: 0; width: 18px; text-align: center; opacity: 0.9; }
+.icon {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.iconDir { color: var(--accent); }
+.iconFile { color: var(--text-dim); }
 .name {
   flex: 1;
   min-width: 0;
@@ -67,7 +76,7 @@
   flex-shrink: 0;
   font-variant-numeric: tabular-nums;
 }
-.chev { color: var(--text-dim); font-size: 12px; flex-shrink: 0; width: 12px; text-align: center; }
+.chev { color: var(--text-dim); flex-shrink: 0; display: flex; align-items: center; }
 
 /* Трёхпозиционный чекбокс */
 .check {
