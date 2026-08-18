@@ -28,9 +28,13 @@ export function setupIpcHandlers() {
   ipcMain.handle('modpacks:index', () => fetchModpackIndex())
   ipcMain.handle('modpacks:get', (_, id: string) => fetchModpack(id))
 
-  ipcMain.handle('modpack:export', async (_, id: string) => {
-    const { exportModpack } = await import('./packio')
-    return exportModpack(id)
+  ipcMain.handle('modpack:list-dir', async (_, id: string, relPath: string) => {
+    const { listPackDir } = await import('./packio')
+    return listPackDir(id, relPath)
+  })
+  ipcMain.handle('modpack:export-selected', async (_, id: string, marks: Record<string, 'in' | 'out'>) => {
+    const { exportModpackSelected } = await import('./packio')
+    return exportModpackSelected(id, marks)
   })
   ipcMain.handle('modpack:import', async () => {
     const { importModpack } = await import('./packio')

@@ -9,6 +9,7 @@ import SettingsModal from './components/SettingsModal'
 import UpdateBanner from './components/UpdateBanner'
 import CreateModpackModal from './components/CreateModpackModal'
 import ConfirmModal from './components/ConfirmModal'
+import ExportModal from './components/ExportModal'
 import CrashModal, { CrashData } from './components/CrashModal'
 import { ensureLogCapture } from './gameLog'
 import styles from './styles/App.module.css'
@@ -26,6 +27,7 @@ export default function App() {
   const [customPacks, setCustomPacks] = useState<Modpack[]>([])
   const [createOpen, setCreateOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<Modpack | null>(null)
+  const [exportTarget, setExportTarget] = useState<{ id: string; name: string } | null>(null)
   const [toast, setToast] = useState<{ text: string; kind: 'info' | 'success' | 'error' } | null>(null)
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [devMode, setDevMode] = useState(false)
@@ -179,16 +181,9 @@ export default function App() {
     }
   }
 
-  const handleExportCustom = async (id: string) => {
-    showToast('Экспорт сборки…', 'info')
-    try {
-      const res = await window.api.modpacks.export(id)
-      if (res.cancelled) { setToast(null); return }
-      if (res.ok) showToast('Сборка сохранена в файл', 'success')
-      else setToast(null)
-    } catch (e) {
-      showToast(`Ошибка экспорта: ${e instanceof Error ? e.message : String(e)}`, 'error')
-    }
+  const handleExportCustom = (id: string) => {
+    const pack = [...(modpackIndex?.modpacks ?? []), ...customPacks].find(p => p.id === id)
+    setExportTarget({ id, name: pack?.name ?? 'Сборка' })
   }
 
   return (
@@ -258,6 +253,14 @@ export default function App() {
               danger
               onConfirm={confirmDeleteCustom}
               onClose={() => setDeleteTarget(null)}
+            />
+          )}
+          {exportTarget && (
+            <ExportModal
+              packId={exportTarget.id}
+              packName={exportTarget.name}
+              showToast={showToast}
+              onClose={() => setExportTarget(null)}
             />
           )}
         </div>

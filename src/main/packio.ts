@@ -1,24 +1,86 @@
 import { dialog, app } from 'electron'
-import { join, dirname, sep } from 'path'
-import { existsSync, mkdirSync, rmSync, statSync, writeFileSync } from 'fs'
+import { join, dirname, sep, resolve } from 'path'
+import { existsSync, mkdirSync, rmSync, statSync, writeFileSync, readdirSync } from 'fs'
 import axios from 'axios'
 import AdmZip from 'adm-zip'
 import { store } from './store'
 import { fetchModpack } from './modpacks'
 import { Modpack, Mod } from '../types/modpack'
 
-// Что кладём в .fwpack (worlds/logs/versions/assets не трогаем - они личные/восстановимые)
-const CONTENT_DIRS = ['mods', 'resourcepacks', 'shaderpacks', 'config']
-
 export interface ExportResult { ok?: boolean; path?: string; cancelled?: boolean }
 export interface ImportResult { ok?: boolean; modpack?: Modpack; cancelled?: boolean }
+export interface DirEntry { name: string; isDir: boolean; size: number; mtime: number }
+
+/** Отметки выбора для экспорта: путь (posix, относительно корня сборки) → включён/исключён.
+ *  Действует ближайший предок: если у файла нет своей отметки, берётся отметка родителя и т.д.
+ *  Корень по умолчанию 'out' (ничего не выбрано). */
+export type ExportMark = 'in' | 'out'
 
 function slugify(s: string): string {
   return (s || 'pack').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'pack'
 }
 
-/** Экспорт сборки в файл .fwpack (zip: modpack.json + mods/resourcepacks/shaderpacks/config + options.txt). */
-export async function exportModpack(id: string): Promise<ExportResult> {
+/** Содержимое одной папки внутри сборки (для дерева выбора при экспорте). Ленивая загрузка по уровням. */
+export function listPackDir(id: string, relPath: string): DirEntry[] {
+  const installPath = store.get('installPath') as string
+  if (!installPath) return []
+  const gameRoot = resolve(join(installPath, id))
+  const target = resolve(gameRoot, relPath || '.')
+  // защита от выхода за пределы папки сборки
+  if (target !== gameRoot && !target.startsWith(gameRoot + sep)) return []
+  if (!existsSync(target) || !statSync(target).isDirectory()) return []
+
+  const out: DirEntry[] = []
+  for (const name of readdirSync(target)) {
+    try {
+      const st = statSync(join(target, name))
+      out.push({ name, isDir: st.isDirectory(), size: st.isDirectory() ? 0 : st.size, mtime: st.mtimeMs })
+    } catch { /* недоступный файл — пропускаем */ }
+  }
+  // папки сверху, затем файлы; внутри — по алфавиту
+  out.sort((a, b) => (a.isDir === b.isDir ? a.name.localeCompare(b.name, 'ru') : a.isDir ? -1 : 1))
+  return out
+}
+
+/** Эффективная отметка пути: ближайший предок-или-он-сам с явной отметкой; иначе 'out'. */
+function resolveMark(rel: string, marks: Record<string, ExportMark>): ExportMark {
+  let p = rel
+  for (;;) {
+    if (marks[p]) return marks[p]
+    const i = p.lastIndexOf('/')
+    if (i < 0) return 'out'
+    p = p.slice(0, i)
+  }
+}
+
+/** Есть ли под этим путём хоть одна явная отметка (значит поддерево «смешанное»). */
+function hasDescendantMark(rel: string, marks: Record<string, ExportMark>): boolean {
+  const prefix = rel + '/'
+  return Object.keys(marks).some(k => k.startsWith(prefix))
+}
+
+/** Кладёт в zip выбранные файлы/папки, отсекая целиком невыбранные поддеревья (saves/versions/assets и т.п.). */
+function collectSelected(gameRoot: string, relDir: string, marks: Record<string, ExportMark>, zip: AdmZip): void {
+  const absDir = relDir ? join(gameRoot, relDir) : gameRoot
+  let names: string[]
+  try { names = readdirSync(absDir) } catch { return }
+  for (const name of names) {
+    const rel = relDir ? `${relDir}/${name}` : name
+    const abs = join(absDir, name)
+    let isDir: boolean
+    try { isDir = statSync(abs).isDirectory() } catch { continue }
+    if (isDir) {
+      if (hasDescendantMark(rel, marks)) collectSelected(gameRoot, rel, marks, zip) // смешанное — вглубь
+      else if (resolveMark(rel, marks) === 'in') zip.addLocalFolder(abs, rel)        // папка целиком
+      // 'out' и без вложенных отметок — пропускаем целиком (не ходим внутрь)
+    } else if (resolveMark(rel, marks) === 'in') {
+      zip.addLocalFile(abs, relDir)
+    }
+  }
+}
+
+/** Экспорт сборки в .fwpack по выбору пользователя (modpack.json + выбранные файлы/папки). */
+export async function exportModpackSelected(id: string, marks: Record<string, ExportMark>): Promise<ExportResult> {
   const modpack = await fetchModpack(id)
   const installPath = store.get('installPath') as string
   const gameRoot = join(installPath, id)
@@ -32,12 +94,7 @@ export async function exportModpack(id: string): Promise<ExportResult> {
 
   const zip = new AdmZip()
   zip.addFile('modpack.json', Buffer.from(JSON.stringify(modpack, null, 2), 'utf8'))
-  for (const sub of CONTENT_DIRS) {
-    const dir = join(gameRoot, sub)
-    if (existsSync(dir) && statSync(dir).isDirectory()) zip.addLocalFolder(dir, sub)
-  }
-  const opts = join(gameRoot, 'options.txt')
-  if (existsSync(opts)) zip.addLocalFile(opts)
+  if (existsSync(gameRoot) && statSync(gameRoot).isDirectory()) collectSelected(gameRoot, '', marks, zip)
 
   zip.writeZip(res.filePath)
   return { ok: true, path: res.filePath }

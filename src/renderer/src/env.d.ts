@@ -10,7 +10,8 @@ interface Window {
       index: () => Promise<import('../../types/modpack').ModpackIndex>
       get: (id: string) => Promise<import('../../types/modpack').Modpack>
       status: (id: string) => Promise<'not_installed' | 'outdated' | 'ready'>
-      export: (id: string) => Promise<{ ok?: boolean; path?: string; cancelled?: boolean }>
+      listDir: (id: string, relPath: string) => Promise<{ name: string; isDir: boolean; size: number; mtime: number }[]>
+      exportSelected: (id: string, marks: Record<string, 'in' | 'out'>) => Promise<{ ok?: boolean; path?: string; cancelled?: boolean }>
       import: () => Promise<{ ok?: boolean; modpack?: import('../../types/modpack').Modpack; cancelled?: boolean }>
     }
     getPathForFile: (file: File) => string
