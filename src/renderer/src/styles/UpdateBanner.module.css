@@ -14,8 +14,8 @@
 }
 
 .bannerReady {
-  background: rgba(197, 248, 42, 0.08);
-  border-bottom-color: rgba(197, 248, 42, 0.3);
+  background: rgb(from var(--accent) r g b / 0.08);
+  border-bottom-color: rgb(from var(--accent) r g b / 0.3);
   color: var(--text);
 }
 

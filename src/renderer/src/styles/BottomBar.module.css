@@ -179,7 +179,7 @@
 .playBtnAccent:hover:not(:disabled) {
   background: var(--accent-dim);
   transform: translateY(-1px);
-  box-shadow: 0 6px 18px rgba(197, 248, 42, 0.25);
+  box-shadow: 0 6px 18px rgb(from var(--accent) r g b / 0.25);
 }
 .playBtnAccent:active:not(:disabled) {
   transform: translateY(0);

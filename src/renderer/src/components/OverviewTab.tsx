@@ -164,11 +164,11 @@ function WorldIcon(): JSX.Element {
 function ServerIcon(): JSX.Element {
   return (
     <div className={`${styles.iconFallback} ${styles.fbServer}`}>
-      <svg viewBox="0 0 46 46" className={styles.iconSvg} fill="none" stroke="#c5f82a" strokeWidth="2" xmlns="http://www.w3.org/2000/svg">
+      <svg viewBox="0 0 46 46" className={styles.iconSvg} fill="none" stroke="currentColor" strokeWidth="2" xmlns="http://www.w3.org/2000/svg">
         <rect x="11" y="13" width="24" height="8.5" rx="2.5" />
         <rect x="11" y="24.5" width="24" height="8.5" rx="2.5" />
-        <circle cx="16" cy="17.2" r="1.4" fill="#c5f82a" stroke="none" />
-        <circle cx="16" cy="28.7" r="1.4" fill="#c5f82a" stroke="none" />
+        <circle cx="16" cy="17.2" r="1.4" fill="currentColor" stroke="none" />
+        <circle cx="16" cy="28.7" r="1.4" fill="currentColor" stroke="none" />
       </svg>
     </div>
   )

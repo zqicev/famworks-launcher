@@ -75,5 +75,5 @@
 .notice {
   padding: 10px 14px; font-size: 12.5px; border-radius: 9px;
 }
-.noticeOk { color: var(--accent); background: rgba(197, 248, 42, 0.1); border: 1px solid rgba(197, 248, 42, 0.3); }
+.noticeOk { color: var(--accent); background: rgb(from var(--accent) r g b / 0.1); border: 1px solid rgb(from var(--accent) r g b / 0.3); }
 .noticeErr { color: #ffb4b4; background: rgba(255, 68, 68, 0.1); border: 1px solid rgba(255, 68, 68, 0.35); }
