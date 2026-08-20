@@ -12,6 +12,7 @@ import ConfirmModal from './components/ConfirmModal'
 import ExportModal from './components/ExportModal'
 import CrashModal, { CrashData } from './components/CrashModal'
 import { ensureLogCapture } from './gameLog'
+import { applyAccent } from './lib/theme'
 import styles from './styles/App.module.css'
 
 export default function App() {
@@ -100,6 +101,7 @@ export default function App() {
     const init = async () => {
       const path = await window.api.store.get('installPath') as string
       window.api.store.get('devMode').then(v => setDevMode(!!v)).catch(() => {})
+      window.api.store.get('accentColor').then(c => { if (typeof c === 'string' && c) applyAccent(c) }).catch(() => {})
       if (!path) { setNeedsSetup(true); setLoading(false); return }
       setInstallPath(path)
       await Promise.all([loadIndex(), loadCustom()])
