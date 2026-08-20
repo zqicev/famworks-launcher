@@ -40,6 +40,19 @@ export function setupIpcHandlers() {
     const { exportModpackMrpack } = await import('./packio')
     return exportModpackMrpack(id, marks)
   })
+
+  ipcMain.handle('bg:pick', async () => {
+    const { pickBackground } = await import('./background')
+    return pickBackground()
+  })
+  ipcMain.handle('bg:clear', async () => {
+    const { clearBackground } = await import('./background')
+    clearBackground()
+  })
+  ipcMain.handle('bg:get', async () => {
+    const { getBackground } = await import('./background')
+    return getBackground()
+  })
   ipcMain.handle('modpack:import', async () => {
     const { importModpack } = await import('./packio')
     return importModpack()

@@ -11,6 +11,28 @@
   overflow: hidden;
 }
 
+/* Пользовательский фон: приглушённая, размытая картинка позади всего интерфейса.
+   scale скрывает прозрачные края, которые даёт blur. Затемнение довершает
+   полупрозрачный базовый фон (--bg под body.has-bg). */
+.bgLayer {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background-size: cover;
+  background-position: center;
+  filter: blur(7px) brightness(0.72) saturate(1.05);
+  transform: scale(1.08);
+  pointer-events: none;
+}
+/* Затемняющий слой поверх картинки (единый, чтобы фон/панели не складывали прозрачности) */
+.bgScrim {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background: linear-gradient(180deg, rgba(8, 8, 8, 0.5) 0%, rgba(8, 8, 8, 0.64) 100%);
+}
+
 .toast {
   position: fixed;
   bottom: 22px;

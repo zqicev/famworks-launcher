@@ -29,6 +29,7 @@ export default function App() {
   const [createOpen, setCreateOpen] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<Modpack | null>(null)
   const [exportTarget, setExportTarget] = useState<{ id: string; name: string } | null>(null)
+  const [bgImage, setBgImage] = useState<string | null>(null)
   const [toast, setToast] = useState<{ text: string; kind: 'info' | 'success' | 'error' } | null>(null)
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [devMode, setDevMode] = useState(false)
@@ -81,6 +82,12 @@ export default function App() {
   // Захват логов игры для вкладки «Логи» (один раз на всё приложение)
   useEffect(() => { ensureLogCapture() }, [])
 
+  // Пользовательский фон: делаем базовый холст прозрачным, чтобы картинка просвечивала.
+  useEffect(() => {
+    document.documentElement.classList.toggle('has-bg', !!bgImage)
+    return () => document.documentElement.classList.remove('has-bg')
+  }, [bgImage])
+
   // Диагностика краша игры
   useEffect(() => window.api.crash.onReport(d => setCrash(d as CrashData)), [])
 
@@ -102,6 +109,7 @@ export default function App() {
       const path = await window.api.store.get('installPath') as string
       window.api.store.get('devMode').then(v => setDevMode(!!v)).catch(() => {})
       window.api.store.get('accentColor').then(c => { if (typeof c === 'string' && c) applyAccent(c) }).catch(() => {})
+      window.api.bg.get().then(setBgImage).catch(() => {})
       if (!path) { setNeedsSetup(true); setLoading(false); return }
       setInstallPath(path)
       await Promise.all([loadIndex(), loadCustom()])
@@ -190,6 +198,10 @@ export default function App() {
 
   return (
     <div className={styles.root}>
+      {bgImage && <>
+        <div className={styles.bgLayer} style={{ backgroundImage: `url("fwbg://local/${bgImage}")` }} />
+        <div className={styles.bgScrim} />
+      </>}
       <TitleBar />
       <UpdateBanner />
       {needsSetup ? (
@@ -242,6 +254,8 @@ export default function App() {
               onPathChange={setInstallPath}
               devMode={devMode}
               onDevModeChange={setDevMode}
+              bgImage={bgImage}
+              onBgChange={setBgImage}
               onClose={() => setSettingsOpen(false)}
             />
           )}

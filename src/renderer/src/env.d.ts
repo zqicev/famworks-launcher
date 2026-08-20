@@ -85,6 +85,11 @@ interface Window {
       openExternal: (url: string) => Promise<void>
     }
     cleanupJunk: () => Promise<{ freedBytes: number; instances: number }>
+    bg: {
+      pick: () => Promise<{ filename?: string; cancelled?: boolean }>
+      clear: () => Promise<void>
+      get: () => Promise<string | null>
+    }
     browser: {
       installModpack: (source: string, id: string) => Promise<{ ok?: boolean; modpack?: import('../../types/modpack').Modpack; error?: string; cancelled?: boolean }>
       install: (source: string, type: string, projectId: string, refId: string, mc: string, loader: string, packRoot: string) =>

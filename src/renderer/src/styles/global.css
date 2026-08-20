@@ -31,6 +31,19 @@ html, body, #root {
   user-select: none;
 }
 
+/* Пользовательский фон активен: базовый холст прозрачный, чтобы просвечивала картинка
+   (слой .bgLayer и затемнение .bgScrim лежат позади, z-index:-1). Поверхности - карточки,
+   меню, модалки (--bg-surface и т.п.) - остаются непрозрачными, читаемость не страдает.
+   --bg делаем чуть затемнённо-прозрачным: области базового фона получают лёгкую вуаль. */
+html.has-bg,
+html.has-bg body,
+html.has-bg #root {
+  background: transparent;
+}
+html.has-bg {
+  --bg: rgba(10, 10, 10, 0.34);
+}
+
 button {
   font-family: var(--font-ui);
   cursor: pointer;

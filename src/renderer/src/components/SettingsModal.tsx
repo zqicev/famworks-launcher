@@ -8,10 +8,12 @@ interface Props {
   onPathChange: (path: string) => void
   devMode: boolean
   onDevModeChange: (v: boolean) => void
+  bgImage: string | null
+  onBgChange: (filename: string | null) => void
   onClose: () => void
 }
 
-export default function SettingsModal({ installPath, onPathChange, devMode, onDevModeChange, onClose }: Props) {
+export default function SettingsModal({ installPath, onPathChange, devMode, onDevModeChange, bgImage, onBgChange, onClose }: Props) {
   const [path, setPath] = useState(installPath)
   const [cleaning, setCleaning] = useState(false)
   const [cleanMsg, setCleanMsg] = useState('')
@@ -52,6 +54,15 @@ export default function SettingsModal({ installPath, onPathChange, devMode, onDe
   const pickFolder = async () => {
     const p = await window.api.dialog.pickFolder()
     if (p) setPath(p)
+  }
+
+  const pickBg = async () => {
+    const r = await window.api.bg.pick()
+    if (r.filename) onBgChange(r.filename)
+  }
+  const clearBg = async () => {
+    await window.api.bg.clear()
+    onBgChange(null)
   }
 
   const save = async () => {
@@ -113,6 +124,16 @@ export default function SettingsModal({ installPath, onPathChange, devMode, onDe
               {accent !== DEFAULT_ACCENT && (
                 <> · <button className={styles.linkBtn} onClick={() => pickAccent(DEFAULT_ACCENT)}>сбросить</button></>
               )}
+            </p>
+
+            <div className={styles.pathRow} style={{ marginTop: 12 }}>
+              <button className={styles.browseBtn} onClick={pickBg}>
+                {bgImage ? 'Сменить фон' : 'Выбрать фон'}
+              </button>
+              {bgImage && <button className={styles.iconBtn} onClick={clearBg} title="Убрать фон">Убрать</button>}
+            </div>
+            <p className={styles.hint}>
+              Своя картинка на фон лаунчера. Приглушается затемнением и размытием, чтобы интерфейс оставался читаемым.
             </p>
           </div>
 

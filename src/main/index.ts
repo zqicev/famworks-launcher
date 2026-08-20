@@ -5,6 +5,10 @@ import { setDefaultResultOrder } from 'dns'
 import { setupIpcHandlers } from './ipc'
 import { setupUpdater } from './updater'
 import { initDiscord } from './discord'
+import { registerBackgroundSchemes, registerBackgroundProtocol } from './background'
+
+// Схему пользовательского фона (fwbg://) надо объявить до готовности приложения.
+registerBackgroundSchemes()
 
 // Предпочитаем IPv4: у части провайдеров/сетей IPv6 «висит», и Node-запросы
 // (Ely.by, GitHub и т.п.) уходят в таймаут, хотя в браузере всё открывается.
@@ -81,6 +85,7 @@ if (!gotLock) {
   })
 
   app.whenReady().then(() => {
+    registerBackgroundProtocol()
     setupIpcHandlers()
     const win = createWindow()
     setupUpdater()
