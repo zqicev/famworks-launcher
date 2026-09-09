@@ -61,7 +61,10 @@ export interface CharacterAnim {
   idle?: string       // URL к .animation.json для idle-анимации; иначе встроенная idle
   idle_data?: string  // инлайн-содержимое .animation.json (для локальных сборок; приоритетнее idle)
   idle_name?: string  // имя анимации внутри файла (если несколько); иначе берётся первая
-  objects?: SceneObject[] // доп. glTF-объекты сцены со своими анимациями
+  objects?: SceneObject[] // доп. glTF-объекты сцены со своими анимациями (устар. — см. scene)
+  // Единая сцена: один экспорт Blockbench (.glb/.gltf, URL или data:) с игроком + объектами + анимациями.
+  // Если задан — рендерится как единая сцена (SceneStage), а текстура игрока подменяется скином аккаунта.
+  scene?: string
 }
 
 export interface Modpack extends ModpackSummary {

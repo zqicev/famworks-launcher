@@ -73,6 +73,24 @@ export function setupIpcHandlers() {
       return { error: e instanceof Error ? e.message : String(e) }
     }
   })
+  // Выбор 3D-сцены (.glb/.gltf из Blockbench: игрок + объекты + анимации) — читаем в data-URL.
+  ipcMain.handle('scene:pick', async () => {
+    const res = await dialog.showOpenDialog({
+      title: '3D-сцена (.glb или .gltf)',
+      filters: [{ name: 'glTF сцена', extensions: ['glb', 'gltf'] }],
+      properties: ['openFile']
+    })
+    if (res.canceled || !res.filePaths[0]) return { cancelled: true }
+    const file = res.filePaths[0]
+    try {
+      const buf = readFileSync(file)
+      const glb = file.toLowerCase().endsWith('.glb')
+      const mime = glb ? 'model/gltf-binary' : 'model/gltf+json'
+      return { dataUrl: `data:${mime};base64,${buf.toString('base64')}` }
+    } catch (e) {
+      return { error: e instanceof Error ? e.message : String(e) }
+    }
+  })
   ipcMain.handle('modpack:import', async () => {
     const { importModpack } = await import('./packio')
     return importModpack()

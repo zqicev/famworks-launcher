@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react'
 import { Modpack, CharacterAnim } from '../../../types/modpack'
 import { formatSizeMb } from '../lib/format'
 import CharacterStage from './CharacterStage'
+import SceneStage from './SceneStage'
 import AnimationGuideModal from './AnimationGuideModal'
+import SceneGuideModal from './SceneGuideModal'
 import styles from '../styles/OverviewTab.module.css'
 
 interface Props { modpack: Modpack; busyId: string | null; onModpackReload?: () => void }
@@ -17,15 +19,28 @@ export default function OverviewTab({ modpack, busyId, onModpackReload }: Props)
   const sizeFmt = formatSizeMb(modpack.mods.reduce((s, m) => s + m.size_mb, 0))
 
   const [guideOpen, setGuideOpen] = useState(false)
+  const [sceneOpen, setSceneOpen] = useState(false)
   const [charOverride, setCharOverride] = useState<CharacterAnim | null>(null)
+  const character = charOverride ?? modpack.character
   const isCustom = modpack.id.startsWith('custom-')
 
-  // Загруженная локально анимация: сразу показываем и сохраняем в сборку (electron-store).
+  // Сохраняем изменения персонажа в сборку (electron-store) и просим App перечитать её.
+  const saveCharacter = (next: CharacterAnim): void => {
+    setCharOverride(next) // мгновенно показываем
+    window.api.custom.save({ ...modpack, character: next }).then(() => onModpackReload?.()).catch(() => {})
+  }
+  // Загруженная локально анимация игрока.
   const applyAnim = (idleData: string): void => {
-    const character: CharacterAnim = { ...(modpack.character ?? {}), idle_data: idleData }
-    setCharOverride(character) // мгновенно показываем
-    // сохраняем в сборку и просим App перечитать её (чтобы пережило переключение вкладок)
-    window.api.custom.save({ ...modpack, character }).then(() => onModpackReload?.()).catch(() => {})
+    saveCharacter({ ...(character ?? {}), idle_data: idleData })
+  }
+  // Загруженная локально единая сцена (.glb/.gltf).
+  const applyScene = (sceneUrl: string): void => {
+    saveCharacter({ ...(character ?? {}), scene: sceneUrl })
+  }
+  const clearScene = (): void => {
+    const next = { ...(character ?? {}) }
+    delete next.scene
+    saveCharacter(next)
   }
   const [entries, setEntries] = useState<Entry[]>([])
   const [pings, setPings] = useState<Record<string, PingState>>({})
@@ -115,14 +130,27 @@ export default function OverviewTab({ modpack, busyId, onModpackReload }: Props)
       </div>
 
       <div className={styles.stageCol}>
-        <CharacterStage character={charOverride ?? modpack.character} />
+        {character?.scene
+          ? <SceneStage scene={character.scene} />
+          : <CharacterStage character={character} />}
         {isCustom && (
-          <button className={styles.changeAnimBtn} onClick={() => setGuideOpen(true)} title="Загрузить свою анимацию">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <polygon points="5 3 19 12 5 21 5 3" />
-            </svg>
-            Сменить анимацию
-          </button>
+          <div className={styles.stageActions}>
+            {!character?.scene && (
+              <button className={styles.changeAnimBtn} onClick={() => setGuideOpen(true)} title="Загрузить свою анимацию">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <polygon points="5 3 19 12 5 21 5 3" />
+                </svg>
+                Сменить анимацию
+              </button>
+            )}
+            <button className={styles.changeAnimBtn} onClick={() => setSceneOpen(true)} title="Загрузить свою 3D-сцену">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 2 2 7l10 5 10-5-10-5Z" />
+                <path d="m2 17 10 5 10-5M2 12l10 5 10-5" />
+              </svg>
+              {character?.scene ? 'Своя сцена' : 'Загрузить сцену'}
+            </button>
+          </div>
         )}
       </div>
 
@@ -161,6 +189,14 @@ export default function OverviewTab({ modpack, busyId, onModpackReload }: Props)
         <AnimationGuideModal
           onClose={() => setGuideOpen(false)}
           onApply={isCustom ? applyAnim : undefined}
+        />
+      )}
+
+      {sceneOpen && (
+        <SceneGuideModal
+          onClose={() => setSceneOpen(false)}
+          onApply={isCustom ? applyScene : undefined}
+          onClear={isCustom && character?.scene ? clearScene : undefined}
         />
       )}
     </div>

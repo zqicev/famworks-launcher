@@ -14,9 +14,8 @@
 
 /* Центральная колонка: сцена тянется на всю высоту, кнопка (для локальных сборок) снизу. */
 .stageCol { display: flex; flex-direction: column; min-height: 0; }
+.stageActions { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
 .changeAnimBtn {
-  align-self: center;
-  margin-top: 10px;
   display: flex;
   align-items: center;
   gap: 7px;

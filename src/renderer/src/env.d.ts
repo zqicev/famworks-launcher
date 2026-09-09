@@ -96,6 +96,9 @@ interface Window {
     anim: {
       pick: () => Promise<{ text?: string; cancelled?: boolean; error?: string }>
     }
+    scene: {
+      pick: () => Promise<{ dataUrl?: string; cancelled?: boolean; error?: string }>
+    }
     browser: {
       installModpack: (source: string, id: string) => Promise<{ ok?: boolean; modpack?: import('../../types/modpack').Modpack; error?: string; cancelled?: boolean }>
       install: (source: string, type: string, projectId: string, refId: string, mc: string, loader: string, packRoot: string) =>
