@@ -18,12 +18,16 @@ const RAD = Math.PI / 180
 
 // Маппинг осей Bedrock -> skinview3d (three). У skinview3d ось X зеркальна относительно
 // Bedrock (rightArm стоит на x=-5, а в Bedrock-риге на x=+5), т.е. модель отражена по X.
-// Отражение по X: поворот (x,y,z) -> (x,-y,-z); с учётом внутренней конвенции Blockbench
-// (экспорт инвертирует X,Y) итог по повороту [-x,+y,-z], по позиции [+x,+y,+z]. Свап не нужен —
-// отражение само ставит правую/левую конечность на верную сторону. Порядок Эйлера — XYZ (дефолт three).
-// ЕДИНАЯ точка калибровки: если поза всё же зеркалит — меняем знак здесь.
-const ROT_SIGN: Vec3 = [-1, 1, -1] // rotation x,y,z
-const POS_SIGN: Vec3 = [1, 1, 1]   // position x,y,z (в тех же единицах, что риг ~ пиксели)
+// Отражение по X даёт: поворот [+x,-y,-z], позиция [-x,+y,+z], БЕЗ обмена left/right
+// (отражение само ставит конечности на верную сторону) и порядок Эйлера ZYX (как в Blockbench;
+// у руки поворот сразу по 3 осям, при XYZ твист уводил её в сторону вместо к голове).
+// ЕДИНАЯ точка калибровки: если поза всё же зеркалит по одной оси — меняем знак здесь.
+const ROT_SIGN: Vec3 = [1, -1, -1] // поворот КОНЕЧНОСТЕЙ x,y,z (зеркалит Y,Z)
+const POS_SIGN: Vec3 = [-1, 1, 1]  // позиция x,y,z (в тех же единицах, что риг ~ пиксели)
+const EULER_ORDER = 'ZYX'          // порядок применения поворотов (Bedrock/Blockbench)
+// root двигает ВСЮ модель. Сама модель не отражена (лицо на +Z), отражены лишь позиции
+// конечностей — поэтому у root зеркало НЕ применяем (иначе разворот уходит не в ту сторону).
+const ROOT_ROT_SIGN: Vec3 = [1, 1, 1]
 
 function num(v: unknown): number {
   if (typeof v === 'number') return v
@@ -103,8 +107,9 @@ function sample(kf: Keyframe[], t: number): Vec3 {
 }
 
 interface Vector3Like { x: number; y: number; z: number; set(x: number, y: number, z: number): void }
-interface Part { rotation: { set(x: number, y: number, z: number): void }; position: Vector3Like }
-interface RigPlayer { rotation: { set(x: number, y: number, z: number): void }; position: Vector3Like; skin: Record<string, Part> }
+interface EulerLike { order: string; set(x: number, y: number, z: number): void }
+interface Part { rotation: EulerLike; position: Vector3Like }
+interface RigPlayer { rotation: EulerLike; position: Vector3Like; skin: Record<string, Part> }
 
 /** Функция для skinview3d.FunctionAnimation: сбрасывает позу в покой и применяет кадры клипа.
  *  position-кадры — это СМЕЩЕНИЕ от базовой позиции кости, поэтому базовые позиции запоминаем
@@ -125,12 +130,14 @@ export function createClipFn(clip: AnimClip): (player: RigPlayer, progress: numb
 
     const t = clip.loop ? (progress % clip.length) : Math.min(progress, clip.length)
 
-    // поза покоя
+    // поза покоя (+ порядок Эйлера как в Bedrock)
+    player.rotation.order = EULER_ORDER
     player.rotation.set(0, 0, 0)
     player.position.set(prest[0], prest[1], prest[2])
     for (const p of PART_NAMES) {
       const part = player.skin[p]
       if (!part) continue
+      part.rotation.order = EULER_ORDER
       part.rotation.set(0, 0, 0)
       const r = rest[p]
       if (r) part.position.set(r[0], r[1], r[2])
@@ -138,7 +145,7 @@ export function createClipFn(clip: AnimClip): (player: RigPlayer, progress: numb
 
     for (const [bone, track] of Object.entries(clip.bones)) {
       if (bone === 'root') {
-        if (track.rotation) { const [x, y, z] = sample(track.rotation, t); player.rotation.set(ROT_SIGN[0] * x * RAD, ROT_SIGN[1] * y * RAD, ROT_SIGN[2] * z * RAD) }
+        if (track.rotation) { const [x, y, z] = sample(track.rotation, t); player.rotation.set(ROOT_ROT_SIGN[0] * x * RAD, ROOT_ROT_SIGN[1] * y * RAD, ROOT_ROT_SIGN[2] * z * RAD) }
         if (track.position) { const [x, y, z] = sample(track.position, t); player.position.set(prest[0] + POS_SIGN[0] * x, prest[1] + POS_SIGN[1] * y, prest[2] + POS_SIGN[2] * z) }
         continue
       }
