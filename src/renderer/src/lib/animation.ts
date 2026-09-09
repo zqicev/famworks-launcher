@@ -1,28 +1,32 @@
 // Плеер анимаций формата Minecraft Bedrock (.animation.json из Blockbench) для рига skinview3d.
-// v1: только повороты костей (rotation) с линейной интерполяцией по ключевым кадрам.
-// Позиция/скейл и molang-выражения пока не поддерживаются (числовые кадры покрывают 95% ручных анимаций).
+// Поддержка: rotation и position (линейная интерполяция), кость root -> вся модель.
+// Не поддерживается: scale и molang-выражения (числовые кадры покрывают ручные анимации).
 
 type Vec3 = [number, number, number]
-type Keyframe = [number, Vec3] // [времяСек, [x,y,z] градусы]
+type Keyframe = [number, Vec3] // [времяСек, [x,y,z]]
 
-interface BoneTrack { rotation: Keyframe[] | null }
+interface BoneTrack { rotation: Keyframe[] | null; position: Keyframe[] | null }
 export interface AnimClip {
   loop: boolean
   length: number
   bones: Record<string, BoneTrack>
 }
 
-// Кости рига skinview3d (player.skin.*). Имена из Blockbench приводим к ним.
+// Кости рига skinview3d (player.skin.*). Особая кость root двигает всю модель.
 const PART_NAMES = ['head', 'body', 'rightArm', 'leftArm', 'rightLeg', 'leftLeg'] as const
 const RAD = Math.PI / 180
 
+// Маппинг осей Bedrock -> three. ЕДИНАЯ точка калибровки под экспорт Blockbench.
+// Если в лаунчере поза зеркалит/переворачивается относительно Blockbench — меняем знак здесь.
+const ROT_SIGN: Vec3 = [-1, -1, 1] // rotation x,y,z
+const POS_SIGN: Vec3 = [1, 1, -1]  // position x,y,z (в тех же единицах, что риг ~ пиксели)
+
 function num(v: unknown): number {
   if (typeof v === 'number') return v
-  if (typeof v === 'string') { const n = parseFloat(v); return isNaN(n) ? 0 : n } // molang не считаем — берём 0
+  if (typeof v === 'string') { const n = parseFloat(v); return isNaN(n) ? 0 : n } // molang не считаем
   return 0
 }
 
-/** Приводит значение канала (rotation) к [x,y,z]. Поддерживает массив и форму {pre,post}. */
 function toVec3(raw: unknown): Vec3 {
   if (Array.isArray(raw)) return [num(raw[0]), num(raw[1]), num(raw[2])]
   if (raw && typeof raw === 'object') {
@@ -33,12 +37,12 @@ function toVec3(raw: unknown): Vec3 {
   return [0, 0, 0]
 }
 
-/** rotation-канал → отсортированные ключевые кадры. Массив = константа (кадр в t=0). */
-function parseRotation(rot: unknown): Keyframe[] | null {
-  if (!rot) return null
-  if (Array.isArray(rot)) return [[0, toVec3(rot)]]
-  if (typeof rot === 'object') {
-    const frames: Keyframe[] = Object.entries(rot as Record<string, unknown>)
+/** Канал (rotation/position) -> отсортированные кадры. Массив = константа (кадр в t=0). */
+function parseChannel(ch: unknown): Keyframe[] | null {
+  if (!ch) return null
+  if (Array.isArray(ch)) return [[0, toVec3(ch)]]
+  if (typeof ch === 'object') {
+    const frames: Keyframe[] = Object.entries(ch as Record<string, unknown>)
       .map(([time, v]) => [parseFloat(time), toVec3(v)] as Keyframe)
       .filter(f => !isNaN(f[0]))
       .sort((a, b) => a[0] - b[0])
@@ -47,7 +51,7 @@ function parseRotation(rot: unknown): Keyframe[] | null {
   return null
 }
 
-/** Разбирает .animation.json. Берёт анимацию по имени, иначе первую. Возвращает null, если пусто. */
+/** Разбирает .animation.json. Берёт анимацию по имени, иначе первую. null, если пусто. */
 export function parseAnimationJson(text: string, wantName?: string): AnimClip | null {
   let root: unknown
   try { root = JSON.parse(text) } catch { return null }
@@ -63,9 +67,10 @@ export function parseAnimationJson(text: string, wantName?: string): AnimClip | 
   const bones: Record<string, BoneTrack> = {}
   let maxT = 0
   for (const [bone, channels] of Object.entries(bonesRaw)) {
-    const rotation = parseRotation(channels?.rotation)
-    if (rotation) { for (const [t] of rotation) if (t > maxT) maxT = t }
-    bones[camel(bone)] = { rotation }
+    const rotation = parseChannel(channels?.rotation)
+    const position = parseChannel(channels?.position)
+    for (const kf of [rotation, position]) if (kf) for (const [t] of kf) if (t > maxT) maxT = t
+    bones[camel(bone)] = { rotation, position }
   }
 
   const length = num(anim.animation_length) || maxT || 1
@@ -73,7 +78,7 @@ export function parseAnimationJson(text: string, wantName?: string): AnimClip | 
   return { loop, length, bones }
 }
 
-/** right_arm → rightArm; остальное как есть. */
+/** right_arm -> rightArm; root/head/... как есть. */
 function camel(b: string): string {
   return b.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase())
 }
@@ -93,21 +98,50 @@ function sample(kf: Keyframe[], t: number): Vec3 {
   return kf[n - 1][1]
 }
 
-/** Тип кости рига skinview3d (у каждой есть .rotation). */
-interface Part { rotation: { set(x: number, y: number, z: number): void } }
-interface RigPlayer { skin: Record<string, Part> }
+interface Vector3Like { x: number; y: number; z: number; set(x: number, y: number, z: number): void }
+interface Part { rotation: { set(x: number, y: number, z: number): void }; position: Vector3Like }
+interface RigPlayer { rotation: { set(x: number, y: number, z: number): void }; position: Vector3Like; skin: Record<string, Part> }
 
-/** Функция для skinview3d.FunctionAnimation: сбрасывает позу и применяет кадры клипа.
- *  Маппинг осей Bedrock→three: (-x, -y, z). Единая точка калибровки под реальный Blockbench-экспорт. */
+/** Функция для skinview3d.FunctionAnimation: сбрасывает позу в покой и применяет кадры клипа.
+ *  position-кадры — это СМЕЩЕНИЕ от базовой позиции кости, поэтому базовые позиции запоминаем
+ *  (иначе руки/ноги «улетят» в центр). Кость root двигает всю модель. */
 export function createClipFn(clip: AnimClip): (player: RigPlayer, progress: number) => void {
+  let rest: Record<string, Vec3> | null = null
+  let prest: Vec3 = [0, 0, 0]
+
   return (player, progress) => {
+    if (!rest) {
+      rest = {}
+      for (const p of PART_NAMES) {
+        const q = player.skin[p]?.position
+        if (q) rest[p] = [q.x, q.y, q.z]
+      }
+      prest = [player.position.x, player.position.y, player.position.z]
+    }
+
     const t = clip.loop ? (progress % clip.length) : Math.min(progress, clip.length)
-    for (const p of PART_NAMES) player.skin[p]?.rotation.set(0, 0, 0) // поза покоя
+
+    // поза покоя
+    player.rotation.set(0, 0, 0)
+    player.position.set(prest[0], prest[1], prest[2])
+    for (const p of PART_NAMES) {
+      const part = player.skin[p]
+      if (!part) continue
+      part.rotation.set(0, 0, 0)
+      const r = rest[p]
+      if (r) part.position.set(r[0], r[1], r[2])
+    }
+
     for (const [bone, track] of Object.entries(clip.bones)) {
+      if (bone === 'root') {
+        if (track.rotation) { const [x, y, z] = sample(track.rotation, t); player.rotation.set(ROT_SIGN[0] * x * RAD, ROT_SIGN[1] * y * RAD, ROT_SIGN[2] * z * RAD) }
+        if (track.position) { const [x, y, z] = sample(track.position, t); player.position.set(prest[0] + POS_SIGN[0] * x, prest[1] + POS_SIGN[1] * y, prest[2] + POS_SIGN[2] * z) }
+        continue
+      }
       const part = player.skin[bone]
-      if (!part || !track.rotation) continue
-      const [x, y, z] = sample(track.rotation, t)
-      part.rotation.set(-x * RAD, -y * RAD, z * RAD)
+      if (!part) continue
+      if (track.rotation) { const [x, y, z] = sample(track.rotation, t); part.rotation.set(ROT_SIGN[0] * x * RAD, ROT_SIGN[1] * y * RAD, ROT_SIGN[2] * z * RAD) }
+      if (track.position) { const [x, y, z] = sample(track.position, t); const r = rest[bone] ?? [0, 0, 0]; part.position.set(r[0] + POS_SIGN[0] * x, r[1] + POS_SIGN[1] * y, r[2] + POS_SIGN[2] * z) }
     }
   }
 }
