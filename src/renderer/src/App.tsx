@@ -246,6 +246,7 @@ export default function App() {
               devMode={devMode}
               selectedId={selectedId}
               onOpenBrowser={(type) => openBrowser(type, selectedId)}
+              onModpackReload={() => { if (selectedId) window.api.modpacks.get(selectedId).then(setModpack).catch(() => {}) }}
             />
           )}
           {settingsOpen && (

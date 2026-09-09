@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import * as skinview3d from 'skinview3d'
 import steveUrl from '../assets/steve.png'
 import { parseAnimationJson, createClipFn } from '../lib/animation'
@@ -11,20 +11,21 @@ interface Props {
 
 /** Центральная 3D-сцена: анимированная модель скина игрока (skinview3d/Three.js) с idle-анимацией
  *  и мягким акцентным свечением у основания. Вращение отключено.
- *  Idle можно переопределить на сборку через character.idle (Blockbench .animation.json по URL). */
+ *  Анимация idle берётся из сборки: character.idle_data (инлайн JSON) или character.idle (URL). */
 export default function CharacterStage({ character }: Props): JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
+  const [ready, setReady] = useState(false)
 
   useEffect(() => {
     const canvas = canvasRef.current
     const wrap = wrapRef.current
     if (!canvas || !wrap) return
+    setReady(false)
 
     const w = wrap.clientWidth || 360
     const h = wrap.clientHeight || 460
     const viewer = new skinview3d.SkinViewer({ canvas, width: w, height: h, skin: steveUrl })
-    viewer.animation = new skinview3d.IdleAnimation() // дефолт, пока не пришёл клип сборки
     viewer.fov = 40
     viewer.zoom = 0.82
     viewer.autoRotate = false
@@ -34,29 +35,39 @@ export default function CharacterStage({ character }: Props): JSX.Element {
 
     let disposed = false
 
+    const applyClipText = (text: string | null | undefined): boolean => {
+      if (!text) return false
+      const clip = parseAnimationJson(text, character?.idle_name)
+      if (!clip) return false
+      const fn = createClipFn(clip) as unknown as ConstructorParameters<typeof skinview3d.FunctionAnimation>[0]
+      viewer.animation = new skinview3d.FunctionAnimation(fn)
+      return true
+    }
+    const setBuiltIn = (): void => { viewer.animation = new skinview3d.IdleAnimation() }
+
+    // Анимацию задаём ТОЛЬКО когда она разрешена (инлайн/URL/встроенная) — чтобы не мелькала
+    // смена «встроенный idle → клип сборки».
+    let animPromise: Promise<unknown>
+    if (character?.idle_data) {
+      if (!applyClipText(character.idle_data)) setBuiltIn()
+      animPromise = Promise.resolve()
+    } else if (character?.idle) {
+      animPromise = fetch(character.idle)
+        .then(r => (r.ok ? r.text() : Promise.reject(new Error(String(r.status)))))
+        .then(text => { if (!disposed && !applyClipText(text)) setBuiltIn() })
+        .catch(() => { if (!disposed) setBuiltIn() })
+    } else {
+      setBuiltIn()
+      animPromise = Promise.resolve()
+    }
+
     // Реальный скин активного аккаунта (если найдётся) — иначе остаётся дефолтный Steve.
-    window.api.skin.get()
-      .then(res => {
-        if (!disposed && res?.dataUrl) {
-          viewer.loadSkin(res.dataUrl, { model: res.slim ? 'slim' : 'auto-detect' }).catch(() => {})
-        }
-      })
+    const skinPromise = window.api.skin.get()
+      .then(res => { if (!disposed && res?.dataUrl) return viewer.loadSkin(res.dataUrl, { model: res.slim ? 'slim' : 'auto-detect' }) })
       .catch(() => {})
 
-    // Idle-анимация по сборке (Blockbench .animation.json). При ошибке остаётся встроенный idle.
-    if (character?.idle) {
-      fetch(character.idle)
-        .then(r => (r.ok ? r.text() : Promise.reject(new Error(String(r.status)))))
-        .then(text => {
-          if (disposed) return
-          const clip = parseAnimationJson(text, character.idle_name)
-          if (clip) {
-            const fn = createClipFn(clip) as unknown as ConstructorParameters<typeof skinview3d.FunctionAnimation>[0]
-            viewer.animation = new skinview3d.FunctionAnimation(fn)
-          }
-        })
-        .catch(() => { /* нет клипа/сети — остаётся встроенный idle */ })
-    }
+    // Показываем модель только когда и скин, и анимация готовы (никаких промежуточных поз).
+    Promise.all([animPromise, skinPromise]).then(() => { if (!disposed) setReady(true) })
 
     const ro = new ResizeObserver(() => {
       const cw = wrap.clientWidth
@@ -75,10 +86,10 @@ export default function CharacterStage({ character }: Props): JSX.Element {
       ro.disconnect()
       viewer.dispose()
     }
-  }, [character?.idle, character?.idle_name])
+  }, [character?.idle, character?.idle_data, character?.idle_name])
 
   return (
-    <div ref={wrapRef} className={styles.stage}>
+    <div ref={wrapRef} className={`${styles.stage} ${ready ? styles.ready : ''}`}>
       <div className={styles.glow} />
       <div className={styles.particles} aria-hidden="true">
         <i className={styles.p1} style={{ left: '12%' }} />
@@ -88,6 +99,7 @@ export default function CharacterStage({ character }: Props): JSX.Element {
         <i className={styles.p1} style={{ left: '90%', animationDelay: '4.1s' }} />
       </div>
       <canvas ref={canvasRef} className={styles.canvas} />
+      {!ready && <div className={styles.loader} aria-label="Загрузка"><span className={styles.spin} /></div>}
     </div>
   )
 }

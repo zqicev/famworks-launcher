@@ -112,6 +112,9 @@ contextBridge.exposeInMainWorld('api', {
   skin: {
     get: () => ipcRenderer.invoke('skin:get')
   },
+  anim: {
+    pick: () => ipcRenderer.invoke('anim:pick')
+  },
   browser: {
     installModpack: (source: string, id: string) => ipcRenderer.invoke('browser:install-modpack', source, id),
     project: (source: string, id: string, type: string) => ipcRenderer.invoke('browser:project', source, id, type),

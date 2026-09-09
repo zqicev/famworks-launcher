@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react'
-import { Modpack } from '../../../types/modpack'
+import { Modpack, CharacterAnim } from '../../../types/modpack'
 import { formatSizeMb } from '../lib/format'
 import CharacterStage from './CharacterStage'
 import AnimationGuideModal from './AnimationGuideModal'
 import styles from '../styles/OverviewTab.module.css'
 
-interface Props { modpack: Modpack; busyId: string | null }
+interface Props { modpack: Modpack; busyId: string | null; onModpackReload?: () => void }
 
 type World = { kind: 'world'; folder: string; name: string; lastPlayed: number; mode: string; version: string; icon: string | null; score: number }
 type Server = { kind: 'server'; name: string; ip: string; icon: string | null; score: number }
@@ -13,11 +13,20 @@ type Entry = World | Server
 type PingResult = { online: number; max: number; favicon: string | null; ping: number; motd: string; version: string } | null
 type PingState = { loading: boolean; data: PingResult }
 
-export default function OverviewTab({ modpack, busyId }: Props) {
+export default function OverviewTab({ modpack, busyId, onModpackReload }: Props) {
   const sizeFmt = formatSizeMb(modpack.mods.reduce((s, m) => s + m.size_mb, 0))
 
   const [guideOpen, setGuideOpen] = useState(false)
+  const [charOverride, setCharOverride] = useState<CharacterAnim | null>(null)
   const isCustom = modpack.id.startsWith('custom-')
+
+  // Загруженная локально анимация: сразу показываем и сохраняем в сборку (electron-store).
+  const applyAnim = (idleData: string): void => {
+    const character: CharacterAnim = { ...(modpack.character ?? {}), idle_data: idleData }
+    setCharOverride(character) // мгновенно показываем
+    // сохраняем в сборку и просим App перечитать её (чтобы пережило переключение вкладок)
+    window.api.custom.save({ ...modpack, character }).then(() => onModpackReload?.()).catch(() => {})
+  }
   const [entries, setEntries] = useState<Entry[]>([])
   const [pings, setPings] = useState<Record<string, PingState>>({})
 
@@ -106,9 +115,9 @@ export default function OverviewTab({ modpack, busyId }: Props) {
       </div>
 
       <div className={styles.stageCol}>
-        <CharacterStage character={modpack.character} />
+        <CharacterStage character={charOverride ?? modpack.character} />
         {isCustom && (
-          <button className={styles.changeAnimBtn} onClick={() => setGuideOpen(true)} title="Как сделать свою анимацию">
+          <button className={styles.changeAnimBtn} onClick={() => setGuideOpen(true)} title="Загрузить свою анимацию">
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <polygon points="5 3 19 12 5 21 5 3" />
             </svg>
@@ -148,7 +157,12 @@ export default function OverviewTab({ modpack, busyId }: Props) {
         </section>
       </div>
 
-      {guideOpen && <AnimationGuideModal onClose={() => setGuideOpen(false)} />}
+      {guideOpen && (
+        <AnimationGuideModal
+          onClose={() => setGuideOpen(false)}
+          onApply={isCustom ? applyAnim : undefined}
+        />
+      )}
     </div>
   )
 }

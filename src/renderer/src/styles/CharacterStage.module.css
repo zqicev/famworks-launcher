@@ -62,4 +62,30 @@
   position: relative;
   z-index: 1;
   display: block;
+  opacity: 0;
+  transition: opacity 0.35s ease;
 }
+/* Показываем модель и свечение только когда всё загрузилось (скин + анимация). */
+.glow { opacity: 0; transition: opacity 0.35s ease; }
+.ready .canvas { opacity: 1; }
+.ready .glow { opacity: 1; }
+
+/* Прелоадер поверх сцены, пока не готово. */
+.loader {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+.spin {
+  width: 30px;
+  height: 30px;
+  border: 3px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: fwSpin 0.8s linear infinite;
+}
+@keyframes fwSpin { to { transform: rotate(360deg); } }

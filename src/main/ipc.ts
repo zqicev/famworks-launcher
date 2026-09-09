@@ -1,5 +1,5 @@
 import { ipcMain, dialog, BrowserWindow, shell, app } from 'electron'
-import { copyFileSync, mkdirSync, rmSync, existsSync } from 'fs'
+import { copyFileSync, mkdirSync, rmSync, existsSync, readFileSync } from 'fs'
 import { basename, join as pathJoin } from 'path'
 import { spawn } from 'child_process'
 import { setIdle } from './discord'
@@ -57,6 +57,21 @@ export function setupIpcHandlers() {
   ipcMain.handle('skin:get', async () => {
     const { getActiveSkin } = await import('./skinResolve')
     return getActiveSkin()
+  })
+
+  // Выбор файла .animation.json (Blockbench) — читаем текст в main и отдаём в рендер.
+  ipcMain.handle('anim:pick', async () => {
+    const res = await dialog.showOpenDialog({
+      title: 'Файл анимации (.animation.json)',
+      filters: [{ name: 'Blockbench анимация', extensions: ['json'] }],
+      properties: ['openFile']
+    })
+    if (res.canceled || !res.filePaths[0]) return { cancelled: true }
+    try {
+      return { text: readFileSync(res.filePaths[0], 'utf8') }
+    } catch (e) {
+      return { error: e instanceof Error ? e.message : String(e) }
+    }
   })
   ipcMain.handle('modpack:import', async () => {
     const { importModpack } = await import('./packio')

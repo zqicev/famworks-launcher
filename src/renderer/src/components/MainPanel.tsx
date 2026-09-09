@@ -17,6 +17,7 @@ interface Props {
   devMode: boolean
   selectedId: string | null
   onOpenBrowser: (type: string) => void
+  onModpackReload?: () => void
 }
 
 async function countDir(dir: string, ext: string): Promise<{ total: number; enabled: number }> {
@@ -29,7 +30,7 @@ async function countDir(dir: string, ext: string): Promise<{ total: number; enab
   return { total, enabled }
 }
 
-export default function MainPanel({ modpack, installPath, loading, error, devMode, selectedId, onOpenBrowser }: Props) {
+export default function MainPanel({ modpack, installPath, loading, error, devMode, selectedId, onOpenBrowser, onModpackReload }: Props) {
   const [tab, setTab] = useState<'mods' | 'resourcepacks' | 'shaders' | 'overview' | 'logs' | 'dev'>('overview')
   const [counts, setCounts] = useState({ modsTotal: 0, modsActive: 0, rp: 0, sh: 0 })
   const [busyId, setBusyId] = useState<string | null>(null)
@@ -139,7 +140,7 @@ export default function MainPanel({ modpack, installPath, loading, error, devMod
         {tab === 'mods' && <ModsTab modpack={modpack} modsDir={modsDir} onCount={(total, active) => setCounts(c => ({ ...c, modsTotal: total, modsActive: active }))} />}
         {tab === 'resourcepacks' && <PackTab dir={rpDir} items={modpack.resourcepacks ?? []} noun="ресурспаков" onCount={n => setCounts(c => ({ ...c, rp: n }))} />}
         {tab === 'shaders' && <PackTab dir={shDir} items={modpack.shaders ?? []} noun="шейдеров" onCount={n => setCounts(c => ({ ...c, sh: n }))} />}
-        {tab === 'overview' && <OverviewTab modpack={modpack} busyId={busyId} />}
+        {tab === 'overview' && <OverviewTab modpack={modpack} busyId={busyId} onModpackReload={onModpackReload} />}
         {tab === 'logs' && <LogsTab modpackId={modpack.id} />}
         {tab === 'dev' && devMode && <DevTab modpackId={modpack.id} loader={modpack.loader} mcVersion={modpack.mc_version} />}
       </div>
