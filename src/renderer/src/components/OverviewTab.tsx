@@ -102,7 +102,7 @@ export default function OverviewTab({ modpack, busyId }: Props) {
         )}
       </div>
 
-      <CharacterStage />
+      <CharacterStage character={modpack.character} />
 
       <div className={styles.colRight}>
       <div className={styles.params}>

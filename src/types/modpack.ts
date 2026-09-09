@@ -50,6 +50,12 @@ export interface ConfigFile {
   extract?: boolean     // download_url — zip-архив: распаковать в корень сборки (структура папок сохраняется), архив удалить
 }
 
+// Анимация 3D-модельки игрока на экране «Обзор» (Blockbench .animation.json по URL).
+export interface CharacterAnim {
+  idle?: string       // URL к .animation.json для idle-анимации; иначе встроенная idle
+  idle_name?: string  // имя анимации внутри файла (если несколько); иначе берётся первая
+}
+
 export interface Modpack extends ModpackSummary {
   fabric_api_version: string
   long_description: string
@@ -59,4 +65,5 @@ export interface Modpack extends ModpackSummary {
   shaders?: Mod[]         // ставятся в shaderpacks/
   servers?: ServerEntry[]
   configs?: ConfigFile[]
+  character?: CharacterAnim  // анимация модельки на «Обзоре»
 }
