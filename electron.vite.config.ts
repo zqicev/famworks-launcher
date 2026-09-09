@@ -17,6 +17,9 @@ export default defineConfig({
     plugins: [externalizeDepsPlugin()]
   },
   renderer: {
+    // Один экземпляр three на всех (skinview3d + наш CharacterStage) — иначе меши из
+    // «чужого» three ломают рендерер skinview3d.
+    resolve: { dedupe: ['three'] },
     plugins: [react()]
   }
 })

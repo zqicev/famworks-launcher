@@ -90,6 +90,9 @@ interface Window {
       clear: () => Promise<void>
       get: () => Promise<string | null>
     }
+    skin: {
+      get: () => Promise<{ dataUrl: string; slim: boolean } | null>
+    }
     browser: {
       installModpack: (source: string, id: string) => Promise<{ ok?: boolean; modpack?: import('../../types/modpack').Modpack; error?: string; cancelled?: boolean }>
       install: (source: string, type: string, projectId: string, refId: string, mc: string, loader: string, packRoot: string) =>

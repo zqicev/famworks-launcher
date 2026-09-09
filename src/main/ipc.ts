@@ -53,6 +53,11 @@ export function setupIpcHandlers() {
     const { getBackground } = await import('./background')
     return getBackground()
   })
+
+  ipcMain.handle('skin:get', async () => {
+    const { getActiveSkin } = await import('./skinResolve')
+    return getActiveSkin()
+  })
   ipcMain.handle('modpack:import', async () => {
     const { importModpack } = await import('./packio')
     return importModpack()

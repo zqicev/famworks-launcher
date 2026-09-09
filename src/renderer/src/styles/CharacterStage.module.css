@@ -1,0 +1,65 @@
+.stage {
+  position: relative;
+  height: 100%;
+  min-height: 440px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+/* Мягкое свечение акцентом у основания под ногами (за canvas). Пьедестал рисуется
+   внутри canvas (3D), а свет — мягкий радиал, как в дизайне. */
+.glow {
+  position: absolute;
+  left: 50%;
+  bottom: 4%;
+  width: 58%;
+  height: 40%;
+  transform: translateX(-50%);
+  background: radial-gradient(ellipse 55% 45% at 50% 66%, rgb(from var(--accent) r g b / 0.34), transparent 70%);
+  filter: blur(20px);
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Поднимающиеся частицы акцентом (декор). Пьедестал рисуется внутри canvas (3D-сцена). */
+.particles {
+  position: absolute;
+  left: 50%;
+  bottom: 12%;
+  width: 330px;
+  max-width: 90%;
+  height: 52%;
+  transform: translateX(-50%);
+  pointer-events: none;
+  z-index: 0;
+}
+.particles i {
+  position: absolute;
+  bottom: 0;
+  width: 5px;
+  height: 5px;
+  display: block;
+  border-radius: 1px;
+  background: var(--accent);
+  box-shadow: 0 0 6px rgb(from var(--accent) r g b / 0.8);
+}
+.p1 { animation: fwP1 7s linear infinite; }
+.p2 { width: 3px; height: 3px; animation: fwP2 9s linear infinite; }
+@keyframes fwP1 {
+  0% { transform: translateY(20px); opacity: 0; }
+  30% { opacity: 0.85; }
+  100% { transform: translateY(-300px); opacity: 0; }
+}
+@keyframes fwP2 {
+  0% { transform: translateY(10px); opacity: 0; }
+  40% { opacity: 0.7; }
+  100% { transform: translateY(-340px); opacity: 0; }
+}
+
+.canvas {
+  position: relative;
+  z-index: 1;
+  display: block;
+}

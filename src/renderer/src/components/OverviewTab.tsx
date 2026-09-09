@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Modpack } from '../../../types/modpack'
 import { formatSizeMb } from '../lib/format'
+import CharacterStage from './CharacterStage'
 import styles from '../styles/OverviewTab.module.css'
 
 interface Props { modpack: Modpack; busyId: string | null }
@@ -51,7 +52,7 @@ export default function OverviewTab({ modpack, busyId }: Props) {
 
   return (
     <div className={styles.wrapper}>
-      <div className={styles.left}>
+      <div className={styles.colLeft}>
         {entries.length > 0 && (
           <section className={styles.section}>
             <div className={styles.label}>ПРОДОЛЖИТЬ ИГРУ</div>
@@ -86,11 +87,6 @@ export default function OverviewTab({ modpack, busyId }: Props) {
           </section>
         )}
 
-        <section className={styles.section}>
-          <div className={styles.label}>ОПИСАНИЕ</div>
-          <p className={styles.text}>{modpack.long_description || modpack.description}</p>
-        </section>
-
         {modpack.changelog?.length > 0 && (
           <section className={styles.section}>
             <div className={styles.label}>ПОСЛЕДНИЕ ИЗМЕНЕНИЯ</div>
@@ -106,6 +102,9 @@ export default function OverviewTab({ modpack, busyId }: Props) {
         )}
       </div>
 
+      <CharacterStage />
+
+      <div className={styles.colRight}>
       <div className={styles.params}>
         <div className={styles.paramTitle}>ПАРАМЕТРЫ</div>
         <div className={styles.paramRow}>
@@ -128,6 +127,12 @@ export default function OverviewTab({ modpack, busyId }: Props) {
           <span className={styles.paramKey}>FABRIC API</span>
           <span className={styles.paramVal}>{modpack.fabric_api_version}</span>
         </div>
+      </div>
+
+        <section className={styles.section}>
+          <div className={styles.label}>ОПИСАНИЕ</div>
+          <p className={styles.text}>{modpack.long_description || modpack.description}</p>
+        </section>
       </div>
     </div>
   )

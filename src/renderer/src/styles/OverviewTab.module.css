@@ -1,7 +1,12 @@
 .wrapper {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(240px, 300px) minmax(0, 1fr) minmax(220px, 264px);
   gap: 24px;
+  align-items: stretch;
 }
+
+.colLeft { display: flex; flex-direction: column; gap: 28px; min-width: 0; }
+.colRight { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
 
 .left { flex: 1; display: flex; flex-direction: column; gap: 28px; }
 
@@ -21,7 +26,7 @@
   line-height: 1.7;
 }
 
-.recentGrid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.recentGrid { display: grid; grid-template-columns: 1fr; gap: 10px; }
 .recentCard {
   display: flex; align-items: center; gap: 12px; padding: 10px 12px;
   background: var(--bg-surface); border: 1px solid var(--border); border-radius: 12px;
@@ -81,8 +86,7 @@
 }
 
 .params {
-  width: 280px;
-  flex-shrink: 0;
+  width: auto;
   background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: 12px;
@@ -90,7 +94,6 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
-  align-self: flex-start;
 }
 
 .paramTitle {
