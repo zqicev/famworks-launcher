@@ -1,12 +1,35 @@
 .wrapper {
   display: grid;
   grid-template-columns: minmax(240px, 300px) minmax(0, 1fr) minmax(220px, 264px);
+  grid-template-rows: minmax(min-content, 1fr);
   gap: 24px;
   align-items: stretch;
+  /* Тянемся на всю высоту области контента, чтобы центральная сцена доходила до нижней
+     полоски независимо от количества карточек слева. */
+  min-height: 100%;
 }
 
-.colLeft { display: flex; flex-direction: column; gap: 28px; min-width: 0; }
-.colRight { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.colLeft { display: flex; flex-direction: column; gap: 28px; min-width: 0; align-self: start; }
+.colRight { display: flex; flex-direction: column; gap: 16px; min-width: 0; align-self: start; }
+
+/* Центральная колонка: сцена тянется на всю высоту, кнопка (для локальных сборок) снизу. */
+.stageCol { display: flex; flex-direction: column; min-height: 0; }
+.changeAnimBtn {
+  align-self: center;
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  transition: color 0.15s, border-color 0.15s;
+}
+.changeAnimBtn:hover { color: var(--accent); border-color: rgb(from var(--accent) r g b / 0.5); }
 
 .left { flex: 1; display: flex; flex-direction: column; gap: 28px; }
 

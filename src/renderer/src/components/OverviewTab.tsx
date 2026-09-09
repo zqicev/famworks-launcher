@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Modpack } from '../../../types/modpack'
 import { formatSizeMb } from '../lib/format'
 import CharacterStage from './CharacterStage'
+import AnimationGuideModal from './AnimationGuideModal'
 import styles from '../styles/OverviewTab.module.css'
 
 interface Props { modpack: Modpack; busyId: string | null }
@@ -15,6 +16,8 @@ type PingState = { loading: boolean; data: PingResult }
 export default function OverviewTab({ modpack, busyId }: Props) {
   const sizeFmt = formatSizeMb(modpack.mods.reduce((s, m) => s + m.size_mb, 0))
 
+  const [guideOpen, setGuideOpen] = useState(false)
+  const isCustom = modpack.id.startsWith('custom-')
   const [entries, setEntries] = useState<Entry[]>([])
   const [pings, setPings] = useState<Record<string, PingState>>({})
 
@@ -102,7 +105,17 @@ export default function OverviewTab({ modpack, busyId }: Props) {
         )}
       </div>
 
-      <CharacterStage character={modpack.character} />
+      <div className={styles.stageCol}>
+        <CharacterStage character={modpack.character} />
+        {isCustom && (
+          <button className={styles.changeAnimBtn} onClick={() => setGuideOpen(true)} title="Как сделать свою анимацию">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <polygon points="5 3 19 12 5 21 5 3" />
+            </svg>
+            Сменить анимацию
+          </button>
+        )}
+      </div>
 
       <div className={styles.colRight}>
       <div className={styles.params}>
@@ -134,6 +147,8 @@ export default function OverviewTab({ modpack, busyId }: Props) {
           <p className={styles.text}>{modpack.long_description || modpack.description}</p>
         </section>
       </div>
+
+      {guideOpen && <AnimationGuideModal onClose={() => setGuideOpen(false)} />}
     </div>
   )
 }
