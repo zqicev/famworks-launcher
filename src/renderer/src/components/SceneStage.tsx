@@ -66,18 +66,41 @@ export default function SceneStage({ scene: sceneUrl }: Props): JSX.Element {
 
     let disposed = false
     let mixer: THREE.AnimationMixer | null = null
-    let rootObj: THREE.Object3D | null = null
+    let sceneBox: THREE.Box3 | null = null
     const clock = new THREE.Clock()
     let raf = 0
+    const FOV = 40
+    const MARGIN = 1.18
 
-    const frameCamera = (): void => {
-      const target = rootObj ?? scene
-      const box = new THREE.Box3().setFromObject(target)
+    // Бокс всей сцены с учётом анимации: объекты (пчела и т.п.) по кадрам смещаются,
+    // поэтому объединяем боксы по нескольким моментам клипа, чтобы ничего не ушло за кадр.
+    const computeSceneBox = (obj: THREE.Object3D, dur: number): THREE.Box3 => {
+      const box = new THREE.Box3()
+      if (mixer && dur > 0) {
+        const steps = 16
+        for (let i = 0; i <= steps; i++) {
+          mixer.setTime((dur * i) / steps)
+          obj.updateMatrixWorld(true)
+          box.expandByObject(obj)
+        }
+        mixer.setTime(0)
+        obj.updateMatrixWorld(true)
+      } else {
+        box.setFromObject(obj)
+      }
+      return box
+    }
+
+    // Кадрируем по всей сцене, по обеим осям (учитывая аспект) — игрок остаётся в центре композиции.
+    const frameCamera = (box: THREE.Box3): void => {
       if (!isFinite(box.min.y)) return
       const c = box.getCenter(new THREE.Vector3())
       const s = box.getSize(new THREE.Vector3())
-      const height = s.y || 1
-      const dist = (height / (2 * Math.tan((40 * Math.PI) / 180 / 2))) * 1.6
+      const fovV = (FOV * Math.PI) / 180
+      const fovH = 2 * Math.atan(Math.tan(fovV / 2) * camera.aspect)
+      const distV = s.y / 2 / Math.tan(fovV / 2)
+      const distH = s.x / 2 / Math.tan(fovH / 2)
+      const dist = Math.max(distV, distH) * MARGIN + s.z / 2
       camera.position.set(c.x, c.y, c.z + dist)
       camera.lookAt(c.x, c.y, c.z)
       camera.updateProjectionMatrix()
@@ -102,7 +125,6 @@ export default function SceneStage({ scene: sceneUrl }: Props): JSX.Element {
       .then(([gltf, skinTex]) => {
         if (disposed) { disposeTree(gltf.scene); skinTex.dispose(); return }
         scene.add(gltf.scene)
-        rootObj = gltf.scene.getObjectByName('root') ?? gltf.scene
 
         // Подменяем карту у материалов игрока (они общие для всех его частей).
         const done = new Set<THREE.Material>()
@@ -119,11 +141,13 @@ export default function SceneStage({ scene: sceneUrl }: Props): JSX.Element {
           }
         })
 
-        frameCamera()
+        let dur = 0
         if (gltf.animations.length) {
           mixer = new THREE.AnimationMixer(gltf.scene)
-          for (const clip of gltf.animations) mixer.clipAction(clip).play()
+          for (const clip of gltf.animations) { mixer.clipAction(clip).play(); dur = Math.max(dur, clip.duration) }
         }
+        sceneBox = computeSceneBox(gltf.scene, dur)
+        frameCamera(sceneBox)
         setReady(true)
       })
       .catch(() => { if (!disposed) setReady(true) }) // не смогли — снимаем спиннер, покажем пустую сцену
@@ -144,7 +168,8 @@ export default function SceneStage({ scene: sceneUrl }: Props): JSX.Element {
         w = cw; h = ch
         renderer.setSize(w, h, false)
         camera.aspect = w / h
-        camera.updateProjectionMatrix()
+        if (sceneBox) frameCamera(sceneBox)
+        else camera.updateProjectionMatrix()
       }
     })
     ro.observe(wrap)
