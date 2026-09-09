@@ -16,10 +16,14 @@ export interface AnimClip {
 const PART_NAMES = ['head', 'body', 'rightArm', 'leftArm', 'rightLeg', 'leftLeg'] as const
 const RAD = Math.PI / 180
 
-// Маппинг осей Bedrock -> three. ЕДИНАЯ точка калибровки под экспорт Blockbench.
-// Если в лаунчере поза зеркалит/переворачивается относительно Blockbench — меняем знак здесь.
-const ROT_SIGN: Vec3 = [-1, -1, 1] // rotation x,y,z
-const POS_SIGN: Vec3 = [1, 1, -1]  // position x,y,z (в тех же единицах, что риг ~ пиксели)
+// Маппинг осей Bedrock -> skinview3d (three). У skinview3d ось X зеркальна относительно
+// Bedrock (rightArm стоит на x=-5, а в Bedrock-риге на x=+5), т.е. модель отражена по X.
+// Отражение по X: поворот (x,y,z) -> (x,-y,-z); с учётом внутренней конвенции Blockbench
+// (экспорт инвертирует X,Y) итог по повороту [-x,+y,-z], по позиции [+x,+y,+z]. Свап не нужен —
+// отражение само ставит правую/левую конечность на верную сторону. Порядок Эйлера — XYZ (дефолт three).
+// ЕДИНАЯ точка калибровки: если поза всё же зеркалит — меняем знак здесь.
+const ROT_SIGN: Vec3 = [-1, 1, -1] // rotation x,y,z
+const POS_SIGN: Vec3 = [1, 1, 1]   // position x,y,z (в тех же единицах, что риг ~ пиксели)
 
 function num(v: unknown): number {
   if (typeof v === 'number') return v
