@@ -50,11 +50,18 @@ export interface ConfigFile {
   extract?: boolean     // download_url — zip-архив: распаковать в корень сборки (структура папок сохраняется), архив удалить
 }
 
-// Анимация 3D-модельки игрока на экране «Обзор» (Blockbench .animation.json).
+// Доп. 3D-объект на сцене (glTF/GLB из Blockbench со своими анимациями — пчела, питомец, декор).
+export interface SceneObject {
+  url: string         // URL к .glb/.gltf (http(s) или data:); анимации проигрываются из самого файла
+  scale?: number      // множитель масштаба, если единицы экспорта не совпадают с ригом (по умолчанию 1)
+}
+
+// Анимация 3D-модельки игрока на экране «Обзор» (Blockbench .animation.json) + доп. объекты сцены.
 export interface CharacterAnim {
   idle?: string       // URL к .animation.json для idle-анимации; иначе встроенная idle
   idle_data?: string  // инлайн-содержимое .animation.json (для локальных сборок; приоритетнее idle)
   idle_name?: string  // имя анимации внутри файла (если несколько); иначе берётся первая
+  objects?: SceneObject[] // доп. glTF-объекты сцены со своими анимациями
 }
 
 export interface Modpack extends ModpackSummary {

@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import * as THREE from 'three'
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import * as skinview3d from 'skinview3d'
 import steveUrl from '../assets/steve.png'
 import { parseAnimationJson, createClipFn } from '../lib/animation'
@@ -9,13 +11,34 @@ interface Props {
   character?: CharacterAnim
 }
 
-/** Центральная 3D-сцена: анимированная модель скина игрока (skinview3d/Three.js) с idle-анимацией
- *  и мягким акцентным свечением у основания. Вращение отключено.
- *  Анимация idle берётся из сборки: character.idle_data (инлайн JSON) или character.idle (URL). */
+type PlayerObj = skinview3d.PlayerObject
+type PoseFn = (player: PlayerObj, progress: number) => void
+
+/** Освобождает GPU-ресурсы дерева объектов (геометрии/материалы/текстуры). */
+function disposeObject(root: THREE.Object3D): void {
+  root.traverse(obj => {
+    const mesh = obj as THREE.Mesh
+    if (mesh.geometry) mesh.geometry.dispose()
+    const mat = (mesh as THREE.Mesh).material
+    const mats = Array.isArray(mat) ? mat : mat ? [mat] : []
+    for (const m of mats) {
+      for (const k of Object.keys(m)) {
+        const v = (m as unknown as Record<string, unknown>)[k]
+        if (v && (v as THREE.Texture).isTexture) (v as THREE.Texture).dispose()
+      }
+      m.dispose()
+    }
+  })
+}
+
+/** Центральная 3D-сцена: анимированная модель скина игрока (skinview3d/Three.js) с idle-анимацией,
+ *  мягким акцентным свечением и доп. glTF-объектами (пчела/питомец/декор) со своими анимациями.
+ *  Всё анимируется в ОДНОМ кадре skinview3d (общий delta) — без рассинхрона и второго render-цикла. */
 export default function CharacterStage({ character }: Props): JSX.Element {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const wrapRef = useRef<HTMLDivElement>(null)
   const [ready, setReady] = useState(false)
+  const objectsKey = JSON.stringify(character?.objects ?? [])
 
   useEffect(() => {
     const canvas = canvasRef.current
@@ -29,45 +52,69 @@ export default function CharacterStage({ character }: Props): JSX.Element {
     viewer.fov = 40
     viewer.zoom = 0.82
     viewer.autoRotate = false
-    viewer.controls.enableRotate = false // модель не вертим — только анимация
+    viewer.controls.enableRotate = false
     viewer.controls.enableZoom = false
     viewer.controls.enablePan = false
 
     let disposed = false
+    const mixers: THREE.AnimationMixer[] = []
+    const loaded: THREE.Object3D[] = []
+    let clipFn: PoseFn | null = null // idle-поза игрока по сборке (иначе встроенный idle)
+    const idle = new skinview3d.IdleAnimation()
+
+    // Единый аниматор: поза игрока + тик всех миксеров ОДНИМ delta кадра skinview3d.
+    viewer.animation = new skinview3d.FunctionAnimation((player, progress, delta) => {
+      if (clipFn) clipFn(player, progress)
+      else idle.update(player, delta)
+      for (const m of mixers) m.update(delta)
+    })
 
     const applyClipText = (text: string | null | undefined): boolean => {
       if (!text) return false
       const clip = parseAnimationJson(text, character?.idle_name)
       if (!clip) return false
-      const fn = createClipFn(clip) as unknown as ConstructorParameters<typeof skinview3d.FunctionAnimation>[0]
-      viewer.animation = new skinview3d.FunctionAnimation(fn)
+      clipFn = createClipFn(clip) as unknown as PoseFn
       return true
     }
-    const setBuiltIn = (): void => { viewer.animation = new skinview3d.IdleAnimation() }
 
-    // Анимацию задаём ТОЛЬКО когда она разрешена (инлайн/URL/встроенная) — чтобы не мелькала
-    // смена «встроенный idle → клип сборки».
+    // Анимация игрока: инлайн JSON / URL / встроенная.
     let animPromise: Promise<unknown>
     if (character?.idle_data) {
-      if (!applyClipText(character.idle_data)) setBuiltIn()
+      applyClipText(character.idle_data)
       animPromise = Promise.resolve()
     } else if (character?.idle) {
       animPromise = fetch(character.idle)
         .then(r => (r.ok ? r.text() : Promise.reject(new Error(String(r.status)))))
-        .then(text => { if (!disposed && !applyClipText(text)) setBuiltIn() })
-        .catch(() => { if (!disposed) setBuiltIn() })
+        .then(text => { if (!disposed) applyClipText(text) })
+        .catch(() => { /* нет клипа — остаётся встроенный idle */ })
     } else {
-      setBuiltIn()
       animPromise = Promise.resolve()
     }
 
-    // Реальный скин активного аккаунта (если найдётся) — иначе остаётся дефолтный Steve.
+    // Реальный скин активного аккаунта (иначе дефолтный Steve).
     const skinPromise = window.api.skin.get()
       .then(res => { if (!disposed && res?.dataUrl) return viewer.loadSkin(res.dataUrl, { model: res.slim ? 'slim' : 'auto-detect' }) })
       .catch(() => {})
 
-    // Показываем модель только когда и скин, и анимация готовы (никаких промежуточных поз).
-    Promise.all([animPromise, skinPromise]).then(() => { if (!disposed) setReady(true) })
+    // Доп. glTF-объекты сцены со своими анимациями (позиция/движение целиком из файла).
+    const gltfLoader = new GLTFLoader()
+    const objectsPromise = Promise.all(
+      (character?.objects ?? []).map(obj =>
+        gltfLoader.loadAsync(obj.url).then(gltf => {
+          if (disposed) { disposeObject(gltf.scene); return }
+          if (obj.scale && obj.scale !== 1) gltf.scene.scale.setScalar(obj.scale)
+          viewer.scene.add(gltf.scene)
+          loaded.push(gltf.scene)
+          if (gltf.animations.length) {
+            const mixer = new THREE.AnimationMixer(gltf.scene)
+            for (const clip of gltf.animations) mixer.clipAction(clip).play()
+            mixers.push(mixer)
+          }
+        }).catch(() => { /* битый/недоступный объект — пропускаем */ })
+      )
+    )
+
+    Promise.all([animPromise, skinPromise, objectsPromise]).then(() => { if (!disposed) setReady(true) })
 
     const ro = new ResizeObserver(() => {
       const cw = wrap.clientWidth
@@ -76,7 +123,7 @@ export default function CharacterStage({ character }: Props): JSX.Element {
     })
     ro.observe(wrap)
 
-    // Не крутим анимацию, когда окно свёрнуто/не видно — бережём GPU.
+    // Пауза когда окно не видно (FunctionAnimation.paused тормозит и позу игрока, и миксеры вместе).
     const onVis = (): void => { if (viewer.animation) viewer.animation.paused = document.hidden }
     document.addEventListener('visibilitychange', onVis)
 
@@ -84,9 +131,11 @@ export default function CharacterStage({ character }: Props): JSX.Element {
       disposed = true
       document.removeEventListener('visibilitychange', onVis)
       ro.disconnect()
+      for (const m of mixers) m.stopAllAction()
+      for (const o of loaded) { viewer.scene.remove(o); disposeObject(o) }
       viewer.dispose()
     }
-  }, [character?.idle, character?.idle_data, character?.idle_name])
+  }, [character?.idle, character?.idle_data, character?.idle_name, objectsKey])
 
   return (
     <div ref={wrapRef} className={`${styles.stage} ${ready ? styles.ready : ''}`}>
