@@ -101,15 +101,21 @@ export default function SceneStage({ scene: sceneUrl }: Props): JSX.Element {
     // Смотрим со стороны -z: это «лицо» модели Blockbench (иначе видно спину, а объекты зеркалятся).
     const frameCamera = (box: THREE.Box3): void => {
       if (!isFinite(box.min.y)) return
-      const c = box.getCenter(new THREE.Vector3())
-      const s = box.getSize(new THREE.Vector3())
+      // По X и Z центрируем на оси модели (0,0), а НЕ на центре бокса сцены: тогда игрок стоит строго
+      // по центру, а объекты (пчела и т.п.) остаются на своих местах и не утягивают кадр вбок.
+      // По вертикали (Y) кадрируем по сцене. Дистанцию считаем от этого центра, чтобы всё влезло.
+      const cx = 0, cz = 0
+      const cy = (box.min.y + box.max.y) / 2
       const fovV = (FOV * Math.PI) / 180
       const fovH = 2 * Math.atan(Math.tan(fovV / 2) * camera.aspect)
-      const distV = s.y / 2 / Math.tan(fovV / 2)
-      const distH = s.x / 2 / Math.tan(fovH / 2)
-      const dist = Math.max(distV, distH) * MARGIN + s.z / 2
-      camera.position.set(c.x, c.y, c.z - dist)
-      camera.lookAt(c.x, c.y, c.z)
+      const halfX = Math.max(Math.abs(box.min.x - cx), Math.abs(box.max.x - cx))
+      const halfY = (box.max.y - box.min.y) / 2
+      const halfZ = Math.max(Math.abs(box.min.z - cz), Math.abs(box.max.z - cz))
+      const distV = halfY / Math.tan(fovV / 2)
+      const distH = halfX / Math.tan(fovH / 2)
+      const dist = Math.max(distV, distH) * MARGIN + halfZ
+      camera.position.set(cx, cy, cz - dist)
+      camera.lookAt(cx, cy, cz)
       camera.updateProjectionMatrix()
     }
 
