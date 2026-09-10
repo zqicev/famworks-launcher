@@ -17,11 +17,17 @@ const bustCache = (url: string): string =>
 // Кости стандартного рига игрока — их меши получают скин аккаунта; остальное (объекты) — свои текстуры.
 const PLAYER_BONES = new Set([
   'root', 'waist', 'body', 'head', 'helmet',
-  'rightArm', 'leftArm', 'rightLeg', 'leftLeg', 'rightItem', 'leftItem'
+  'rightArm', 'leftArm', 'rightLeg', 'leftLeg'
 ])
+
+// Держатели предметов в руках. Их содержимое (тюльпан, факел и т.п.) — реквизит со СВОЕЙ текстурой,
+// скин на него не кладём. Держатели вложены в руки (rightItem → rightArm), поэтому при обходе вверх
+// проверяем их ПЕРВЫМИ и выходим: иначе меш предмета зацепится за кость руки и получит скин.
+const ITEM_BONES = new Set(['rightItem', 'leftItem'])
 
 function isPlayerMesh(o: THREE.Object3D): boolean {
   for (let p: THREE.Object3D | null = o; p; p = p.parent) {
+    if (ITEM_BONES.has(p.name)) return false
     if (PLAYER_BONES.has(p.name)) return true
   }
   return false
