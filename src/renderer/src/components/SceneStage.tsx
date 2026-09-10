@@ -65,10 +65,13 @@ export default function SceneStage({ scene: sceneUrl }: Props): JSX.Element {
 
     const scene = new THREE.Scene()
     const camera = new THREE.PerspectiveCamera(40, w / h, 0.01, 1000)
-    scene.add(new THREE.AmbientLight(0xffffff, 1.25))
-    const dir = new THREE.DirectionalLight(0xffffff, 0.45)
-    dir.position.set(0.5, 1, 1.5)
-    scene.add(dir)
+    // Яркий «минекрафтовый» свет как у skinview3d: сильный ambient + ключевой свет СПЕРЕДИ
+    // (со стороны камеры, -z). Раньше направленный свет стоял на +z (в спину), и видимые грани
+    // освещались только ambient — из-за этого сцена выглядела тусклее стандартного idle.
+    scene.add(new THREE.AmbientLight(0xffffff, 2.0))
+    const key = new THREE.DirectionalLight(0xffffff, 0.7)
+    key.position.set(0.3, 0.8, -2)
+    scene.add(key)
 
     let disposed = false
     let mixer: THREE.AnimationMixer | null = null
