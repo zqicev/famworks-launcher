@@ -18,23 +18,31 @@ export default function OverviewTab({ modpack, busyId, onModpackReload }: Props)
   const sizeFmt = formatSizeMb(modpack.mods.reduce((s, m) => s + m.size_mb, 0))
 
   const [sceneOpen, setSceneOpen] = useState(false)
-  const [charOverride, setCharOverride] = useState<CharacterAnim | null>(null)
-  const character = charOverride ?? modpack.character
   const isCustom = modpack.id.startsWith('custom-')
 
-  // Сохраняем изменения персонажа в сборку (electron-store) и просим App перечитать её.
-  const saveCharacter = (next: CharacterAnim): void => {
-    setCharOverride(next) // мгновенно показываем
-    window.api.custom.save({ ...modpack, character: next }).then(() => onModpackReload?.()).catch(() => {})
-  }
-  // Загруженная локально единая сцена (.glb/.gltf) — из неё тянется и модель, и анимации.
+  // Локальный override сцены/анимации по id сборки — работает и для официальных, и для локальных.
+  // Эффективный персонаж = override ?? modpack.character (у официальных это анимация из репозитория).
+  const [override, setOverride] = useState<CharacterAnim | null>(null)
+  const character = override ?? modpack.character
+
+  useEffect(() => {
+    setOverride(null)
+    window.api.character.getOverride(modpack.id).then(o => setOverride(o ?? null)).catch(() => {})
+  }, [modpack.id])
+
+  // Загруженная локально сцена (.gltf) — из неё тянется и модель, и анимации.
   const applyScene = (sceneUrl: string): void => {
-    saveCharacter({ ...(character ?? {}), scene: sceneUrl })
+    const next: CharacterAnim = { scene: sceneUrl }
+    setOverride(next)
+    window.api.character.setOverride(modpack.id, next).catch(() => {})
   }
-  const clearScene = (): void => {
-    const next = { ...(character ?? {}) }
-    delete next.scene
-    saveCharacter(next)
+  // Сброс: у официальных — к анимации из сборки (репозиторий), у локальных — к стандартному idle.
+  const resetAnim = (): void => {
+    setOverride(null)
+    window.api.character.clearOverride(modpack.id).catch(() => {})
+    if (isCustom && modpack.character) {
+      window.api.custom.save({ ...modpack, character: undefined }).then(() => onModpackReload?.()).catch(() => {})
+    }
   }
   const [entries, setEntries] = useState<Entry[]>([])
   const [pings, setPings] = useState<Record<string, PingState>>({})
@@ -127,16 +135,26 @@ export default function OverviewTab({ modpack, busyId, onModpackReload }: Props)
         {character?.scene
           ? <SceneStage scene={character.scene} />
           : <CharacterStage character={character} />}
-        {isCustom && (
-          <div className={styles.stageActions}>
-            <button className={styles.changeAnimBtn} onClick={() => setSceneOpen(true)} title="Загрузить свою модель и анимацию (.gltf)">
+        <div className={styles.stageActions}>
+          <div className={styles.animGroup}>
+            <button className={styles.animMain} onClick={() => setSceneOpen(true)} title="Загрузить свою модель и анимацию (.gltf)">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <polygon points="5 3 19 12 5 21 5 3" />
               </svg>
               Сменить анимацию
             </button>
+            <span className={styles.animSep} />
+            <button
+              className={styles.animReset}
+              onClick={resetAnim}
+              title={isCustom ? 'Вернуть стандартную анимацию' : 'Вернуть анимацию из сборки'}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+              </svg>
+            </button>
           </div>
-        )}
+        </div>
       </div>
 
       <div className={styles.colRight}>
@@ -171,11 +189,7 @@ export default function OverviewTab({ modpack, busyId, onModpackReload }: Props)
       </div>
 
       {sceneOpen && (
-        <SceneGuideModal
-          onClose={() => setSceneOpen(false)}
-          onApply={isCustom ? applyScene : undefined}
-          onClear={isCustom && character?.scene ? clearScene : undefined}
-        />
+        <SceneGuideModal onClose={() => setSceneOpen(false)} onApply={applyScene} />
       )}
     </div>
   )

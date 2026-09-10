@@ -97,6 +97,11 @@ interface Window {
       clear: (id: string) => Promise<void>
       all: () => Promise<Record<string, string>>
     }
+    character: {
+      getOverride: (id: string) => Promise<import('../../types/modpack').CharacterAnim | null>
+      setOverride: (id: string, character: import('../../types/modpack').CharacterAnim) => Promise<void>
+      clearOverride: (id: string) => Promise<void>
+    }
     skin: {
       get: () => Promise<{ dataUrl: string; slim: boolean } | null>
     }

@@ -65,6 +65,21 @@ export function setupIpcHandlers() {
     const { getPackIcons } = await import('./background')
     return getPackIcons()
   })
+  // Локальный override персонажа/анимации по id сборки (и для официальных, и для локальных).
+  ipcMain.handle('character:get-override', (_, id: string) => {
+    const map = (store.get('characterOverrides') as Record<string, unknown>) ?? {}
+    return map[id] ?? null
+  })
+  ipcMain.handle('character:set-override', (_, id: string, character: unknown) => {
+    const map = { ...((store.get('characterOverrides') as Record<string, unknown>) ?? {}) }
+    map[id] = character
+    store.set('characterOverrides', map)
+  })
+  ipcMain.handle('character:clear-override', (_, id: string) => {
+    const map = { ...((store.get('characterOverrides') as Record<string, unknown>) ?? {}) }
+    delete map[id]
+    store.set('characterOverrides', map)
+  })
 
   ipcMain.handle('skin:get', async () => {
     const { getActiveSkin } = await import('./skinResolve')

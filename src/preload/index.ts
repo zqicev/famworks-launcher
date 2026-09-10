@@ -116,6 +116,11 @@ contextBridge.exposeInMainWorld('api', {
     clear: (id: string) => ipcRenderer.invoke('packicon:clear', id),
     all: () => ipcRenderer.invoke('packicon:all')
   },
+  character: {
+    getOverride: (id: string) => ipcRenderer.invoke('character:get-override', id),
+    setOverride: (id: string, character: unknown) => ipcRenderer.invoke('character:set-override', id, character),
+    clearOverride: (id: string) => ipcRenderer.invoke('character:clear-override', id)
+  },
   skin: {
     get: () => ipcRenderer.invoke('skin:get')
   },

@@ -14,8 +14,19 @@
 
 /* Центральная колонка: сцена тянется на всю высоту, кнопка (для локальных сборок) снизу. */
 .stageCol { display: flex; flex-direction: column; min-height: 0; }
-.stageActions { display: flex; justify-content: center; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-.changeAnimBtn {
+.stageActions { display: flex; justify-content: center; margin-top: 10px; }
+/* Сплит-кнопка «Сменить анимацию | 🗑» — единый пилл с разделителем. */
+.animGroup {
+  display: flex;
+  align-items: stretch;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  overflow: hidden;
+  transition: border-color 0.15s;
+}
+.animGroup:hover { border-color: rgb(from var(--accent) r g b / 0.5); }
+.animMain {
   display: flex;
   align-items: center;
   gap: 7px;
@@ -23,12 +34,18 @@
   font-size: 12px;
   font-weight: 600;
   color: var(--text-secondary);
-  background: var(--bg-surface);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  transition: color 0.15s, border-color 0.15s;
+  transition: color 0.15s;
 }
-.changeAnimBtn:hover { color: var(--accent); border-color: rgb(from var(--accent) r g b / 0.5); }
+.animMain:hover { color: var(--accent); }
+.animSep { width: 1px; background: var(--border); }
+.animReset {
+  display: flex;
+  align-items: center;
+  padding: 0 11px;
+  color: var(--text-secondary);
+  transition: color 0.15s;
+}
+.animReset:hover { color: var(--red); }
 
 .left { flex: 1; display: flex; flex-direction: column; gap: 28px; }
 
