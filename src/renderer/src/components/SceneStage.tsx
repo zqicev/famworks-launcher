@@ -65,10 +65,19 @@ export default function SceneStage({ scene: sceneUrl }: Props): JSX.Element {
 
     const scene = new THREE.Scene()
     const camera = new THREE.PerspectiveCamera(40, w / h, 0.01, 1000)
-    scene.add(new THREE.AmbientLight(0xffffff, 1.25))
-    const dir = new THREE.DirectionalLight(0xffffff, 0.45)
-    dir.position.set(0.5, 1, 1.5)
-    scene.add(dir)
+
+    // Акцент лаунчера (--accent) — для контрового света и свечения пола, чтобы персонаж «жил» в теме.
+    const accentStr = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim()
+    const accent = new THREE.Color(/^#?[0-9a-f]{6}$/i.test(accentStr) ? accentStr : '#c5f82a')
+
+    scene.add(new THREE.AmbientLight(0xffffff, 1.2))
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x1a1a1e, 0.3)) // мягкая объёмность
+    const key = new THREE.DirectionalLight(0xffffff, 0.55) // ключевой свет спереди-сверху (камера с -z)
+    key.position.set(0.4, 1.2, -1.6)
+    scene.add(key)
+    const rim = new THREE.DirectionalLight(accent, 0.9) // акцентный контровой сзади — цветной ободок силуэта
+    rim.position.set(-0.6, 1.3, 2.6)
+    scene.add(rim)
 
     let disposed = false
     let mixer: THREE.AnimationMixer | null = null
@@ -117,6 +126,32 @@ export default function SceneStage({ scene: sceneUrl }: Props): JSX.Element {
       camera.position.set(cx, cy, cz - dist)
       camera.lookAt(cx, cy, cz)
       camera.updateProjectionMatrix()
+    }
+
+    // Светящийся акцентный «пол» под ногами (горизонтальный диск с радиальным градиентом, в перспективе) —
+    // заземляет персонажа в сцене и завязывает его на акцент лаунчера.
+    const addGlowPad = (box: THREE.Box3): void => {
+      const cv = document.createElement('canvas')
+      cv.width = cv.height = 128
+      const ctx = cv.getContext('2d')
+      if (!ctx) return
+      const r = Math.round(accent.r * 255), g = Math.round(accent.g * 255), b = Math.round(accent.b * 255)
+      const grd = ctx.createRadialGradient(64, 64, 0, 64, 64, 64)
+      grd.addColorStop(0, `rgba(${r},${g},${b},0.55)`)
+      grd.addColorStop(1, `rgba(${r},${g},${b},0)`)
+      ctx.fillStyle = grd
+      ctx.fillRect(0, 0, 128, 128)
+      const tex = new THREE.CanvasTexture(cv)
+      tex.colorSpace = THREE.SRGBColorSpace
+      const height = box.max.y - box.min.y || 2
+      const pad = new THREE.Mesh(
+        new THREE.PlaneGeometry(1, 1),
+        new THREE.MeshBasicMaterial({ map: tex, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending })
+      )
+      pad.rotation.x = -Math.PI / 2
+      pad.position.set(0, box.min.y + 0.01, 0)
+      pad.scale.set(height * 0.95, height * 0.72, 1)
+      scene.add(pad)
     }
 
     // Скин аккаунта (иначе дефолтный Steve) как текстура для материала игрока.
@@ -185,6 +220,7 @@ export default function SceneStage({ scene: sceneUrl }: Props): JSX.Element {
           sceneBox = computeSceneBox(gltf.scene, 0)
           frameCamera(sceneBox)
         }
+        addGlowPad(sceneBox)
         setReady(true)
       })
       .catch(() => { if (!disposed) setReady(true) }) // не смогли — снимаем спиннер, покажем пустую сцену
@@ -223,7 +259,7 @@ export default function SceneStage({ scene: sceneUrl }: Props): JSX.Element {
 
   return (
     <div ref={wrapRef} className={`${styles.stage} ${ready ? styles.ready : ''}`}>
-      <div className={styles.glow} />
+      {/* Свечение пола рисуется в 3D (перспективный диск в сцене), CSS-glow не нужен — только частицы. */}
       <div className={styles.particles} aria-hidden="true">
         <i className={styles.p1} style={{ left: '12%' }} />
         <i className={styles.p2} style={{ left: '32%', animationDelay: '1.4s' }} />
