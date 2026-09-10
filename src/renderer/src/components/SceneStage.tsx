@@ -8,6 +8,12 @@ interface Props {
   scene: string // URL или data: к .glb/.gltf (игрок + объекты + анимации из одного проекта Blockbench)
 }
 
+// Один штамп на запуск: http(s)-сцену дёргаем с ?t=<штамп>, чтобы после обновления .glb в репозитории
+// не подтягивался закэшированный старый файл. В рамках сессии URL стабилен (кэш работает), свежий — при перезапуске.
+const SESSION = Date.now()
+const bustCache = (url: string): string =>
+  /^https?:/i.test(url) ? url + (url.includes('?') ? '&' : '?') + 't=' + SESSION : url
+
 // Кости стандартного рига игрока — их меши получают скин аккаунта; остальное (объекты) — свои текстуры.
 const PLAYER_BONES = new Set([
   'root', 'waist', 'body', 'head', 'helmet',
@@ -122,7 +128,7 @@ export default function SceneStage({ scene: sceneUrl }: Props): JSX.Element {
     }
 
     const gltfLoader = new GLTFLoader()
-    Promise.all([gltfLoader.loadAsync(sceneUrl), loadSkinTexture()])
+    Promise.all([gltfLoader.loadAsync(bustCache(sceneUrl)), loadSkinTexture()])
       .then(([gltf, skinTex]) => {
         if (disposed) { disposeTree(gltf.scene); skinTex.dispose(); return }
         scene.add(gltf.scene)

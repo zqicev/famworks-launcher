@@ -59,20 +59,6 @@ export function setupIpcHandlers() {
     return getActiveSkin()
   })
 
-  // Выбор файла .animation.json (Blockbench) — читаем текст в main и отдаём в рендер.
-  ipcMain.handle('anim:pick', async () => {
-    const res = await dialog.showOpenDialog({
-      title: 'Файл анимации (.animation.json)',
-      filters: [{ name: 'Blockbench анимация', extensions: ['json'] }],
-      properties: ['openFile']
-    })
-    if (res.canceled || !res.filePaths[0]) return { cancelled: true }
-    try {
-      return { text: readFileSync(res.filePaths[0], 'utf8') }
-    } catch (e) {
-      return { error: e instanceof Error ? e.message : String(e) }
-    }
-  })
   // Выбор 3D-сцены (.glb/.gltf из Blockbench: игрок + объекты + анимации) — читаем в data-URL.
   ipcMain.handle('scene:pick', async () => {
     const res = await dialog.showOpenDialog({

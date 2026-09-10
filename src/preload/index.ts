@@ -112,9 +112,6 @@ contextBridge.exposeInMainWorld('api', {
   skin: {
     get: () => ipcRenderer.invoke('skin:get')
   },
-  anim: {
-    pick: () => ipcRenderer.invoke('anim:pick')
-  },
   scene: {
     pick: () => ipcRenderer.invoke('scene:pick'),
     saveExample: (text: string) => ipcRenderer.invoke('example:save', text)

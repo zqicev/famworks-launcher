@@ -93,9 +93,6 @@ interface Window {
     skin: {
       get: () => Promise<{ dataUrl: string; slim: boolean } | null>
     }
-    anim: {
-      pick: () => Promise<{ text?: string; cancelled?: boolean; error?: string }>
-    }
     scene: {
       pick: () => Promise<{ dataUrl?: string; cancelled?: boolean; error?: string }>
       saveExample: (text: string) => Promise<{ ok?: boolean; cancelled?: boolean; error?: string }>
