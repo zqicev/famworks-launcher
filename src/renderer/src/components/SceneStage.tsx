@@ -146,13 +146,33 @@ export default function SceneStage({ scene: sceneUrl }: Props): JSX.Element {
           }
         })
 
-        let dur = 0
+        // Анимации: если есть клип "init" — проигрываем его один раз при загрузке,
+        // а по завершении включаем зацикленный "idle" (и любые прочие клипы). Иначе — сразу idle.
         if (gltf.animations.length) {
           mixer = new THREE.AnimationMixer(gltf.scene)
-          for (const clip of gltf.animations) { mixer.clipAction(clip).play(); dur = Math.max(dur, clip.duration) }
+          const init = gltf.animations.find(c => c.name.toLowerCase() === 'init' && c.duration > 0)
+          const loopClips = gltf.animations.filter(c => c.name.toLowerCase() !== 'init')
+          const playLoop = (): void => {
+            for (const clip of loopClips) mixer!.clipAction(clip).reset().setLoop(THREE.LoopRepeat, Infinity).play()
+          }
+          // Кадрируем по устойчивому состоянию сцены (idle): проигрываем idle, снимаем бокс, затем при
+          // наличии init — стартуем с него, а idle подключаем по событию finished.
+          playLoop()
+          const dur = loopClips.reduce((m, c) => Math.max(m, c.duration), 0)
+          sceneBox = computeSceneBox(gltf.scene, dur)
+          frameCamera(sceneBox)
+          if (init) {
+            mixer.stopAllAction()
+            const a = mixer.clipAction(init)
+            a.reset(); a.setLoop(THREE.LoopOnce, 1); a.clampWhenFinished = true; a.play()
+            const onFinished = (): void => { mixer!.removeEventListener('finished', onFinished); a.stop(); playLoop() }
+            mixer.addEventListener('finished', onFinished)
+            mixer.setTime(0)
+          }
+        } else {
+          sceneBox = computeSceneBox(gltf.scene, 0)
+          frameCamera(sceneBox)
         }
-        sceneBox = computeSceneBox(gltf.scene, dur)
-        frameCamera(sceneBox)
         setReady(true)
       })
       .catch(() => { if (!disposed) setReady(true) }) // не смогли — снимаем спиннер, покажем пустую сцену

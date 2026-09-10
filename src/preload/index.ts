@@ -116,7 +116,8 @@ contextBridge.exposeInMainWorld('api', {
     pick: () => ipcRenderer.invoke('anim:pick')
   },
   scene: {
-    pick: () => ipcRenderer.invoke('scene:pick')
+    pick: () => ipcRenderer.invoke('scene:pick'),
+    saveExample: (text: string) => ipcRenderer.invoke('example:save', text)
   },
   browser: {
     installModpack: (source: string, id: string) => ipcRenderer.invoke('browser:install-modpack', source, id),

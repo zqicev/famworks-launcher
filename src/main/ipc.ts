@@ -1,5 +1,5 @@
 import { ipcMain, dialog, BrowserWindow, shell, app } from 'electron'
-import { copyFileSync, mkdirSync, rmSync, existsSync, readFileSync } from 'fs'
+import { copyFileSync, mkdirSync, rmSync, existsSync, readFileSync, writeFileSync } from 'fs'
 import { basename, join as pathJoin } from 'path'
 import { spawn } from 'child_process'
 import { setIdle } from './discord'
@@ -87,6 +87,21 @@ export function setupIpcHandlers() {
       const glb = file.toLowerCase().endsWith('.glb')
       const mime = glb ? 'model/gltf-binary' : 'model/gltf+json'
       return { dataUrl: `data:${mime};base64,${buf.toString('base64')}` }
+    } catch (e) {
+      return { error: e instanceof Error ? e.message : String(e) }
+    }
+  })
+  // Сохранение примера проекта Blockbench (.bbmodel) — диалог «Сохранить как» и запись текста.
+  ipcMain.handle('example:save', async (_, text: string) => {
+    const res = await dialog.showSaveDialog({
+      title: 'Сохранить пример проекта',
+      defaultPath: 'famlauncher_example.bbmodel',
+      filters: [{ name: 'Blockbench проект', extensions: ['bbmodel'] }]
+    })
+    if (res.canceled || !res.filePath) return { cancelled: true }
+    try {
+      writeFileSync(res.filePath, text, 'utf8')
+      return { ok: true }
     } catch (e) {
       return { error: e instanceof Error ? e.message : String(e) }
     }

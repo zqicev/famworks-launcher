@@ -3,7 +3,6 @@ import { Modpack, CharacterAnim } from '../../../types/modpack'
 import { formatSizeMb } from '../lib/format'
 import CharacterStage from './CharacterStage'
 import SceneStage from './SceneStage'
-import AnimationGuideModal from './AnimationGuideModal'
 import SceneGuideModal from './SceneGuideModal'
 import styles from '../styles/OverviewTab.module.css'
 
@@ -18,7 +17,6 @@ type PingState = { loading: boolean; data: PingResult }
 export default function OverviewTab({ modpack, busyId, onModpackReload }: Props) {
   const sizeFmt = formatSizeMb(modpack.mods.reduce((s, m) => s + m.size_mb, 0))
 
-  const [guideOpen, setGuideOpen] = useState(false)
   const [sceneOpen, setSceneOpen] = useState(false)
   const [charOverride, setCharOverride] = useState<CharacterAnim | null>(null)
   const character = charOverride ?? modpack.character
@@ -29,11 +27,7 @@ export default function OverviewTab({ modpack, busyId, onModpackReload }: Props)
     setCharOverride(next) // мгновенно показываем
     window.api.custom.save({ ...modpack, character: next }).then(() => onModpackReload?.()).catch(() => {})
   }
-  // Загруженная локально анимация игрока.
-  const applyAnim = (idleData: string): void => {
-    saveCharacter({ ...(character ?? {}), idle_data: idleData })
-  }
-  // Загруженная локально единая сцена (.glb/.gltf).
+  // Загруженная локально единая сцена (.glb/.gltf) — из неё тянется и модель, и анимации.
   const applyScene = (sceneUrl: string): void => {
     saveCharacter({ ...(character ?? {}), scene: sceneUrl })
   }
@@ -135,20 +129,11 @@ export default function OverviewTab({ modpack, busyId, onModpackReload }: Props)
           : <CharacterStage character={character} />}
         {isCustom && (
           <div className={styles.stageActions}>
-            {!character?.scene && (
-              <button className={styles.changeAnimBtn} onClick={() => setGuideOpen(true)} title="Загрузить свою анимацию">
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <polygon points="5 3 19 12 5 21 5 3" />
-                </svg>
-                Сменить анимацию
-              </button>
-            )}
-            <button className={styles.changeAnimBtn} onClick={() => setSceneOpen(true)} title="Загрузить свою 3D-сцену">
+            <button className={styles.changeAnimBtn} onClick={() => setSceneOpen(true)} title="Загрузить свою модель и анимацию (.gltf)">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 2 2 7l10 5 10-5-10-5Z" />
-                <path d="m2 17 10 5 10-5M2 12l10 5 10-5" />
+                <polygon points="5 3 19 12 5 21 5 3" />
               </svg>
-              {character?.scene ? 'Своя сцена' : 'Загрузить сцену'}
+              Сменить анимацию
             </button>
           </div>
         )}
@@ -184,13 +169,6 @@ export default function OverviewTab({ modpack, busyId, onModpackReload }: Props)
           <p className={styles.text}>{modpack.long_description || modpack.description}</p>
         </section>
       </div>
-
-      {guideOpen && (
-        <AnimationGuideModal
-          onClose={() => setGuideOpen(false)}
-          onApply={isCustom ? applyAnim : undefined}
-        />
-      )}
 
       {sceneOpen && (
         <SceneGuideModal
