@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Mod } from '../../../types/modpack'
 import ModRow from './ModRow'
+import { useContentIcons } from '../lib/useContentIcons'
 import styles from '../styles/ModsTab.module.css'
 
 interface Props {
@@ -61,6 +62,7 @@ export default function PackTab({ dir, items, noun, onCount }: Props) {
     .map(p => ({ ...p, size_mb: sizes[p.filename] ?? p.size_mb }))
   const filtered = all.filter(m => m.name.toLowerCase().includes(search.toLowerCase()))
   const enabledCount = all.filter(p => !disabled.has(p.filename)).length
+  const iconFor = useContentIcons(dir, all, present)
 
   useEffect(() => { onCount?.(all.length) }, [all.length])
 
@@ -107,7 +109,7 @@ export default function PackTab({ dir, items, noun, onCount }: Props) {
       <div className={styles.list}>
         {all.length === 0 && <div style={{ padding: 18, textAlign: 'center', color: 'var(--text-dim)', fontSize: 13 }}>Пусто</div>}
         {filtered.map(p => (
-          <ModRow key={p.id} mod={p} enabled={!disabled.has(p.filename)} onToggle={v => handleToggle(p, v)} onDelete={() => handleDelete(p)} />
+          <ModRow key={p.id} mod={p} icon={iconFor(p)} enabled={!disabled.has(p.filename)} onToggle={v => handleToggle(p, v)} onDelete={() => handleDelete(p)} />
         ))}
       </div>
     </div>

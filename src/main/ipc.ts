@@ -116,6 +116,10 @@ export function setupIpcHandlers() {
   })
 
   ipcMain.handle('mods:installed', (_, modsDir: string) => getInstalledMods(modsDir))
+  ipcMain.handle('mods:local-icons', async (_, dir: string, filenames: string[]) => {
+    const { getLocalIcons } = await import('./localicons')
+    return getLocalIcons(dir, filenames)
+  })
   ipcMain.handle('mods:toggle', (_, modsDir: string, filename: string, enabled: boolean) =>
     toggleMod(modsDir, filename, enabled))
   ipcMain.handle('mods:delete', (_, modsDir: string, filename: string) =>

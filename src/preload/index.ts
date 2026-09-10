@@ -28,6 +28,7 @@ contextBridge.exposeInMainWorld('api', {
   getPathForFile: (file: File) => webUtils.getPathForFile(file),
   mods: {
     installed: (modsDir: string) => ipcRenderer.invoke('mods:installed', modsDir),
+    localIcons: (dir: string, filenames: string[]) => ipcRenderer.invoke('mods:local-icons', dir, filenames),
     toggle: (modsDir: string, filename: string, enabled: boolean) =>
       ipcRenderer.invoke('mods:toggle', modsDir, filename, enabled),
     delete: (modsDir: string, filename: string) => ipcRenderer.invoke('mods:delete', modsDir, filename),
