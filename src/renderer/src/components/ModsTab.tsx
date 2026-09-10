@@ -22,6 +22,9 @@ export default function ModsTab({ modpack, modsDir, onCount }: Props) {
   const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set())
   const [presentBases, setPresentBases] = useState<Set<string> | null>(null)
   const [dragging, setDragging] = useState(false)
+  // Стаггер играет один раз при монтировании вкладки, потом класс снимаем — поиск не дёргает список.
+  const [staggerOn, setStaggerOn] = useState(true)
+  useEffect(() => { const t = setTimeout(() => setStaggerOn(false), 700); return () => clearTimeout(t) }, [])
   const scanRef = useRef(false)
 
   const scanMods = async () => {
@@ -159,7 +162,7 @@ export default function ModsTab({ modpack, modsDir, onCount }: Props) {
         </button>
       </div>
 
-      <div className={styles.list}>
+      <div className={`${styles.list} ${staggerOn ? 'fw-stagger' : ''}`}>
         {filtered.map(mod => (
           <ModRow
             key={mod.id}

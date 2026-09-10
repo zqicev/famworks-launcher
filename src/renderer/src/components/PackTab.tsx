@@ -19,6 +19,9 @@ export default function PackTab({ dir, items, noun, onCount }: Props) {
   const [extra, setExtra] = useState<Mod[]>([])
   const [deleted, setDeleted] = useState<Set<string>>(new Set())
   const [dragging, setDragging] = useState(false)
+  // Стаггер один раз при открытии вкладки, потом класс снимаем — поиск не дёргает список.
+  const [staggerOn, setStaggerOn] = useState(true)
+  useEffect(() => { const t = setTimeout(() => setStaggerOn(false), 700); return () => clearTimeout(t) }, [])
 
   const scan = useCallback(async () => {
     const files = await window.api.mods.installed(dir).catch(() => [] as string[])
@@ -106,7 +109,7 @@ export default function PackTab({ dir, items, noun, onCount }: Props) {
           </svg>
         </button>
       </div>
-      <div className={styles.list}>
+      <div className={`${styles.list} ${staggerOn ? 'fw-stagger' : ''}`}>
         {all.length === 0 && <div style={{ padding: 18, textAlign: 'center', color: 'var(--text-dim)', fontSize: 13 }}>Пусто</div>}
         {filtered.map(p => (
           <ModRow key={p.id} mod={p} icon={iconFor(p)} enabled={!disabled.has(p.filename)} onToggle={v => handleToggle(p, v)} onDelete={() => handleDelete(p)} />
