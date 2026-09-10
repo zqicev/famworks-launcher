@@ -92,6 +92,7 @@ export default function SceneStage({ scene: sceneUrl }: Props): JSX.Element {
     }
 
     // Кадрируем по всей сцене, по обеим осям (учитывая аспект) — игрок остаётся в центре композиции.
+    // Смотрим со стороны -z: это «лицо» модели Blockbench (иначе видно спину, а объекты зеркалятся).
     const frameCamera = (box: THREE.Box3): void => {
       if (!isFinite(box.min.y)) return
       const c = box.getCenter(new THREE.Vector3())
@@ -101,7 +102,7 @@ export default function SceneStage({ scene: sceneUrl }: Props): JSX.Element {
       const distV = s.y / 2 / Math.tan(fovV / 2)
       const distH = s.x / 2 / Math.tan(fovH / 2)
       const dist = Math.max(distV, distH) * MARGIN + s.z / 2
-      camera.position.set(c.x, c.y, c.z + dist)
+      camera.position.set(c.x, c.y, c.z - dist)
       camera.lookAt(c.x, c.y, c.z)
       camera.updateProjectionMatrix()
     }
@@ -136,6 +137,10 @@ export default function SceneStage({ scene: sceneUrl }: Props): JSX.Element {
             if (done.has(m)) continue
             const std = m as THREE.MeshStandardMaterial
             std.map = skinTex
+            // Скин 64x64: прозрачные пиксели 2-го слоя (шапка/куртка) вырезаем через alphaTest,
+            // иначе внешний слой (если он есть в модели) залил бы базовый непрозрачным боксом.
+            std.alphaTest = 0.5
+            std.transparent = false
             std.needsUpdate = true
             done.add(m)
           }
