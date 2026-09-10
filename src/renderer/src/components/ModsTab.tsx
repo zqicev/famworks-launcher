@@ -20,6 +20,7 @@ export default function ModsTab({ modpack, modsDir, onCount }: Props) {
   const [extraMods, setExtraMods] = useState<LocalMod[]>([])
   const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set())
   const [presentBases, setPresentBases] = useState<Set<string> | null>(null)
+  const [icons, setIcons] = useState<Record<string, string | null>>({})
   const [dragging, setDragging] = useState(false)
   const scanRef = useRef(false)
 
@@ -89,6 +90,14 @@ export default function ModsTab({ modpack, modsDir, onCount }: Props) {
   }))
   const allMods: LocalMod[] = [...packMods, ...extraMods].filter(m => !deletedIds.has(m.id))
   const enabledCount = allMods.filter(m => !disabled.has(m.id)).length
+
+  // Иконки модов с Modrinth (один bulk-запрос). Ключ по набору id — не дёргаем на каждый рендер.
+  const idsKey = allMods.map(m => m.modrinth_id).filter(Boolean).join(',')
+  useEffect(() => {
+    const ids = idsKey ? idsKey.split(',') : []
+    if (!ids.length) return
+    window.api.modrinth.icons(ids).then(map => setIcons(prev => ({ ...prev, ...map }))).catch(() => {})
+  }, [idsKey])
 
   // Отдаём родителю фактическое число модов и сколько из них включено
   useEffect(() => {
@@ -162,6 +171,7 @@ export default function ModsTab({ modpack, modsDir, onCount }: Props) {
           <ModRow
             key={mod.id}
             mod={mod}
+            icon={mod.modrinth_id ? icons[mod.modrinth_id] ?? undefined : undefined}
             enabled={!disabled.has(mod.id)}
             notInstalled={mod._notInstalled}
             onToggle={(v) => handleToggle(mod, v)}

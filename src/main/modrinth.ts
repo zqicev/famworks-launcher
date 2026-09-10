@@ -94,6 +94,18 @@ export async function getModrinthDependencies(id: string): Promise<{ name: strin
   return out
 }
 
+/** Иконки проектов Modrinth по их id одним bulk-запросом (для списка модов). id -> icon_url|null. */
+export async function getModrinthIcons(ids: string[]): Promise<Record<string, string | null>> {
+  const out: Record<string, string | null> = {}
+  const uniq = [...new Set(ids.filter(Boolean))]
+  if (!uniq.length) return out
+  try {
+    const res = await axios.get(`${BASE}/projects`, { headers: HEADERS, params: { ids: JSON.stringify(uniq) } })
+    for (const p of (res.data ?? []) as { id: string; icon_url: string | null }[]) out[p.id] = p.icon_url ?? null
+  } catch { /* нет сети - вернётся пусто, останутся буквы */ }
+  return out
+}
+
 export interface ModrinthDependency {
   project_id?: string
   version_id?: string

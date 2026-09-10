@@ -103,10 +103,18 @@
 .item:hover { background: var(--bg-hover); }
 .active { background: var(--bg-active) !important; }
 
+.avatarImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
 .avatar {
   width: 34px;
   height: 34px;
   border-radius: 8px;
+  overflow: hidden;
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;

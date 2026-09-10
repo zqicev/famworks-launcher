@@ -41,7 +41,8 @@ contextBridge.exposeInMainWorld('api', {
     versions: (projectId: string, mcVersion: string, loader: string, type?: string) =>
       ipcRenderer.invoke('modrinth:versions', projectId, mcVersion, loader, type),
     download: (url: string, filename: string, modsDir: string, sha512?: string) =>
-      ipcRenderer.invoke('modrinth:download', url, filename, modsDir, sha512)
+      ipcRenderer.invoke('modrinth:download', url, filename, modsDir, sha512),
+    icons: (ids: string[]) => ipcRenderer.invoke('modrinth:icons', ids)
   },
   curseforge: {
     search: (query: string, mcVersion: string, loader: string, type?: string) =>
@@ -108,6 +109,11 @@ contextBridge.exposeInMainWorld('api', {
     pick: () => ipcRenderer.invoke('bg:pick'),
     clear: () => ipcRenderer.invoke('bg:clear'),
     get: () => ipcRenderer.invoke('bg:get')
+  },
+  packIcon: {
+    pick: (id: string) => ipcRenderer.invoke('packicon:pick', id),
+    clear: (id: string) => ipcRenderer.invoke('packicon:clear', id),
+    all: () => ipcRenderer.invoke('packicon:all')
   },
   skin: {
     get: () => ipcRenderer.invoke('skin:get')

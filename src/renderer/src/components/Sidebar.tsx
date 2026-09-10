@@ -35,16 +35,33 @@ const ExportIcon = () => (
     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" y1="15" x2="12" y2="3" />
   </svg>
 )
+const ImageIcon = () => (
+  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3" y="3" width="18" height="18" rx="2" /><circle cx="8.5" cy="8.5" r="1.5" /><path d="m21 15-5-5L5 21" />
+  </svg>
+)
 
 export default function Sidebar({ index, customPacks, selectedId, seenUpdates, onSelect, onSettings, onRefresh, onCreate, onDeleteCustom, onImport, onExport, browserActive, onOpenBrowser }: Props) {
   const [version, setVersion] = useState('')
+  const [icons, setIcons] = useState<Record<string, string>>({})
   useEffect(() => { window.api.appVersion().then(setVersion).catch(() => {}) }, [])
+  useEffect(() => { window.api.packIcon.all().then(setIcons).catch(() => {}) }, [])
 
-  const Avatar = ({ name, active }: { name: string; active: boolean }) => (
-    <div className={styles.avatar} style={{ background: active ? 'var(--accent)' : 'var(--bg-active)' }}>
-      <span style={{ color: active ? '#0a0a0a' : 'var(--text)' }}>{(name[0] ?? '?').toUpperCase()}</span>
-    </div>
-  )
+  const setPackIcon = async (id: string): Promise<void> => {
+    const r = await window.api.packIcon.pick(id).catch(() => null)
+    if (r?.filename) setIcons(prev => ({ ...prev, [id]: r.filename! }))
+  }
+
+  const Avatar = ({ name, active, icon }: { name: string; active: boolean; icon?: string }): JSX.Element =>
+    icon ? (
+      <div className={styles.avatar}>
+        <img className={styles.avatarImg} src={`fwbg://icon/${icon}`} alt="" />
+      </div>
+    ) : (
+      <div className={styles.avatar} style={{ background: active ? 'var(--accent)' : 'var(--bg-active)' }}>
+        <span style={{ color: active ? '#0a0a0a' : 'var(--text)' }}>{(name[0] ?? '?').toUpperCase()}</span>
+      </div>
+    )
 
   return (
     <aside className={styles.sidebar}>
@@ -82,12 +99,13 @@ export default function Sidebar({ index, customPacks, selectedId, seenUpdates, o
               const active = selectedId === pack.id
               return (
                 <button key={pack.id} className={`${styles.item} ${active ? styles.active : ''}`} onClick={() => onSelect(pack.id)}>
-                  <Avatar name={pack.name} active={active} />
+                  <Avatar name={pack.name} active={active} icon={icons[pack.id]} />
                   <div className={styles.info}>
                     <div className={styles.name}>{pack.name}{hasUpdate && <span className={styles.updateBadge}>ОБНОВЛЕНО</span>}</div>
                     <div className={styles.meta}>{pack.loader.charAt(0).toUpperCase() + pack.loader.slice(1)} · {pack.mc_version}</div>
                   </div>
                   <div className={styles.itemActions}>
+                    <button className={styles.actBtn} onClick={(e) => { e.stopPropagation(); setPackIcon(pack.id) }} title="Сменить картинку сборки"><ImageIcon /></button>
                     <button className={styles.actBtn} onClick={(e) => { e.stopPropagation(); onExport(pack.id) }} title="Экспорт сборки в .fwpack"><ExportIcon /></button>
                   </div>
                   <div className={`${styles.dot} ${active ? styles.dotActive : ''}`} />
@@ -119,12 +137,13 @@ export default function Sidebar({ index, customPacks, selectedId, seenUpdates, o
               const active = selectedId === pack.id
               return (
                 <button key={pack.id} className={`${styles.item} ${active ? styles.active : ''}`} onClick={() => onSelect(pack.id)}>
-                  <Avatar name={pack.name} active={active} />
+                  <Avatar name={pack.name} active={active} icon={icons[pack.id]} />
                   <div className={styles.info}>
                     <div className={styles.name}>{pack.name}</div>
                     <div className={styles.meta}>{pack.loader.charAt(0).toUpperCase() + pack.loader.slice(1)} · {pack.mc_version}</div>
                   </div>
                   <div className={styles.itemActions}>
+                    <button className={styles.actBtn} onClick={(e) => { e.stopPropagation(); setPackIcon(pack.id) }} title="Сменить картинку сборки"><ImageIcon /></button>
                     <button className={styles.actBtn} onClick={(e) => { e.stopPropagation(); onExport(pack.id) }} title="Экспорт сборки в файл"><ExportIcon /></button>
                     <button className={styles.actBtn} onClick={(e) => { e.stopPropagation(); onDeleteCustom(pack.id) }} title="Удалить сборку"><span className={styles.del}>✕</span></button>
                   </div>

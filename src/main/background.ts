@@ -13,6 +13,14 @@ function bgDir(): string {
   return d
 }
 
+// Кастомные картинки сборок в сайдбаре (по одной на сборку). Тот же протокол fwbg, но хост 'icon':
+// fwbg://icon/<filename>. store.packIcons: { <packId>: filename }.
+function packIconDir(): string {
+  const d = join(app.getPath('userData'), 'packicons')
+  mkdirSync(d, { recursive: true })
+  return d
+}
+
 function mimeFor(ext: string): string {
   switch (ext.toLowerCase()) {
     case '.jpg':
@@ -35,8 +43,10 @@ export function registerBackgroundSchemes(): void {
 /** Отдаёт файл фона по fwbg://local/<filename>. Вызывать ПОСЛЕ app.ready. */
 export function registerBackgroundProtocol(): void {
   protocol.handle(SCHEME, req => {
-    const name = basename(decodeURIComponent(new URL(req.url).pathname)) // basename гасит выход за каталог
-    const file = join(bgDir(), name)
+    const url = new URL(req.url)
+    const name = basename(decodeURIComponent(url.pathname)) // basename гасит выход за каталог
+    const dir = url.host === 'icon' ? packIconDir() : bgDir()
+    const file = join(dir, name)
     if (!name || !existsSync(file)) return new Response('not found', { status: 404 })
     return new Response(readFileSync(file), { headers: { 'content-type': mimeFor(extname(file)) } })
   })
@@ -73,4 +83,48 @@ export function getBackground(): string | null {
   const name = store.get('bgImage') as string | null
   if (!name) return null
   return existsSync(join(bgDir(), name)) ? name : null
+}
+
+// ——— Картинки сборок ———
+
+function getPackIconMap(): Record<string, string> {
+  return (store.get('packIcons') as Record<string, string> | null) ?? {}
+}
+
+/** { packId: filename } только для реально существующих файлов. */
+export function getPackIcons(): Record<string, string> {
+  const map = getPackIconMap()
+  const out: Record<string, string> = {}
+  for (const [id, name] of Object.entries(map)) {
+    if (name && existsSync(join(packIconDir(), name))) out[id] = name
+  }
+  return out
+}
+
+/** Диалог выбора картинки для сборки → копия в userData. Возвращает имя файла или отмену. */
+export async function pickPackIcon(packId: string): Promise<{ filename?: string; cancelled?: boolean }> {
+  const res = await dialog.showOpenDialog({
+    title: 'Картинка сборки',
+    filters: [{ name: 'Изображения', extensions: ['jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp'] }],
+    properties: ['openFile']
+  })
+  if (res.canceled || !res.filePaths[0]) return { cancelled: true }
+  const src = res.filePaths[0]
+  const ext = (extname(src) || '.png').toLowerCase()
+  const map = getPackIconMap()
+  const old = map[packId]
+  if (old) { try { unlinkSync(join(packIconDir(), old)) } catch { /* уже нет */ } }
+  const filename = `${packId}-${Date.now()}${ext}`
+  copyFileSync(src, join(packIconDir(), filename))
+  store.set('packIcons', { ...map, [packId]: filename })
+  return { filename }
+}
+
+export function clearPackIcon(packId: string): void {
+  const map = getPackIconMap()
+  const old = map[packId]
+  if (old) { try { unlinkSync(join(packIconDir(), old)) } catch { /* уже нет */ } }
+  const next = { ...map }
+  delete next[packId]
+  store.set('packIcons', next)
 }

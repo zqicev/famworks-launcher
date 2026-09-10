@@ -28,6 +28,7 @@ interface Window {
       search: (query: string, mcVersion: string, loader: string, type?: string) => Promise<unknown[]>
       versions: (projectId: string, mcVersion: string, loader: string, type?: string) => Promise<unknown[]>
       download: (url: string, filename: string, modsDir: string, sha512?: string) => Promise<string>
+      icons: (ids: string[]) => Promise<Record<string, string | null>>
     }
     curseforge: {
       search: (query: string, mcVersion: string, loader: string, type?: string) => Promise<unknown[]>
@@ -89,6 +90,11 @@ interface Window {
       pick: () => Promise<{ filename?: string; cancelled?: boolean }>
       clear: () => Promise<void>
       get: () => Promise<string | null>
+    }
+    packIcon: {
+      pick: (id: string) => Promise<{ filename?: string; cancelled?: boolean }>
+      clear: (id: string) => Promise<void>
+      all: () => Promise<Record<string, string>>
     }
     skin: {
       get: () => Promise<{ dataUrl: string; slim: boolean } | null>

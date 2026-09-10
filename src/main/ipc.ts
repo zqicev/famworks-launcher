@@ -8,7 +8,7 @@ import { fetchModpackIndex, fetchModpack } from './modpacks'
 import { checkAndInstallModpack, getModpackStatus, toggleMod, deleteMod, getInstalledMods, downloadModToDir, getModFileSizeBytes } from './installer'
 import { launchGame, offlineAuthorization, abortLaunch, markUserKill, QuickPlay } from './launcher'
 import { setupLoader, latestLoaderVersion, LoaderId } from './loaders'
-import { searchModrinth, getModVersions } from './modrinth'
+import { searchModrinth, getModVersions, getModrinthIcons } from './modrinth'
 import { microsoftLogin, microsoftRefresh } from './msAuth'
 import { Account } from './store'
 import { beginOperation, endOperation, cancelCurrent, isCancelError } from './abort'
@@ -52,6 +52,18 @@ export function setupIpcHandlers() {
   ipcMain.handle('bg:get', async () => {
     const { getBackground } = await import('./background')
     return getBackground()
+  })
+  ipcMain.handle('packicon:pick', async (_, id: string) => {
+    const { pickPackIcon } = await import('./background')
+    return pickPackIcon(id)
+  })
+  ipcMain.handle('packicon:clear', async (_, id: string) => {
+    const { clearPackIcon } = await import('./background')
+    clearPackIcon(id)
+  })
+  ipcMain.handle('packicon:all', async () => {
+    const { getPackIcons } = await import('./background')
+    return getPackIcons()
   })
 
   ipcMain.handle('skin:get', async () => {
@@ -118,6 +130,7 @@ export function setupIpcHandlers() {
     searchModrinth(query, mcVersion, loader, type))
   ipcMain.handle('modrinth:versions', (_, projectId: string, mcVersion: string, loader: string, type?: string) =>
     getModVersions(projectId, mcVersion, loader, type))
+  ipcMain.handle('modrinth:icons', (_, ids: string[]) => getModrinthIcons(ids))
   ipcMain.handle('modrinth:download', async (_, url: string, filename: string, modsDir: string, sha512?: string) => {
     await downloadModToDir(url, filename, modsDir, getWindow(), sha512)
     return filename

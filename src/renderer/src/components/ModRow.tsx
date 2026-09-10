@@ -1,20 +1,25 @@
+import { useState } from 'react'
 import { Mod } from '../../../types/modpack'
 import styles from '../styles/ModRow.module.css'
 
 interface Props {
   mod: Mod
+  icon?: string | null
   enabled: boolean
   notInstalled?: boolean
   onToggle: (enabled: boolean) => void
   onDelete: () => void
 }
 
-export default function ModRow({ mod, enabled, notInstalled, onToggle, onDelete }: Props) {
+export default function ModRow({ mod, icon, enabled, notInstalled, onToggle, onDelete }: Props) {
   const locked = mod.required || !!notInstalled
+  const [broken, setBroken] = useState(false)
   return (
     <div className={`${styles.row} ${!enabled ? styles.disabled : ''}`}>
       <div className={styles.avatar} style={{ opacity: enabled ? 1 : 0.4 }}>
-        {mod.name[0].toUpperCase()}
+        {icon && !broken
+          ? <img src={icon} alt="" className={styles.avatarImg} loading="lazy" onError={() => setBroken(true)} />
+          : mod.name[0].toUpperCase()}
       </div>
 
       <div className={styles.info}>
