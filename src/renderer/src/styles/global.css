@@ -94,6 +94,26 @@ input {
   to { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes fwItemIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Каскадное появление элементов списка. Повесь класс fw-stagger на контейнер —
+   его прямые дети выезжают снизу по очереди. Элементы после 10-го появляются без доп.
+   задержки (не тормозим длинные списки). backwards — до своей очереди ребёнок скрыт. */
+.fw-stagger > * { animation: fwItemIn 0.34s cubic-bezier(0.16, 1, 0.3, 1) backwards; }
+.fw-stagger > *:nth-child(1) { animation-delay: 0.02s; }
+.fw-stagger > *:nth-child(2) { animation-delay: 0.05s; }
+.fw-stagger > *:nth-child(3) { animation-delay: 0.08s; }
+.fw-stagger > *:nth-child(4) { animation-delay: 0.11s; }
+.fw-stagger > *:nth-child(5) { animation-delay: 0.14s; }
+.fw-stagger > *:nth-child(6) { animation-delay: 0.17s; }
+.fw-stagger > *:nth-child(7) { animation-delay: 0.20s; }
+.fw-stagger > *:nth-child(8) { animation-delay: 0.23s; }
+.fw-stagger > *:nth-child(9) { animation-delay: 0.26s; }
+.fw-stagger > *:nth-child(n+10) { animation-delay: 0.29s; }
+
 /* Уважаем системную настройку «уменьшить движение» */
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

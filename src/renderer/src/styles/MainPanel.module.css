@@ -143,5 +143,5 @@
   flex: 1;
   overflow-y: auto;
   padding: 20px 32px;
-  animation: fadeIn 0.2s ease;
+  animation: slideUp 0.28s cubic-bezier(0.16, 1, 0.3, 1);
 }

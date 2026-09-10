@@ -77,7 +77,7 @@ export default function OverviewTab({ modpack, busyId, onModpackReload }: Props)
         {entries.length > 0 && (
           <section className={styles.section}>
             <div className={styles.label}>ПРОДОЛЖИТЬ ИГРУ</div>
-            <div className={styles.recentGrid}>
+            <div className={`${styles.recentGrid} fw-stagger`}>
               {entries.map((e) => {
                 const st = e.kind === 'server' ? pings[e.ip] : undefined
                 const img = e.kind === 'server' ? (st?.data?.favicon || e.icon) : e.icon
@@ -111,7 +111,7 @@ export default function OverviewTab({ modpack, busyId, onModpackReload }: Props)
         {modpack.changelog?.length > 0 && (
           <section className={styles.section}>
             <div className={styles.label}>ПОСЛЕДНИЕ ИЗМЕНЕНИЯ</div>
-            <div className={styles.changelog}>
+            <div className={`${styles.changelog} fw-stagger`}>
               {modpack.changelog.map((entry) => (
                 <div key={entry.version} className={styles.changelogRow}>
                   <span className={styles.version}>{entry.version}</span>

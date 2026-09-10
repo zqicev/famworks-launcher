@@ -76,7 +76,7 @@ export default function Sidebar({ index, customPacks, selectedId, seenUpdates, o
             <span>СБОРКИ</span>
             <span className={styles.count}>{index?.modpacks.length ?? 0}</span>
           </div>
-          <div className={styles.list}>
+          <div className={`${styles.list} fw-stagger`}>
             {index?.modpacks.map((pack) => {
               const hasUpdate = seenUpdates[pack.id] && seenUpdates[pack.id] !== pack.updated_at
               const active = selectedId === pack.id
@@ -105,7 +105,7 @@ export default function Sidebar({ index, customPacks, selectedId, seenUpdates, o
               <button className={styles.addMini} onClick={onCreate} title="Создать сборку">+</button>
             </div>
           </div>
-          <div className={styles.list}>
+          <div className={`${styles.list} fw-stagger`}>
             {customPacks.length === 0 && (
               <button className={styles.createCard} onClick={onCreate}>
                 <span className={styles.createPlus}>+</span>
