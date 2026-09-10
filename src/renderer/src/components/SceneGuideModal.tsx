@@ -44,7 +44,8 @@ export default function SceneGuideModal({ onClose, onApply, onClear }: Props): J
 
           <ol style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 10, fontSize: 13, lineHeight: 1.55, color: 'var(--text-secondary)' }}>
             <li><b style={{ color: 'var(--text)' }}>Blockbench → New → Generic Model</b> (glTF-совместимый формат).</li>
-            <li>Собери рига игрока с костями <code>root, body, head, rightArm, leftArm, rightLeg, leftLeg</code>. UV игрока — как у обычного скина 64×64, чтобы скин лёг корректно.</li>
+            <li>Собери рига игрока с костями <code>root, body, head, rightArm, leftArm, rightLeg, leftLeg</code>. UV игрока — как у обычного скина 64×64, чтобы скин лёг корректно. Лучше всего взять стандартный риг игрока Minecraft.</li>
+            <li><b style={{ color: 'var(--text)' }}>Добавь 2-й слой</b> (шапка/куртка/рукава/штанины — внешние кубы поверх базовых с UV внешнего слоя). Без него у скина не будет верхнего слоя (волосы/куртка): в модели должна быть геометрия обоих слоёв.</li>
             <li>В этой же сцене добавь любые объекты рядом (своя иерархия костей, свои текстуры) — их материалы останутся собственными.</li>
             <li>Вкладка <b style={{ color: 'var(--text)' }}>Animate</b>: анимируй игрока и объекты. Все анимации проиграются одновременно и зациклятся.</li>
             <li><b style={{ color: 'var(--text)' }}>File → Export → Export glTF</b> (или GLB). GLB компактнее и всегда самодостаточный — рекомендуется.</li>
