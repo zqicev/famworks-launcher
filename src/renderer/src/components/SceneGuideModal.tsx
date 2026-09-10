@@ -70,8 +70,8 @@ export default function SceneGuideModal({ onClose, onApply, onClear }: Props): J
           </ol>
 
           <div className={styles.field} style={{ gap: 6 }}>
-            <label className={styles.label}>ВАЖНО</label>
-            <p className={styles.hint} style={{ margin: 0, lineHeight: 1.55 }}>
+            <label className={styles.label} style={{ color: 'var(--accent)' }}>ВАЖНО</label>
+            <p className={styles.hint} style={{ margin: 0, lineHeight: 1.55, color: 'var(--text-secondary)' }}>
               Не переименовывай кости игрока (<code>root/body/head/rightArm/leftArm/rightLeg/leftLeg</code>) — по ним
               накладывается скин. Оставь имена анимаций <code>init</code> и <code>idle</code>. При экспорте выбирай
               glTF Embedded (текстуры внутри файла), чтобы всё работало одним файлом.
