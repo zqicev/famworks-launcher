@@ -86,6 +86,18 @@ export function setupIpcHandlers() {
     return getActiveSkin()
   })
 
+  // Скин по UUID (для головы лицензионного аккаунта в списке). Кэш 10 мин — скины меняются редко,
+  // и это бережёт лимиты sessionserver Mojang при нескольких аккаунтах.
+  const headCache = new Map<string, { url: string | null; at: number }>()
+  ipcMain.handle('skin:head', async (_, uuid: string) => {
+    const cached = headCache.get(uuid)
+    if (cached && Date.now() - cached.at < 600000) return cached.url
+    const { getSkinDataUrl } = await import('./skinResolve')
+    const url = await getSkinDataUrl(uuid)
+    headCache.set(uuid, { url, at: Date.now() })
+    return url
+  })
+
   // Выбор 3D-сцены (.glb/.gltf из Blockbench: игрок + объекты + анимации) — читаем в data-URL.
   ipcMain.handle('scene:pick', async () => {
     const res = await dialog.showOpenDialog({

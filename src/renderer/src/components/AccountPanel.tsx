@@ -1,5 +1,24 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import styles from '../styles/AccountPanel.module.css'
+
+/** Голова скина (лицо + слой шапки) из 64x64-скина. Обрезка размеронезависимая: CSS-фон в %,
+ *  pixelated. Первый фон — шапка (сверху), второй — лицо. */
+function SkinHead({ url }: { url: string }): JSX.Element {
+  return (
+    <div
+      aria-hidden="true"
+      style={{
+        width: '100%',
+        height: '100%',
+        backgroundImage: `url("${url}"), url("${url}")`,
+        backgroundSize: '800% 800%, 800% 800%',
+        backgroundPosition: '71.4286% 14.2857%, 14.2857% 14.2857%',
+        backgroundRepeat: 'no-repeat',
+        imageRendering: 'pixelated'
+      }}
+    />
+  )
+}
 
 interface Account {
   id: string
@@ -50,6 +69,9 @@ export default function AccountPanel() {
   const [elyTotp, setElyTotp] = useState('')
   const [elyLoading, setElyLoading] = useState(false)
   const [msLoading, setMsLoading] = useState(false)
+  // Головы скинов лицензионных (microsoft) аккаунтов: uuid -> data-URL скина. Тянем один раз на uuid.
+  const [heads, setHeads] = useState<Record<string, string>>({})
+  const headFetched = useRef<Set<string>>(new Set())
 
   const closeAll = (): void => { setOpen(false); setAdding(false); setElyForm(false); setError('') }
 
@@ -74,6 +96,17 @@ export default function AccountPanel() {
       setActiveId(active)
     })
   }, [])
+
+  // Подгружаем голову скина для каждого лицензионного аккаунта (по uuid, один раз).
+  useEffect(() => {
+    for (const a of accounts) {
+      if (a.type === 'microsoft' && a.uuid && !headFetched.current.has(a.uuid)) {
+        const id = a.uuid
+        headFetched.current.add(id)
+        window.api.skin.head(id).then(url => { if (url) setHeads(prev => ({ ...prev, [id]: url })) }).catch(() => {})
+      }
+    }
+  }, [accounts])
 
   const persist = async (list: Account[], active: string | null) => {
     setAccounts(list)
@@ -208,7 +241,9 @@ export default function AccountPanel() {
                         onClick={() => selectAccount(acc.id)}
                       >
                         <div className={`${styles.cAvatar} ${avatarAccent(acc.type) ? styles.cAvatarAccent : ''}`}>
-                          {acc.username[0].toUpperCase()}
+                          {acc.type === 'microsoft' && acc.uuid && heads[acc.uuid]
+                            ? <SkinHead url={heads[acc.uuid]} />
+                            : acc.username[0].toUpperCase()}
                         </div>
                         <div className={styles.cInfo}>
                           <div className={styles.cName}>{acc.username}</div>
@@ -243,7 +278,9 @@ export default function AccountPanel() {
 
       <button className={styles.trigger} onClick={() => setOpen(o => !o)}>
         <div className={`${styles.avatar} ${!activeAcc ? styles.avatarEmpty : ''} ${activeAcc && activeAcc.type !== 'offline' ? styles.avatarMs : ''}`}>
-          {activeAcc ? activeAcc.username[0].toUpperCase() : '?'}
+          {activeAcc && activeAcc.type === 'microsoft' && activeAcc.uuid && heads[activeAcc.uuid]
+            ? <SkinHead url={heads[activeAcc.uuid]} />
+            : activeAcc ? activeAcc.username[0].toUpperCase() : '?'}
         </div>
         <div className={styles.info}>
           <div className={styles.name}>{activeAcc?.username ?? 'Нет аккаунта'}</div>

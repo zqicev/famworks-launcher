@@ -105,6 +105,7 @@ interface Window {
     }
     skin: {
       get: () => Promise<{ dataUrl: string; slim: boolean } | null>
+      head: (uuid: string) => Promise<string | null>
     }
     scene: {
       pick: () => Promise<{ dataUrl?: string; cancelled?: boolean; error?: string }>

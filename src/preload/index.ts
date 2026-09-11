@@ -123,7 +123,8 @@ contextBridge.exposeInMainWorld('api', {
     clearOverride: (id: string) => ipcRenderer.invoke('character:clear-override', id)
   },
   skin: {
-    get: () => ipcRenderer.invoke('skin:get')
+    get: () => ipcRenderer.invoke('skin:get'),
+    head: (uuid: string) => ipcRenderer.invoke('skin:head', uuid)
   },
   scene: {
     pick: () => ipcRenderer.invoke('scene:pick'),

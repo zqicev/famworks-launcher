@@ -44,6 +44,12 @@ async function mojangSkin(uuid: string): Promise<ResolvedSkin | null> {
   }
 }
 
+/** Скин (data-URL) по UUID с серверов Mojang — для головы лицензионного аккаунта в списке. */
+export async function getSkinDataUrl(uuid: string): Promise<string | null> {
+  const r = await mojangSkin(uuid)
+  return r?.dataUrl ?? null
+}
+
 // Скин по нику из Ely.by (для ely-аккаунтов и оффлайн-ников, у кого там есть скин).
 async function elySkin(name: string): Promise<ResolvedSkin | null> {
   const dataUrl = await fetchPng(`https://skinsystem.ely.by/skins/${encodeURIComponent(name)}.png`)
