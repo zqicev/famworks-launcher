@@ -128,15 +128,19 @@ export async function setupLoader(mp: Modpack, gameRoot: string, win: BrowserWin
   // Forge / NeoForge — официальный установщик
   const installer = join(gameRoot, '.loader', `${loader}-${mp.loader_version}-installer.jar`)
   if (!existsSync(installer)) {
-    emit(win, { phase: 'download', message: `Загрузка установщика ${LABELS[loader]}...` })
+    emit(win, { phase: 'download', message: `Загрузка установщика ${LABELS[loader]}` })
     const url = loader === 'forge'
       ? `https://maven.minecraftforge.net/net/minecraftforge/forge/${mp.mc_version}-${mp.loader_version}/forge-${mp.mc_version}-${mp.loader_version}-installer.jar`
       : `https://maven.neoforged.net/releases/net/neoforged/neoforge/${mp.loader_version}/neoforge-${mp.loader_version}-installer.jar`
     mkdirSync(dirname(installer), { recursive: true })
-    await downloadFile(url, installer)
+    await downloadFile(url, installer, (bytes, total, speed) => {
+      emit(win, { phase: 'download', message: `Загрузка установщика ${LABELS[loader]}`, bytesDownloaded: bytes, bytesTotal: total, speedBps: speed })
+    })
   }
 
-  emit(win, { phase: 'download', message: `Установка ${LABELS[loader]} (может занять минуту)...` })
+  // Установщик запускает Java и сам качает библиотеки/клиент - прогресс по байтам оттуда не снять,
+  // поэтому идёт как индетерминантная фаза. Сообщение честно предупреждает, что это надолго.
+  emit(win, { phase: 'download', message: `Установка ${LABELS[loader]}: скачиваются библиотеки, это может занять пару минут` })
   const javaPath = await ensureJava(dirname(gameRoot), win, await requiredJavaMajor(mp.mc_version))
   await runClientInstaller(javaPath, installer, gameRoot, win, mp.id)
   if (!existsSync(versionFile)) {
@@ -273,14 +277,22 @@ export async function latestLoaderVersion(loader: LoaderId, mc: string): Promise
   }
 }
 
-/** Простая потоковая загрузка файла с поддержкой отмены. */
-async function downloadFile(url: string, dest: string): Promise<void> {
+/** Простая потоковая загрузка файла с поддержкой отмены и (опционально) прогрессом по байтам. */
+async function downloadFile(
+  url: string,
+  dest: string,
+  onProgress?: (bytes: number, total: number, speed: number) => void
+): Promise<void> {
   const tmp = dest + '.tmp'
   const signal = opSignal()
   const res = await axios.get(url, { responseType: 'stream', maxRedirects: 5, signal })
+  const total = parseInt(String(res.headers['content-length'] ?? '0'), 10)
   await new Promise<void>((resolve, reject) => {
     const stream = createWriteStream(tmp)
     let settled = false
+    let downloaded = 0
+    let lastTime = Date.now()
+    let lastBytes = 0
     const fail = (e: unknown): void => {
       if (settled) return
       settled = true
@@ -292,6 +304,18 @@ async function downloadFile(url: string, dest: string): Promise<void> {
     if (signal) {
       if (signal.aborted) return fail(new DOMException('Aborted', 'AbortError'))
       signal.addEventListener('abort', () => fail(new DOMException('Aborted', 'AbortError')), { once: true })
+    }
+    if (onProgress) {
+      res.data.on('data', (chunk: Buffer) => {
+        downloaded += chunk.length
+        const now = Date.now()
+        const elapsed = (now - lastTime) / 1000
+        if (elapsed >= 0.3) {
+          onProgress(downloaded, total, (downloaded - lastBytes) / elapsed)
+          lastTime = now
+          lastBytes = downloaded
+        }
+      })
     }
     res.data.pipe(stream)
     stream.on('finish', () => { if (!settled) { settled = true; resolve() } })
