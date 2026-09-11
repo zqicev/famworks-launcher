@@ -131,10 +131,17 @@ export function setupIpcHandlers() {
   })
 
   // Полный размер папки установленной сборки (байты). 0 — если ещё не установлена.
+  // Скан большой сборки (десятки тысяч файлов) не из дешёвых — кэшируем на 60с, чтобы
+  // переключение вкладок/сборок не гоняло диск заново.
+  const sizeCache = new Map<string, { bytes: number; at: number }>()
   ipcMain.handle('modpack:dir-size', async (_, modpackId: string) => {
+    const cached = sizeCache.get(modpackId)
+    if (cached && Date.now() - cached.at < 60000) return cached.bytes
     const { dirSize } = await import('./cleanup')
     const installPath = store.get('installPath') as string
-    return dirSize(pathJoin(installPath, modpackId))
+    const bytes = await dirSize(pathJoin(installPath, modpackId))
+    sizeCache.set(modpackId, { bytes, at: Date.now() })
+    return bytes
   })
 
   ipcMain.handle('mods:installed', (_, modsDir: string) => getInstalledMods(modsDir))
@@ -187,6 +194,7 @@ export function setupIpcHandlers() {
       const gameRoot = pathJoin(installPath, modpack.id)
       await setupLoader(modpack, gameRoot, win)
       await checkAndInstallModpack(modpack, installPath, win)
+      sizeCache.delete(modpackId) // размер вырос — пусть пересчитается
       return true
     } catch (e) {
       if (isCancelError(e)) {

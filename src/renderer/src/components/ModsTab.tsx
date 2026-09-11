@@ -133,8 +133,6 @@ export default function ModsTab({ modpack, modsDir, onCount }: Props) {
     if (files.length) setTimeout(scanMods, 300)
   }, [modsDir])
 
-  const openFolder = () => window.api.shell.openFolder(modsDir)
-
   return (
     <div
       className={`${styles.wrapper} ${dragging ? styles.dragging : ''}`}
@@ -155,11 +153,6 @@ export default function ModsTab({ modpack, modsDir, onCount }: Props) {
         <span className={styles.activeCount}>
           {enabledCount} / {allMods.length} активны
         </span>
-        <button className={styles.folderBtn} onClick={openFolder} title="Открыть папку модов">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M4 5h5l2 2h9a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" />
-          </svg>
-        </button>
       </div>
 
       <div className={`${styles.list} ${staggerOn ? 'fw-stagger' : ''}`}>

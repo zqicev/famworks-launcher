@@ -103,11 +103,6 @@ export default function PackTab({ dir, items, noun, onCount }: Props) {
           <input className={styles.search} placeholder={`Поиск ${noun}`} value={search} onChange={e => setSearch(e.target.value)} />
         </div>
         <span className={styles.activeCount}>{enabledCount} / {all.length} активны</span>
-        <button className={styles.folderBtn} onClick={() => window.api.shell.openFolder(dir)} title="Открыть папку">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M4 5h5l2 2h9a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" />
-          </svg>
-        </button>
       </div>
       <div className={`${styles.list} ${staggerOn ? 'fw-stagger' : ''}`}>
         {all.length === 0 && <div style={{ padding: 18, textAlign: 'center', color: 'var(--text-dim)', fontSize: 13 }}>Пусто</div>}

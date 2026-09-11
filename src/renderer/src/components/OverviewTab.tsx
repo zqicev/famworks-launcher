@@ -6,7 +6,7 @@ import SceneStage from './SceneStage'
 import SceneGuideModal from './SceneGuideModal'
 import styles from '../styles/OverviewTab.module.css'
 
-interface Props { modpack: Modpack; installPath: string; busyId: string | null; onModpackReload?: () => void }
+interface Props { modpack: Modpack; packBytes: number; busyId: string | null; onModpackReload?: () => void }
 
 type World = { kind: 'world'; folder: string; name: string; lastPlayed: number; mode: string; version: string; icon: string | null; score: number }
 type Server = { kind: 'server'; name: string; ip: string; icon: string | null; score: number }
@@ -14,22 +14,15 @@ type Entry = World | Server
 type PingResult = { online: number; max: number; favicon: string | null; ping: number; motd: string; version: string } | null
 type PingState = { loading: boolean; data: PingResult }
 
-export default function OverviewTab({ modpack, installPath, busyId, onModpackReload }: Props) {
+export default function OverviewTab({ modpack, packBytes, busyId, onModpackReload }: Props) {
   const [sceneOpen, setSceneOpen] = useState(false)
   const isCustom = modpack.id.startsWith('custom-')
 
-  // Реальный размер = полный вес папки сборки (installPath/<id>). Пока не установлена (0 байт) —
-  // показываем оценку по сумме модов из JSON. Перечитываем при смене сборки и после установки.
-  const [packBytes, setPackBytes] = useState(0)
-  useEffect(() => {
-    setPackBytes(0)
-    window.api.modpacks.dirSize(modpack.id).then(setPackBytes).catch(() => {})
-  }, [modpack.id, busyId])
+  // Размер = полный вес папки сборки (считает MainPanel и передаёт сюда). Пока не установлена
+  // (0 байт) — показываем оценку по сумме модов из JSON.
   const sizeFmt = packBytes > 0
     ? formatBytes(packBytes)
     : formatSizeMb(modpack.mods.reduce((s, m) => s + m.size_mb, 0))
-
-  const openPackFolder = (): void => { window.api.shell.openFolder(`${installPath}/${modpack.id}`) }
 
   // Локальный override сцены/анимации по id сборки — работает и для официальных, и для локальных.
   // Эффективный персонаж = override ?? modpack.character (у официальных это анимация из репозитория).
@@ -177,14 +170,7 @@ export default function OverviewTab({ modpack, installPath, busyId, onModpackRel
 
       <div className={styles.colRight}>
       <div className={styles.params}>
-        <div className={styles.paramHead}>
-          <span className={styles.paramTitle}>ПАРАМЕТРЫ</span>
-          <button className={styles.folderBtn} onClick={openPackFolder} title="Открыть папку сборки">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-            </svg>
-          </button>
-        </div>
+        <div className={styles.paramTitle}>ПАРАМЕТРЫ</div>
         <div className={styles.paramRow}>
           <span className={styles.paramKey}>ЗАГРУЗЧИК</span>
           <span className={styles.paramVal}>{modpack.loader.charAt(0).toUpperCase() + modpack.loader.slice(1)}</span>

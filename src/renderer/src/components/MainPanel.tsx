@@ -6,7 +6,7 @@ import OverviewTab from './OverviewTab'
 import LogsTab from './LogsTab'
 import DevTab from './DevTab'
 import BottomBar from './BottomBar'
-import { formatSizeMb } from '../lib/format'
+import { formatSizeMb, formatBytes } from '../lib/format'
 import styles from '../styles/MainPanel.module.css'
 
 interface Props {
@@ -34,6 +34,8 @@ export default function MainPanel({ modpack, installPath, loading, error, devMod
   const [tab, setTab] = useState<'mods' | 'resourcepacks' | 'shaders' | 'overview' | 'logs' | 'dev'>('overview')
   const [counts, setCounts] = useState({ modsTotal: 0, modsActive: 0, rp: 0, sh: 0 })
   const [busyId, setBusyId] = useState<string | null>(null)
+  // Реальный вес папки сборки (installPath/<id>). 0 — пока не установлена / ещё считается.
+  const [packBytes, setPackBytes] = useState(0)
 
   useEffect(() => {
     window.api.busyGet().then(setBusyId).catch(() => {})
@@ -60,8 +62,13 @@ export default function MainPanel({ modpack, installPath, loading, error, devMod
       sh: modpack?.shaders?.length ?? 0
     })
     refreshCounts()
+    setPackBytes(0)
+    if (mpId) window.api.modpacks.dirSize(mpId).then(setPackBytes).catch(() => {})
     const off = window.api.install.onProgress((raw: unknown) => {
-      if ((raw as { phase: string }).phase === 'done') setTimeout(refreshCounts, 300)
+      if ((raw as { phase: string }).phase === 'done') {
+        setTimeout(refreshCounts, 300)
+        if (mpId) setTimeout(() => window.api.modpacks.dirSize(mpId).then(setPackBytes).catch(() => {}), 400)
+      }
     })
     return off
   }, [mpId, refreshCounts])
@@ -120,6 +127,12 @@ export default function MainPanel({ modpack, installPath, loading, error, devMod
             </button>
           )}
 
+          <button className={styles.folderBtn} onClick={() => window.api.shell.openFolder(`${installPath}/${modpack.id}`)} title="Открыть папку сборки">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4 5h5l2 2h9a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" />
+            </svg>
+          </button>
+
           <button className={styles.browseBtn} onClick={() => onOpenBrowser(browseType)} title="Найти и установить контент">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round">
               <circle cx="11" cy="11" r="7" /><line x1="21" y1="21" x2="16.65" y2="16.65" />
@@ -129,7 +142,7 @@ export default function MainPanel({ modpack, installPath, loading, error, devMod
 
           <div className={styles.stats}>
             <div className={styles.stat}>
-              <span className={styles.statVal}>{formatSizeMb(totalSizeMb)}</span>
+              <span className={styles.statVal}>{packBytes > 0 ? formatBytes(packBytes) : formatSizeMb(totalSizeMb)}</span>
               <span className={styles.statLabel}>РАЗМЕР</span>
             </div>
           </div>
@@ -140,7 +153,7 @@ export default function MainPanel({ modpack, installPath, loading, error, devMod
         {tab === 'mods' && <ModsTab modpack={modpack} modsDir={modsDir} onCount={(total, active) => setCounts(c => ({ ...c, modsTotal: total, modsActive: active }))} />}
         {tab === 'resourcepacks' && <PackTab dir={rpDir} items={modpack.resourcepacks ?? []} noun="ресурспаков" onCount={n => setCounts(c => ({ ...c, rp: n }))} />}
         {tab === 'shaders' && <PackTab dir={shDir} items={modpack.shaders ?? []} noun="шейдеров" onCount={n => setCounts(c => ({ ...c, sh: n }))} />}
-        {tab === 'overview' && <OverviewTab modpack={modpack} installPath={installPath} busyId={busyId} onModpackReload={onModpackReload} />}
+        {tab === 'overview' && <OverviewTab modpack={modpack} packBytes={packBytes} busyId={busyId} onModpackReload={onModpackReload} />}
         {tab === 'logs' && <LogsTab modpackId={modpack.id} />}
         {tab === 'dev' && devMode && <DevTab modpackId={modpack.id} loader={modpack.loader} mcVersion={modpack.mc_version} />}
       </div>

@@ -95,8 +95,21 @@
   border-color: var(--border);
 }
 
-.browseBtn {
+.folderBtn {
   margin-left: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+.folderBtn:hover { color: var(--accent); border-color: var(--accent); background: var(--bg-hover); }
+
+.browseBtn {
   display: flex;
   align-items: center;
   gap: 7px;

@@ -9,15 +9,19 @@ const RESERVED = new Set(['assets', 'runtime'])
 //  - .loader — installer-jar'ы Forge/NeoForge, нужны только в момент установки
 const JUNK_SUBDIRS = ['assets', '.loader']
 
-/** Рекурсивный размер папки. Асинхронно — чтобы не блокировать главный процесс (иначе UI виснет). */
+/** Рекурсивный размер папки. Файлы одной папки считаем параллельно (быстрее на больших сборках
+ *  в десятки тысяч файлов), в подпапки спускаемся последовательно — так пиковая нагрузка на FS
+ *  ограничена размером одной папки и не упирается в EMFILE. Асинхронно — не блокирует UI. */
 export async function dirSize(dir: string): Promise<number> {
-  let total = 0
   let entries: Dirent[]
   try { entries = await readdir(dir, { withFileTypes: true }) } catch { return 0 }
+  const files = entries.filter(e => !e.isDirectory())
+  const sizes = await Promise.all(files.map(async e => {
+    try { return (await stat(join(dir, e.name))).size } catch { return 0 }
+  }))
+  let total = sizes.reduce((a, b) => a + b, 0)
   for (const e of entries) {
-    const p = join(dir, e.name)
-    if (e.isDirectory()) total += await dirSize(p)
-    else { try { total += (await stat(p)).size } catch { /* пропускаем */ } }
+    if (e.isDirectory()) total += await dirSize(join(dir, e.name))
   }
   return total
 }
