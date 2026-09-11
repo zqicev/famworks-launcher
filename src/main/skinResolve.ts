@@ -5,17 +5,8 @@ interface Account { id: string; username: string; type: string; uuid?: string }
 
 export interface ResolvedSkin { dataUrl: string; slim: boolean }
 
-/** Скин активного аккаунта для 3D-модели в лаунчере. Источник — Ely.by по нику
- *  (работает и для ely-аккаунтов, и для оффлайн-ников, у кого там есть скин).
- *  Возвращает null, если скина нет — тогда рендер покажет дефолтного Steve. */
-export async function getActiveSkin(): Promise<ResolvedSkin | null> {
-  const accounts = (store.get('accounts') as Account[] | null) ?? []
-  const activeId = store.get('activeAccountId') as string | null
-  const acc = accounts.find(a => a.id === activeId) ?? accounts[0]
-  const name = acc?.username?.trim()
-  if (!name) return null
-
-  const url = `https://skinsystem.ely.by/skins/${encodeURIComponent(name)}.png`
+// Скачивает PNG по URL и заворачивает в data-URL. null при любой ошибке/не-картинке.
+async function fetchPng(url: string): Promise<string | null> {
   try {
     const resp = await axios.get<ArrayBuffer>(url, {
       responseType: 'arraybuffer',
@@ -23,11 +14,55 @@ export async function getActiveSkin(): Promise<ResolvedSkin | null> {
       maxRedirects: 5,
       validateStatus: s => s === 200
     })
-    const ct = String(resp.headers['content-type'] || '')
-    if (!ct.includes('image')) return null
-    const b64 = Buffer.from(resp.data).toString('base64')
-    return { dataUrl: `data:image/png;base64,${b64}`, slim: false }
+    if (!String(resp.headers['content-type'] || '').includes('image')) return null
+    return `data:image/png;base64,${Buffer.from(resp.data).toString('base64')}`
   } catch {
-    return null // нет скина/сети — не ошибка, просто дефолт
+    return null
   }
+}
+
+// Лицензионный скин с серверов сессий Mojang по UUID (для microsoft-аккаунтов).
+// Профиль отдаёт base64-JSON в properties[textures] → textures.SKIN.url (+ model=slim).
+async function mojangSkin(uuid: string): Promise<ResolvedSkin | null> {
+  const id = uuid.replace(/-/g, '')
+  try {
+    const prof = await axios.get<{ properties?: { name: string; value: string }[] }>(
+      `https://sessionserver.mojang.com/session/minecraft/profile/${id}`,
+      { timeout: 8000, validateStatus: s => s === 200 }
+    )
+    const tex = prof.data.properties?.find(p => p.name === 'textures')
+    if (!tex) return null
+    const decoded = JSON.parse(Buffer.from(tex.value, 'base64').toString('utf8')) as {
+      textures?: { SKIN?: { url: string; metadata?: { model?: string } } }
+    }
+    const skin = decoded.textures?.SKIN
+    if (!skin?.url) return null
+    const dataUrl = await fetchPng(skin.url)
+    return dataUrl ? { dataUrl, slim: skin.metadata?.model === 'slim' } : null
+  } catch {
+    return null
+  }
+}
+
+// Скин по нику из Ely.by (для ely-аккаунтов и оффлайн-ников, у кого там есть скин).
+async function elySkin(name: string): Promise<ResolvedSkin | null> {
+  const dataUrl = await fetchPng(`https://skinsystem.ely.by/skins/${encodeURIComponent(name)}.png`)
+  return dataUrl ? { dataUrl, slim: false } : null
+}
+
+/** Скин активного аккаунта для 3D-модели в лаунчере.
+ *  - microsoft: настоящий лицензионный скин с серверов Mojang по UUID;
+ *  - ely / оффлайн: по нику из Ely.by.
+ *  null → рендер покажет дефолтного Steve. */
+export async function getActiveSkin(): Promise<ResolvedSkin | null> {
+  const accounts = (store.get('accounts') as Account[] | null) ?? []
+  const activeId = store.get('activeAccountId') as string | null
+  const acc = accounts.find(a => a.id === activeId) ?? accounts[0]
+  if (!acc) return null
+
+  // Лицензия: только Mojang по UUID. При недоступности — дефолт, а НЕ чужой скин с Ely.by по нику.
+  if (acc.type === 'microsoft' && acc.uuid) return mojangSkin(acc.uuid)
+
+  const name = acc.username?.trim()
+  return name ? elySkin(name) : null
 }
