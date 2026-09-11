@@ -228,10 +228,10 @@ export default function AccountPanel() {
                   </div>
 
                   <div className={styles.addSection}>
-                    <button className={styles.addEly} onClick={() => { setElyForm(true); setError('') }}>Войти через Ely.by</button>
+                    <button className={styles.addPrimary} onClick={loginMicrosoft} disabled={msLoading}>{msLoading ? 'Вход…' : 'Войти через Microsoft'}</button>
                     <div className={styles.addRow}>
                       <button className={styles.addBtn2} onClick={() => { setAdding(true); setError('') }}>+ Офлайн-аккаунт</button>
-                      <button className={styles.addBtn2} onClick={loginMicrosoft} disabled={msLoading}>{msLoading ? 'Вход…' : 'Microsoft'}</button>
+                      <button className={styles.addBtn2} onClick={() => { setElyForm(true); setError('') }}>Ely.by</button>
                     </div>
                   </div>
                 </>

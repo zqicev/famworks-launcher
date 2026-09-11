@@ -237,7 +237,7 @@
   border-top: 1px solid var(--border);
 }
 
-.addEly {
+.addPrimary {
   width: 100%;
   padding: 11px 12px;
   background: var(--accent);
@@ -247,7 +247,7 @@
   font-weight: 700;
   transition: background 0.15s;
 }
-.addEly:hover { background: var(--accent-dim); }
+.addPrimary:hover { background: var(--accent-dim); }
 
 .addRow { display: flex; gap: 8px; }
 
