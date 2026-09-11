@@ -139,18 +139,21 @@ export async function setupLoader(mp: Modpack, gameRoot: string, win: BrowserWin
   }
 
   // Установщик запускает Java и сам качает библиотеки/клиент - прогресс по байтам оттуда не снять,
-  // поэтому идёт как индетерминантная фаза. Сообщение честно предупреждает, что это надолго.
-  emit(win, { phase: 'download', message: `Установка ${LABELS[loader]}: скачиваются библиотеки, это может занять пару минут` })
+  // поэтому идёт как индетерминантная фаза. ВАЖНО сбросить байты/счётчик от скачивания installer-jar,
+  // иначе полоска замирает на его проценте (напр. 16%), а не показывает «бегущую» индетерминантную.
+  emit(win, { phase: 'download', message: `Установка ${LABELS[loader]}: скачиваются библиотеки, это может занять пару минут`, bytesDownloaded: 0, bytesTotal: 0, current: 0, total: 0 })
   const javaPath = await ensureJava(dirname(gameRoot), win, await requiredJavaMajor(mp.mc_version))
-  await runClientInstaller(javaPath, installer, gameRoot, win, mp.id)
+  await runClientInstaller(javaPath, installer, gameRoot, win, mp.id, LABELS[loader])
   if (!existsSync(versionFile)) {
     throw new Error(`${LABELS[loader]}: установщик не создал профиль ${id}. Проверьте версию загрузчика (${mp.loader_version}).`)
   }
   return id
 }
 
-/** Прогоняет установщик Forge/NeoForge в headless-режиме (создаёт versions/<id>/<id>.json + библиотеки). */
-async function runClientInstaller(javaPath: string, installer: string, gameRoot: string, win: BrowserWindow, id: string): Promise<void> {
+/** Прогоняет установщик Forge/NeoForge в headless-режиме (создаёт versions/<id>/<id>.json + библиотеки).
+ *  Точный процент отсюда не снять (внешний процесс), поэтому держим индетерминантную полосу и показываем
+ *  живой счётчик шагов из вывода установщика (скачивание/обработка библиотек) — чтобы было видно движение. */
+async function runClientInstaller(javaPath: string, installer: string, gameRoot: string, win: BrowserWindow, id: string, label: string): Promise<void> {
   mkdirSync(gameRoot, { recursive: true })
   // Установщик требует наличия launcher_profiles.json в целевой папке
   const profiles = join(gameRoot, 'launcher_profiles.json')
@@ -160,10 +163,23 @@ async function runClientInstaller(javaPath: string, installer: string, gameRoot:
   await new Promise<void>((resolve, reject) => {
     const proc = spawn(javaPath, ['-jar', installer, '--installClient', gameRoot], { cwd: gameRoot })
     let tail = ''
+    let steps = 0
+    let lastEmit = 0
+    const bump = (): void => {
+      steps++
+      const now = Date.now()
+      if (now - lastEmit < 250) return // не спамим событиями
+      lastEmit = now
+      // bytes/count = 0 держат полосу индетерминантной, а растущий счётчик в тексте показывает движение.
+      emit(win, { phase: 'download', message: `Установка ${label}: обработка библиотек (${steps})`, bytesDownloaded: 0, bytesTotal: 0, current: 0, total: 0 })
+    }
     const onOut = (d: Buffer): void => {
       const s = d.toString()
       tail = (tail + s).slice(-800)
       win.webContents.send('launch:log', { id, text: `[installer] ${s.trim()}` })
+      for (const line of s.split('\n')) {
+        if (/download|librar|processor|extract|considering/i.test(line)) bump()
+      }
     }
     proc.stdout.on('data', onOut)
     proc.stderr.on('data', onOut)
