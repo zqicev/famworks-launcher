@@ -1,6 +1,15 @@
 import { Auth } from 'msmc'
 
-// Client ID нашего Azure-приложения (публичный, не секрет).
+// Режим входа Microsoft.
+//  'official' - встроенный в msmc публичный client_id официального лаунчера Minecraft
+//     (00000000402b5328, легаси login.live.com-флоу). Он уже в allowlist Minecraft, поэтому
+//     вход работает БЕЗ одобрения заявки. Формально это вход под видом официального лаунчера
+//     (серая зона ToS) - временная мера, пока Microsoft не одобрит наше приложение.
+//  'app' - наше собственное Azure-приложение (CLIENT_ID ниже). Переключить сюда, когда одобрят
+//     заявку на доступ к Minecraft API; до одобрения getMinecraft() отдаёт 403.
+const AUTH_MODE: 'official' | 'app' = 'official'
+
+// Client ID нашего Azure-приложения (публичный, не секрет). Используется только в режиме 'app'.
 const CLIENT_ID = 'f8594f88-e1a8-4e66-b851-1ad54959c8d1'
 const REDIRECT = 'http://localhost'
 
@@ -21,7 +30,12 @@ export interface MsLoginResult {
 }
 
 function makeAuth() {
-  return new Auth({ client_id: CLIENT_ID, redirect: REDIRECT, prompt: 'select_account' })
+  // В режиме 'official' передаём msmc только prompt-строку - библиотека сама подставит публичный
+  // client_id официального лаунчера и корректный redirect (login.live.com/oauth20_desktop.srf).
+  // В режиме 'app' перебиваем дефолт нашим Azure-приложением.
+  return AUTH_MODE === 'official'
+    ? new Auth('select_account')
+    : new Auth({ client_id: CLIENT_ID, redirect: REDIRECT, prompt: 'select_account' })
 }
 
 /** Превращает ошибку msmc в человеко-читаемое сообщение. */
