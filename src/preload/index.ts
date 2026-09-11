@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld('api', {
     index: () => ipcRenderer.invoke('modpacks:index'),
     get: (id: string) => ipcRenderer.invoke('modpacks:get', id),
     status: (id: string) => ipcRenderer.invoke('modpack:status', id),
+    dirSize: (id: string) => ipcRenderer.invoke('modpack:dir-size', id),
     listDir: (id: string, relPath: string) => ipcRenderer.invoke('modpack:list-dir', id, relPath),
     exportSelected: (id: string, marks: Record<string, 'in' | 'out'>) =>
       ipcRenderer.invoke('modpack:export-selected', id, marks),
@@ -136,6 +137,10 @@ contextBridge.exposeInMainWorld('api', {
   },
   system: {
     totalMemoryMb: () => ipcRenderer.invoke('system:total-memory-mb')
+  },
+  memory: {
+    get: (id: string) => ipcRenderer.invoke('memory:get', id),
+    set: (id: string, mb: number) => ipcRenderer.invoke('memory:set', id, mb)
   },
   update: {
     install: () => ipcRenderer.invoke('update:install'),

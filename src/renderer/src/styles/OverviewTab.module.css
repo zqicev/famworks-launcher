@@ -135,6 +135,12 @@
   gap: 14px;
 }
 
+.paramHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 2px;
+}
 .paramTitle {
   font-size: 10px;
   font-weight: 600;
@@ -142,6 +148,19 @@
   color: var(--text-dim);
   margin-bottom: 2px;
 }
+.paramHead .paramTitle { margin-bottom: 0; }
+.folderBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  color: var(--text-dim);
+  background: var(--bg-active);
+  transition: color 0.15s, background 0.15s;
+}
+.folderBtn:hover { color: var(--accent); background: var(--bg-hover); }
 
 .paramRow {
   display: flex;

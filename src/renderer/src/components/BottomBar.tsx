@@ -125,11 +125,15 @@ export default function BottomBar({ modpack, installPath, activeMods = 0, totalM
   }, [modpack.id, checkStatus])
 
   useEffect(() => {
-    window.api.store.get('allocatedMemory').then(v => { if (v) setMemory(v as number) })
     window.api.system.totalMemoryMb().then(mb => setTotalRamMb(mb)).catch(() => {})
     window.api.busyGet().then(setBusyId).catch(() => {})
     return window.api.onBusyChanged(setBusyId)
   }, [])
+
+  // ОЗУ теперь своё для каждой сборки — перечитываем при смене сборки.
+  useEffect(() => {
+    window.api.memory.get(modpack.id).then(v => { if (v) setMemory(v) }).catch(() => {})
+  }, [modpack.id])
 
   // Если работа началась с этой сборкой извне (например, запуск из Обзора) — отражаем статус
   useEffect(() => {
@@ -160,7 +164,7 @@ export default function BottomBar({ modpack, installPath, activeMods = 0, totalM
 
   const handleMemoryChange = async (v: number) => {
     setMemory(v)
-    await window.api.store.set('allocatedMemory', v)
+    await window.api.memory.set(modpack.id, v)
   }
 
   const handleAction = async () => {

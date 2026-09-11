@@ -16,7 +16,8 @@ interface StoreSchema {
   installPath: string
   accounts: Account[]
   activeAccountId: string | null
-  allocatedMemory: number
+  allocatedMemory: number        // общий дефолт ОЗУ (используется для сборок без своего значения)
+  packMemory: Record<string, number> // ОЗУ per-пак: { [modpackId]: МБ }
   runningPid: number | null
   runningModpackId: string | null
   runningModpackName: string | null
@@ -37,6 +38,7 @@ export const store = new Store<StoreSchema>({
     accounts: [],
     activeAccountId: null,
     allocatedMemory: 4096,
+    packMemory: {},
     runningPid: null,
     runningModpackId: null,
     runningModpackName: null,
@@ -48,3 +50,16 @@ export const store = new Store<StoreSchema>({
     devSettings: {}
   }
 })
+
+/** ОЗУ (МБ) для конкретной сборки: своё значение, иначе общий дефолт allocatedMemory. */
+export function getPackMemory(id: string): number {
+  const map = (store.get('packMemory') as Record<string, number>) ?? {}
+  return map[id] ?? (store.get('allocatedMemory') as number) ?? 4096
+}
+
+/** Сохраняет ОЗУ (МБ) для конкретной сборки. */
+export function setPackMemory(id: string, mb: number): void {
+  const map = { ...((store.get('packMemory') as Record<string, number>) ?? {}) }
+  map[id] = mb
+  store.set('packMemory', map)
+}

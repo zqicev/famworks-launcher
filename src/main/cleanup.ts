@@ -10,7 +10,7 @@ const RESERVED = new Set(['assets', 'runtime'])
 const JUNK_SUBDIRS = ['assets', '.loader']
 
 /** Рекурсивный размер папки. Асинхронно — чтобы не блокировать главный процесс (иначе UI виснет). */
-async function dirSize(dir: string): Promise<number> {
+export async function dirSize(dir: string): Promise<number> {
   let total = 0
   let entries: Dirent[]
   try { entries = await readdir(dir, { withFileTypes: true }) } catch { return 0 }

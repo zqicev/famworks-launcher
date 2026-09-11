@@ -1,6 +1,6 @@
 import { join } from 'path'
 import { existsSync, readdirSync, renameSync } from 'fs'
-import { store } from './store'
+import { store, getPackMemory, setPackMemory } from './store'
 import { fetchModpack } from './modpacks'
 import { searchModrinth, getModVersions } from './modrinth'
 import { downloadModToDir } from './installer'
@@ -28,15 +28,15 @@ export async function applyCrashFix(modpackId: string, fix: Fix): Promise<{ ok: 
     return { ok: true, message: `Установлен ${proj.title} ${v.version_number}` }
   }
 
-  // Увеличить выделенную память
+  // Увеличить выделенную память (для ЭТОЙ сборки — память теперь per-пак)
   if (fix.kind === 'increase-ram') {
-    const cur = (store.get('allocatedMemory') as number) || 4096
+    const cur = getPackMemory(modpackId) || 4096
     const os = await import('os')
     const totalMb = Math.round(os.totalmem() / 1024 / 1024)
     const cap = Math.max(4096, totalMb - 2048) // оставляем ~2 ГБ системе
     const next = Math.min(cur + 2048, cap)
     if (next <= cur) return { ok: false, error: 'Память уже на максимуме для этой системы — закройте другие программы' }
-    store.set('allocatedMemory', next)
+    setPackMemory(modpackId, next)
     return { ok: true, message: `Память увеличена до ${(next / 1024).toFixed(1)} ГБ` }
   }
 

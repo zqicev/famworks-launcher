@@ -10,6 +10,7 @@ interface Window {
       index: () => Promise<import('../../types/modpack').ModpackIndex>
       get: (id: string) => Promise<import('../../types/modpack').Modpack>
       status: (id: string) => Promise<'not_installed' | 'outdated' | 'ready'>
+      dirSize: (id: string) => Promise<number>
       listDir: (id: string, relPath: string) => Promise<{ name: string; isDir: boolean; size: number; mtime: number }[]>
       exportSelected: (id: string, marks: Record<string, 'in' | 'out'>) => Promise<{ ok?: boolean; path?: string; cancelled?: boolean }>
       exportMrpack: (id: string, marks: Record<string, 'in' | 'out'>) => Promise<{ ok?: boolean; path?: string; cancelled?: boolean }>
@@ -137,6 +138,10 @@ interface Window {
     }
     system: {
       totalMemoryMb: () => Promise<number>
+    }
+    memory: {
+      get: (id: string) => Promise<number>
+      set: (id: string, mb: number) => Promise<void>
     }
     update: {
       install: () => Promise<void>

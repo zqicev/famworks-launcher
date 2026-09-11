@@ -3,7 +3,7 @@ import { copyFileSync, mkdirSync, rmSync, existsSync, readFileSync, writeFileSyn
 import { basename, join as pathJoin } from 'path'
 import { spawn } from 'child_process'
 import { setIdle } from './discord'
-import { store } from './store'
+import { store, getPackMemory, setPackMemory } from './store'
 import { fetchModpackIndex, fetchModpack } from './modpacks'
 import { checkAndInstallModpack, getModpackStatus, toggleMod, deleteMod, getInstalledMods, downloadModToDir, getModFileSizeBytes } from './installer'
 import { launchGame, offlineAuthorization, abortLaunch, markUserKill, QuickPlay } from './launcher'
@@ -130,6 +130,13 @@ export function setupIpcHandlers() {
     return getModpackStatus(modpack, installPath)
   })
 
+  // Полный размер папки установленной сборки (байты). 0 — если ещё не установлена.
+  ipcMain.handle('modpack:dir-size', async (_, modpackId: string) => {
+    const { dirSize } = await import('./cleanup')
+    const installPath = store.get('installPath') as string
+    return dirSize(pathJoin(installPath, modpackId))
+  })
+
   ipcMain.handle('mods:installed', (_, modsDir: string) => getInstalledMods(modsDir))
   ipcMain.handle('mods:local-icons', async (_, dir: string, filenames: string[]) => {
     const { getLocalIcons } = await import('./localicons')
@@ -215,7 +222,7 @@ export function setupIpcHandlers() {
     try {
       const modpack = await fetchModpack(modpackId)
       const installPath = store.get('installPath') as string
-      const memory = store.get('allocatedMemory') as number
+      const memory = getPackMemory(modpackId)
 
       const accounts = store.get('accounts') as Account[]
       const activeId = store.get('activeAccountId') as string | null
@@ -515,6 +522,10 @@ export function setupIpcHandlers() {
     const os = await import('os')
     return Math.round(os.totalmem() / 1024 / 1024)
   })
+
+  // ОЗУ per-сборка (МБ). get отдаёт значение сборки или общий дефолт.
+  ipcMain.handle('memory:get', (_, modpackId: string) => getPackMemory(modpackId))
+  ipcMain.handle('memory:set', (_, modpackId: string, mb: number) => setPackMemory(modpackId, mb))
 
   ipcMain.handle('mods:file-size', (_, modsDir: string, filename: string) =>
     getModFileSizeBytes(modsDir, filename))
