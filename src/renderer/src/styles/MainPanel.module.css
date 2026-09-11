@@ -113,7 +113,8 @@
   display: flex;
   align-items: center;
   gap: 7px;
-  padding: 8px 16px;
+  height: 34px;
+  padding: 0 16px;
   background: var(--accent);
   color: #0a0a0a;
   border-radius: 8px;
