@@ -44,6 +44,7 @@ export default function AccountPanel() {
   const [elyPass, setElyPass] = useState('')
   const [elyTotp, setElyTotp] = useState('')
   const [elyLoading, setElyLoading] = useState(false)
+  const [msLoading, setMsLoading] = useState(false)
 
   const closeAll = (): void => { setOpen(false); setAdding(false); setElyForm(false); setError('') }
 
@@ -106,6 +107,21 @@ export default function AccountPanel() {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
       setElyLoading(false)
+    }
+  }
+
+  const loginMicrosoft = async () => {
+    setMsLoading(true); setError('')
+    try {
+      const r = await window.api.auth.microsoftLogin()
+      const id = `microsoft:${r.uuid}`
+      const acc: Account = { id, username: r.username, type: 'microsoft', uuid: r.uuid, refreshToken: r.refreshToken }
+      await persist([...accounts.filter(a => a.id !== id), acc], id)
+      setOpen(false)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+    } finally {
+      setMsLoading(false)
     }
   }
 
@@ -205,7 +221,7 @@ export default function AccountPanel() {
                     <button className={styles.addEly} onClick={() => { setElyForm(true); setError('') }}>Войти через Ely.by</button>
                     <div className={styles.addRow}>
                       <button className={styles.addBtn2} onClick={() => { setAdding(true); setError('') }}>+ Офлайн-аккаунт</button>
-                      <button className={styles.addBtn2} disabled title="Будет доступно после одобрения Microsoft">Microsoft (скоро)</button>
+                      <button className={styles.addBtn2} onClick={loginMicrosoft} disabled={msLoading}>{msLoading ? 'Вход…' : 'Microsoft'}</button>
                     </div>
                   </div>
                 </>
