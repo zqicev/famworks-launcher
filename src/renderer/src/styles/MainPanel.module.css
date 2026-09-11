@@ -97,6 +97,7 @@
 
 .folderBtn {
   margin-left: auto;
+  margin-bottom: 8px; /* как у .browseBtn — иначе кнопки не в одну линию по вертикали */
   display: flex;
   align-items: center;
   justify-content: center;
