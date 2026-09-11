@@ -96,6 +96,14 @@ export default function CharacterStage({ character }: Props): JSX.Element {
       .then(res => { if (!disposed && res?.dataUrl) return viewer.loadSkin(res.dataUrl, { model: res.slim ? 'slim' : 'auto-detect' }) })
       .catch(() => {})
 
+    // Активный аккаунт сменился (событие из панели) - перезагружаем скин на лету.
+    const reloadSkin = (): void => {
+      window.api.skin.get()
+        .then(res => { if (!disposed && res?.dataUrl) return viewer.loadSkin(res.dataUrl, { model: res.slim ? 'slim' : 'auto-detect' }) })
+        .catch(() => {})
+    }
+    window.addEventListener('fw:account-changed', reloadSkin)
+
     // Доп. glTF-объекты сцены со своими анимациями (позиция/движение целиком из файла).
     const gltfLoader = new GLTFLoader()
     const objectsPromise = Promise.all(
@@ -129,6 +137,7 @@ export default function CharacterStage({ character }: Props): JSX.Element {
 
     return () => {
       disposed = true
+      window.removeEventListener('fw:account-changed', reloadSkin)
       document.removeEventListener('visibilitychange', onVis)
       ro.disconnect()
       for (const m of mixers) m.stopAllAction()

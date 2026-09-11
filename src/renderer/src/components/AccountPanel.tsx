@@ -22,6 +22,11 @@ function validateUsername(name: string): string | null {
   return null
 }
 
+// Сообщаем 3D-персонажу, что активный аккаунт сменился - он перезагрузит скин на лету.
+function notifyAccountChanged(): void {
+  window.dispatchEvent(new Event('fw:account-changed'))
+}
+
 // Миграция старых аккаунтов ({username, type:'minecraft'}) к новой схеме.
 function normalize(raw: unknown): Account[] {
   if (!Array.isArray(raw)) return []
@@ -80,6 +85,7 @@ export default function AccountPanel() {
   const selectAccount = async (id: string) => {
     setActiveId(id)
     await window.api.store.set('activeAccountId', id)
+    notifyAccountChanged()
     closeAll()
   }
 
@@ -91,6 +97,7 @@ export default function AccountPanel() {
     if (accounts.find(a => a.id === id)) { setError('Такой аккаунт уже есть'); return }
     const acc: Account = { id, username: name, type: 'offline', customSkins: newSkins }
     await persist([...accounts, acc], id)
+    notifyAccountChanged()
     setNewName(''); setError(''); setAdding(false)
   }
 
@@ -102,6 +109,7 @@ export default function AccountPanel() {
       const id = `ely:${r.uuid}`
       const acc: Account = { id, username: r.name, type: 'ely', uuid: r.uuid, accessToken: r.accessToken, clientToken: r.clientToken }
       await persist([...accounts.filter(a => a.id !== id), acc], id)
+      notifyAccountChanged()
       setElyForm(false); setElyUser(''); setElyPass(''); setElyTotp(''); setOpen(false)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
@@ -117,6 +125,7 @@ export default function AccountPanel() {
       const id = `microsoft:${r.uuid}`
       const acc: Account = { id, username: r.username, type: 'microsoft', uuid: r.uuid, refreshToken: r.refreshToken }
       await persist([...accounts.filter(a => a.id !== id), acc], id)
+      notifyAccountChanged()
       setOpen(false)
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
@@ -135,6 +144,7 @@ export default function AccountPanel() {
     const list = accounts.filter(a => a.id !== id)
     const active = activeId === id ? (list[0]?.id ?? null) : activeId
     await persist(list, active)
+    if (activeId === id) notifyAccountChanged()
   }
 
   const activeAcc = accounts.find(a => a.id === activeId)

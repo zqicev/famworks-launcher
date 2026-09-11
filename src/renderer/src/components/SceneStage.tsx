@@ -142,30 +142,48 @@ export default function SceneStage({ scene: sceneUrl }: Props): JSX.Element {
       return tex
     }
 
+    // Материалы игрока (общие для его частей) + текущая текстура-скин - держим ссылки,
+    // чтобы менять скин на лету при смене аккаунта, не перезагружая всю сцену.
+    const playerMats = new Set<THREE.MeshStandardMaterial>()
+    let currentSkinTex: THREE.Texture | null = null
+    const applySkin = (tex: THREE.Texture): void => {
+      for (const std of playerMats) {
+        std.map = tex
+        // Скин 64x64: прозрачные пиксели 2-го слоя (шапка/куртка) вырезаем через alphaTest,
+        // иначе внешний слой (если он есть в модели) залил бы базовый непрозрачным боксом.
+        std.alphaTest = 0.5
+        std.transparent = false
+        std.needsUpdate = true
+      }
+    }
+    // Активный аккаунт сменился (событие из панели) - подтягиваем новый скин без ребилда сцены.
+    const reloadSkin = async (): Promise<void> => {
+      if (disposed || playerMats.size === 0) return
+      try {
+        const tex = await loadSkinTexture()
+        if (disposed) { tex.dispose(); return }
+        applySkin(tex)
+        if (currentSkinTex && currentSkinTex !== tex) currentSkinTex.dispose()
+        currentSkinTex = tex
+      } catch { /* сеть/скин недоступны - оставляем текущий */ }
+    }
+    window.addEventListener('fw:account-changed', reloadSkin)
+
     const gltfLoader = new GLTFLoader()
     Promise.all([gltfLoader.loadAsync(bustCache(sceneUrl)), loadSkinTexture()])
       .then(([gltf, skinTex]) => {
         if (disposed) { disposeTree(gltf.scene); skinTex.dispose(); return }
         scene.add(gltf.scene)
 
-        // Подменяем карту у материалов игрока (они общие для всех его частей).
-        const done = new Set<THREE.Material>()
+        // Собираем материалы игрока (общие для его частей) и кладём на них скин аккаунта.
         gltf.scene.traverse(o => {
           const mesh = o as THREE.Mesh
           if (!mesh.isMesh || !isPlayerMesh(mesh)) return
           const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
-          for (const m of mats) {
-            if (done.has(m)) continue
-            const std = m as THREE.MeshStandardMaterial
-            std.map = skinTex
-            // Скин 64x64: прозрачные пиксели 2-го слоя (шапка/куртка) вырезаем через alphaTest,
-            // иначе внешний слой (если он есть в модели) залил бы базовый непрозрачным боксом.
-            std.alphaTest = 0.5
-            std.transparent = false
-            std.needsUpdate = true
-            done.add(m)
-          }
+          for (const m of mats) playerMats.add(m as THREE.MeshStandardMaterial)
         })
+        applySkin(skinTex)
+        currentSkinTex = skinTex
 
         // Анимации: если есть клип "init" — проигрываем его один раз при загрузке,
         // а по завершении включаем зацикленный "idle" (и любые прочие клипы). Иначе — сразу idle.
@@ -222,6 +240,7 @@ export default function SceneStage({ scene: sceneUrl }: Props): JSX.Element {
 
     return () => {
       disposed = true
+      window.removeEventListener('fw:account-changed', reloadSkin)
       cancelAnimationFrame(raf)
       ro.disconnect()
       if (mixer) mixer.stopAllAction()
