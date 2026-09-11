@@ -56,6 +56,15 @@ export default function SceneGuideModal({ onClose, onApply, onClear }: Props): J
             твоего аккаунта автоматически. Проще всего взять готовый пример и переделать под себя.
           </p>
 
+          <p className={styles.hint} style={{ margin: 0, fontSize: 13, lineHeight: 1.6 }}>
+            Готовые анимации от других игроков:{' '}
+            <a
+              href="https://discord.gg/bDDz9QyRee"
+              onClick={e => { e.preventDefault(); window.api.shell.openExternal('https://discord.gg/bDDz9QyRee') }}
+              style={{ color: 'var(--accent)', fontWeight: 600, textDecoration: 'none', cursor: 'pointer' }}
+            >Анимации пользователей</a>
+          </p>
+
           <ol style={{ margin: 0, paddingLeft: 18, display: 'flex', flexDirection: 'column', gap: 10, fontSize: 13, lineHeight: 1.55, color: 'var(--text-secondary)' }}>
             <li><b style={{ color: 'var(--text)' }}>Скачай пример</b> (кнопка ниже) и открой его в Blockbench — там уже собран риг игрока с обоими слоями скина, пример объекта (пчела) и две анимации.</li>
             <li>Вкладка <b style={{ color: 'var(--text)' }}>Animate</b>. В проекте две анимации:
