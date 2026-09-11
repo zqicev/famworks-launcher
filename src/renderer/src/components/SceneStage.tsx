@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import steveUrl from '../assets/steve.png'
+import { Particles, Spinner } from './StageDecor'
 import styles from '../styles/CharacterStage.module.css'
 
 interface Props {
@@ -252,15 +253,9 @@ export default function SceneStage({ scene: sceneUrl }: Props): JSX.Element {
   return (
     <div ref={wrapRef} className={`${styles.stage} ${ready ? styles.ready : ''}`}>
       <div className={styles.glow} />
-      <div className={styles.particles} aria-hidden="true">
-        <i className={styles.p1} style={{ left: '12%' }} />
-        <i className={styles.p2} style={{ left: '32%', animationDelay: '1.4s' }} />
-        <i className={styles.p1} style={{ left: '58%', animationDelay: '3s' }} />
-        <i className={styles.p2} style={{ left: '78%', animationDelay: '2.2s' }} />
-        <i className={styles.p1} style={{ left: '90%', animationDelay: '4.1s' }} />
-      </div>
+      <Particles />
       <canvas ref={canvasRef} className={styles.canvas} />
-      {!ready && <div className={styles.loader} aria-label="Загрузка"><span className={styles.spin} /></div>}
+      {!ready && <div className={styles.loader} aria-label="Загрузка"><Spinner /></div>}
     </div>
   )
 }
