@@ -7,6 +7,7 @@ import AdmZip from 'adm-zip'
 import { store } from './store'
 import { fetchModpack } from './modpacks'
 import { Modpack, Mod } from '../types/modpack'
+import { slugify, baseCustomId } from '../shared/slug'
 
 export interface ExportResult { ok?: boolean; path?: string; cancelled?: boolean }
 export interface ImportResult { ok?: boolean; modpack?: Modpack; cancelled?: boolean }
@@ -17,8 +18,16 @@ export interface DirEntry { name: string; isDir: boolean; size: number; mtime: n
  *  Корень по умолчанию 'out' (ничего не выбрано). */
 export type ExportMark = 'in' | 'out'
 
-function slugify(s: string): string {
-  return (s || 'pack').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'pack'
+/** Уникальный читаемый id (= имя папки) для импортируемой сборки: custom-<translit-slug>,
+ *  уникальный и по списку сборок, и по фактическим папкам под installPath. */
+function newCustomId(name: string, installPath: string): string {
+  const usedIds = new Set((store.get('customModpacks') as Modpack[]).map(m => m.id))
+  const taken = (id: string): boolean => usedIds.has(id) || existsSync(join(installPath, id))
+  const base = baseCustomId(name)
+  if (!taken(base)) return base
+  let n = 2
+  while (taken(`${base}-${n}`)) n++
+  return `${base}-${n}`
 }
 
 /** Содержимое одной папки внутри сборки (для дерева выбора при экспорте). Ленивая загрузка по уровням. */
@@ -88,7 +97,7 @@ export async function exportModpackSelected(id: string, marks: Record<string, Ex
 
   const res = await dialog.showSaveDialog({
     title: 'Экспорт сборки',
-    defaultPath: `${slugify(modpack.name)}.fwpack`,
+    defaultPath: `${slugify(modpack.name) || 'pack'}.fwpack`,
     filters: [{ name: 'FamWorks сборка', extensions: ['fwpack'] }]
   })
   if (res.canceled || !res.filePath) return { cancelled: true }
@@ -138,7 +147,7 @@ export async function exportModpackMrpack(id: string, marks: Record<string, Expo
 
   const res = await dialog.showSaveDialog({
     title: 'Экспорт сборки (Modrinth)',
-    defaultPath: `${slugify(modpack.name)}.mrpack`,
+    defaultPath: `${slugify(modpack.name) || 'pack'}.mrpack`,
     filters: [{ name: 'Modrinth сборка', extensions: ['mrpack'] }]
   })
   if (res.canceled || !res.filePath) return { cancelled: true }
@@ -236,7 +245,7 @@ function importFwpack(zip: AdmZip, installPath: string): ImportResult {
     throw new Error('Повреждённый файл сборки: не хватает данных о версии/загрузчике')
   }
 
-  const id = `custom-${slugify(meta.name)}-${Date.now().toString(36)}`
+  const id = newCustomId(meta.name || 'pack', installPath)
   const gameRoot = join(installPath, id)
   mkdirSync(gameRoot, { recursive: true })
 
@@ -284,7 +293,7 @@ function importMrpack(zip: AdmZip, installPath: string): ImportResult {
   else if (deps['neoforge']) { loader = 'neoforge'; loaderVersion = deps['neoforge'] }
 
   const name = idx.name || 'Импортированная сборка'
-  const id = `custom-${slugify(name)}-${Date.now().toString(36)}`
+  const id = newCustomId(name, installPath)
   const gameRoot = join(installPath, id)
   mkdirSync(gameRoot, { recursive: true })
 

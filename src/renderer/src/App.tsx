@@ -12,6 +12,7 @@ import ConfirmModal from './components/ConfirmModal'
 import ExportModal from './components/ExportModal'
 import CrashModal, { CrashData } from './components/CrashModal'
 import { ensureLogCapture } from './gameLog'
+import { uniqueId } from '../../shared/slug'
 import { applyAccent } from './lib/theme'
 import styles from './styles/App.module.css'
 
@@ -157,10 +158,14 @@ export default function App() {
   }
 
   const handleCreated = async (mp: Modpack) => {
-    await window.api.custom.save(mp)
+    // Делаем id (= имя папки) уникальным среди уже существующих локальных сборок.
+    const existing = await window.api.custom.list().catch(() => [] as Modpack[])
+    const id = uniqueId(mp.id, new Set(existing.map(m => m.id)))
+    const finalMp = id === mp.id ? mp : { ...mp, id }
+    await window.api.custom.save(finalMp)
     await loadCustom()
     setCreateOpen(false)
-    setSelectedId(mp.id)
+    setSelectedId(finalMp.id)
   }
 
   const handleDeleteCustom = (id: string) => {

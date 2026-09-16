@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Modpack } from '../../../types/modpack'
+import { baseCustomId } from '../../../shared/slug'
 import Dropdown from './Dropdown'
 import styles from '../styles/SettingsModal.module.css'
 
@@ -54,9 +55,9 @@ export default function CreateModpackModal({ onCreate, onClose }: Props) {
   const create = async () => {
     if (!name.trim() || !mc.trim() || !mcValid || (needsLoaderVer && !loaderVer.trim())) return
     setBusy(true)
-    const id = `custom-${name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')}-${Date.now().toString(36)}`
+    // Читаемый id из имени (с транслитом кириллицы). Уникальность добьёт App перед сохранением.
     const mp: Modpack = {
-      id,
+      id: baseCustomId(name),
       name: name.trim(),
       description: 'Моя сборка',
       long_description: '',
