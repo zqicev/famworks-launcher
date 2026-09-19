@@ -75,6 +75,38 @@
   text-transform: uppercase;
 }
 
+.sectionHeaderDropdown {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 8px 8px;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  transition: .2s;
+}
+.sectionHeaderDropdown:hover {
+  color: var(--text-secondary)
+}
+.sectionHeaderDropdown.dropdownActive {
+  color: var(--text-secondary)
+}
+.dropdownWrap {
+  display: flex;
+  gap: 5px;
+}
+
+.dropdownArrow svg {
+  transform: rotate(-90deg);
+  color: var(--accent);
+  transition: .2s;
+}
+.dropdownActive .dropdownArrow svg {
+  transform: none !important;
+}
+
 .count {
   background: var(--bg-active);
   color: var(--text-secondary);

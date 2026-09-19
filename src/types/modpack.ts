@@ -6,6 +6,7 @@ export interface ModpackSummary {
   loader: 'fabric' | 'forge' | 'neoforge' | 'quilt' | 'vanilla'
   loader_version: string
   updated_at: string
+  for_map?: boolean
 }
 
 export interface ModpackIndex {

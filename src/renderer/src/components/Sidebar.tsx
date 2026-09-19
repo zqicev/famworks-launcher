@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { ModpackIndex, Modpack } from '../../../types/modpack'
+import { ModpackIndex, Modpack, ModpackSummary } from '../../../types/modpack'
 import AccountPanel from './AccountPanel'
 import styles from '../styles/Sidebar.module.css'
 
@@ -41,11 +41,19 @@ const ImageIcon = () => (
   </svg>
 )
 
+const DropdownIcon = () => (
+  <svg xmlns="http://www.w3.org/2000/svg" fill="currentColor" width="12" height="12" viewBox="-6.5 -3 32 32" version="1.1">
+    <path d="M18.813 11.406l-7.906 9.906c-0.75 0.906-1.906 0.906-2.625 0l-7.906-9.906c-0.75-0.938-0.375-1.656 0.781-1.656h16.875c1.188 0 1.531 0.719 0.781 1.656z"/>
+  </svg>
+)
+
 export default function Sidebar({ index, customPacks, selectedId, seenUpdates, onSelect, onSettings, onRefresh, onCreate, onDeleteCustom, onImport, onExport, browserActive, onOpenBrowser }: Props) {
   const [version, setVersion] = useState('')
   const [icons, setIcons] = useState<Record<string, string>>({})
   useEffect(() => { window.api.appVersion().then(setVersion).catch(() => {}) }, [])
   useEffect(() => { window.api.packIcon.all().then(setIcons).catch(() => {}) }, [])
+
+  const [showMapPacks, setShowMapPacks] = useState<boolean>(false);
 
   const setPackIcon = async (id: string): Promise<void> => {
     const r = await window.api.packIcon.pick(id).catch(() => null)
@@ -91,10 +99,10 @@ export default function Sidebar({ index, customPacks, selectedId, seenUpdates, o
         <div className={styles.section}>
           <div className={styles.sectionHeader}>
             <span>СБОРКИ</span>
-            <span className={styles.count}>{index?.modpacks.length ?? 0}</span>
+            <span className={styles.count}>{index?.modpacks.filter((mpack) => !mpack.for_map).length ?? 0}</span>
           </div>
           <div className={`${styles.list} fw-stagger`}>
-            {index?.modpacks.map((pack) => {
+            {index?.modpacks.filter((mpack) => !mpack.for_map).map((pack) => {
               const hasUpdate = seenUpdates[pack.id] && seenUpdates[pack.id] !== pack.updated_at
               const active = selectedId === pack.id
               return (
@@ -114,6 +122,43 @@ export default function Sidebar({ index, customPacks, selectedId, seenUpdates, o
             })}
           </div>
         </div>
+
+        {(index?.modpacks.filter((mpack) => mpack.for_map).length || 0 > 0) &&
+          <div className={styles.section}>
+            <div
+              className={`${styles.sectionHeaderDropdown} ${showMapPacks && styles.dropdownActive}`}
+              onClick={() => setShowMapPacks(!showMapPacks)}
+            >
+              <span>СБОРКИ ДЛЯ КАРТ</span>
+              <span className={styles.dropdownWrap}>
+                <span className={styles.count}>{index?.modpacks.filter((mpack) => mpack.for_map).length ?? 0}</span>
+                <span className={styles.dropdownArrow}>
+                  <DropdownIcon />
+                </span>
+              </span>
+            </div>
+            {showMapPacks && <div className={`${styles.list} fw-stagger`}>
+              {index?.modpacks.filter((mpack) => mpack.for_map).map((pack) => {
+                const hasUpdate = seenUpdates[pack.id] && seenUpdates[pack.id] !== pack.updated_at
+                const active = selectedId === pack.id
+                return (
+                  <button key={pack.id} className={`${styles.item} ${active ? styles.active : ''}`} onClick={() => onSelect(pack.id)}>
+                    <Avatar name={pack.name} active={active} icon={icons[pack.id]} />
+                    <div className={styles.info}>
+                      <div className={styles.name}>{pack.name}{hasUpdate && <span className={styles.updateBadge}>ОБНОВЛЕНО</span>}</div>
+                      <div className={styles.meta}>{pack.loader.charAt(0).toUpperCase() + pack.loader.slice(1)} · {pack.mc_version}</div>
+                    </div>
+                    <div className={styles.itemActions}>
+                      <button className={styles.actBtn} onClick={(e) => { e.stopPropagation(); setPackIcon(pack.id) }} title="Сменить картинку сборки"><ImageIcon /></button>
+                      <button className={styles.actBtn} onClick={(e) => { e.stopPropagation(); onExport(pack.id) }} title="Экспорт сборки в .fwpack"><ExportIcon /></button>
+                    </div>
+                    <div className={`${styles.dot} ${active ? styles.dotActive : ''}`} />
+                  </button>
+                )
+              })}
+            </div>}
+          </div>
+        }
 
         <div className={styles.section}>
           <div className={styles.sectionHeader}>
