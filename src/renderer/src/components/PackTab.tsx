@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Mod } from '../../../types/modpack'
 import ModRow from './ModRow'
 import { useContentIcons } from '../lib/useContentIcons'
@@ -39,12 +39,13 @@ export default function PackTab({ dir, items, noun, onCount }: Props) {
       seen.add(base)
       ex.push({ id: base, name: base.replace(/\.zip$/i, ''), filename: base, version: '', category: 'Локальный', size_mb: 0, required: false })
     }
+    const names = [...new Set(files.map(f => f.replace(/\.disabled$/, '')))]
+      .filter(b => b.toLowerCase().endsWith('.zip'))
+    const bytes = await Promise.all(
+      names.map(b => window.api.mods.fileSize(dir, b).catch(() => 0) as Promise<number>)
+    )
     const sz: Record<string, number> = {}
-    for (const base of new Set(files.map(f => f.replace(/\.disabled$/, '')))) {
-      if (!base.toLowerCase().endsWith('.zip')) continue
-      const bytes = await window.api.mods.fileSize(dir, base).catch(() => 0) as number
-      sz[base] = Math.round(bytes / 1024 / 1024 * 10) / 10
-    }
+    names.forEach((b, i) => { sz[b] = Math.round(bytes[i] / 1024 / 1024 * 10) / 10 })
     setSizes(sz)
     setDisabled(dis)
     setExtra(ex)
@@ -59,27 +60,31 @@ export default function PackTab({ dir, items, noun, onCount }: Props) {
     return off
   }, [scan])
 
-  const packItems = items.filter(p => present.has(p.filename))
-  const all = [...packItems, ...extra]
-    .filter(p => !deleted.has(p.id))
-    .map(p => ({ ...p, size_mb: sizes[p.filename] ?? p.size_mb }))
+  const all = useMemo(
+    () => [...items.filter(p => present.has(p.filename)), ...extra]
+      .filter(p => !deleted.has(p.id))
+      .map(p => ({ ...p, size_mb: sizes[p.filename] ?? p.size_mb })),
+    [items, present, extra, deleted, sizes]
+  )
   const filtered = all.filter(m => m.name.toLowerCase().includes(search.toLowerCase()))
   const enabledCount = all.filter(p => !disabled.has(p.filename)).length
   const iconFor = useContentIcons(dir, all, present)
 
   useEffect(() => { onCount?.(all.length) }, [all.length])
 
-  const handleToggle = async (p: Mod, on: boolean) => {
+  const handleToggle = useCallback(async (p: Mod, on: boolean) => {
     if (p.required) return
     await window.api.mods.toggle(dir, p.filename, on)
     setDisabled(prev => { const n = new Set(prev); on ? n.delete(p.filename) : n.add(p.filename); return n })
-  }
-  const handleDelete = async (p: Mod) => {
+  }, [dir])
+
+  const handleDelete = useCallback(async (p: Mod) => {
     if (p.required) return
     await window.api.mods.delete(dir, p.filename)
     setDeleted(prev => new Set(prev).add(p.id))
     setExtra(prev => prev.filter(x => x.id !== p.id))
-  }
+  }, [dir])
+
   const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault(); setDragging(false)
     const files = Array.from(e.dataTransfer.files).filter(f => f.name.toLowerCase().endsWith('.zip'))
@@ -107,7 +112,7 @@ export default function PackTab({ dir, items, noun, onCount }: Props) {
       <div className={`${styles.list} ${staggerOn ? 'fw-stagger' : ''}`}>
         {all.length === 0 && <div style={{ padding: 18, textAlign: 'center', color: 'var(--text-dim)', fontSize: 13 }}>Пусто</div>}
         {filtered.map(p => (
-          <ModRow key={p.id} mod={p} icon={iconFor(p)} enabled={!disabled.has(p.filename)} onToggle={v => handleToggle(p, v)} onDelete={() => handleDelete(p)} />
+          <ModRow key={p.id} mod={p} icon={iconFor(p)} enabled={!disabled.has(p.filename)} onToggle={handleToggle} onDelete={handleDelete} />
         ))}
       </div>
     </div>
