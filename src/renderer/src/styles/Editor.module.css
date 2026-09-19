@@ -20,6 +20,8 @@
 .textarea { resize: vertical; line-height: 1.5; }
 .invalid { border-color: var(--red); }
 
+.sectionDescription { font-size: 11px; color: var(--text-secondary); margin-top: -10px; margin-bottom: 10px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
 .modActions { display: flex; gap: 8px; }
 .addBtn {
   font-size: 12px; font-weight: 600; color: var(--accent); padding: 6px 12px;

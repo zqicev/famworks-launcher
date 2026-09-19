@@ -16,7 +16,8 @@ function toSummary(m: Modpack): ModpackSummary {
     mc_version: m.mc_version,
     loader: m.loader,
     loader_version: m.loader_version,
-    updated_at: m.updated_at
+    updated_at: m.updated_at,
+    for_map: m.for_map
   }
 }
 

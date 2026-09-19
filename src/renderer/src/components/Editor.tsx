@@ -23,6 +23,8 @@ export default function Editor({ packKey, loaded, onSaved, onDeleted }: Props) {
   const [cfRp, setCfRp] = useState(false)
   const [cfSh, setCfSh] = useState(false)
 
+  console.log(loaded.data)
+
   const set = <K extends keyof Modpack>(key: K, value: Modpack[K]) =>
     setDraft(d => ({ ...d, [key]: value }))
 
@@ -206,6 +208,20 @@ export default function Editor({ packKey, loaded, onSaved, onDeleted }: Props) {
             <Field label="Полное описание (вкладка Обзор)" full>
               <textarea className={styles.textarea} value={draft.long_description} onChange={e => set('long_description', e.target.value)} rows={3} />
             </Field>
+          </div>
+        </section>
+
+        <section className={styles.section}>
+          <div className={styles.sectionTitle}>СБОРКА ИЛИ КАРТА</div>
+          <div className={styles.sectionDescription}>Выбрать, попадёт ли сборка в основной раздел (PACK) или в Карты (MAP)</div>
+          <div className={styles.grid}>
+            <button
+                  className={`${styles.reqBtn} ${draft.for_map ? styles.reqOn : ''}`}
+                  onClick={() => set("for_map", !draft.for_map)}
+                  title={draft.for_map ? 'Сборка для карты' : 'Сборка для сервера'}
+                >
+                  {draft.for_map ? 'MAP' : 'PACK'}
+            </button>
           </div>
         </section>
 
