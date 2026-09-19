@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Modpack, Mod } from '../../../types/modpack'
 import ModRow from './ModRow'
 import { useContentIcons } from '../lib/useContentIcons'
@@ -87,11 +87,15 @@ export default function ModsTab({ modpack, modsDir, onCount }: Props) {
   }, [modsDir])
 
   // Показываем все заявленные моды сборки сразу (в т.ч. до установки); ещё не скачанные помечаем.
-  const packMods: LocalMod[] = modpack.mods.map(m => ({
+  const packMods = useMemo<LocalMod[]>(() => modpack.mods.map(m => ({
     ...m,
     _notInstalled: presentBases ? !presentBases.has(m.filename) : false
-  }))
-  const allMods: LocalMod[] = [...packMods, ...extraMods].filter(m => !deletedIds.has(m.id))
+  })), [modpack.mods, presentBases])
+
+  const allMods = useMemo(
+    () => [...packMods, ...extraMods].filter(m => !deletedIds.has(m.id)),
+    [packMods, extraMods, deletedIds]
+  )
   const enabledCount = allMods.filter(m => !disabled.has(m.id)).length
   const iconFor = useContentIcons(modsDir, allMods, presentBases ?? new Set())
 
@@ -105,22 +109,22 @@ export default function ModsTab({ modpack, modsDir, onCount }: Props) {
     m.category.toLowerCase().includes(search.toLowerCase())
   )
 
-  const handleToggle = async (mod: LocalMod, enabled: boolean) => {
-    if (mod.required || mod._notInstalled) return
+  const handleToggle = useCallback(async (mod: Mod, enabled: boolean) => {
+    if (mod.required) return
     await window.api.mods.toggle(modsDir, mod.filename, enabled)
     setDisabled(prev => {
       const next = new Set(prev)
       enabled ? next.delete(mod.id) : next.add(mod.id)
       return next
     })
-  }
+  }, [modsDir])
 
-  const handleDelete = async (mod: LocalMod) => {
-    if (mod.required || mod._notInstalled) return
+  const handleDelete = useCallback(async (mod: Mod) => {
+    if (mod.required) return
     await window.api.mods.delete(modsDir, mod.filename)
     setDeletedIds(prev => new Set(prev).add(mod.id))
     setExtraMods(prev => prev.filter(m => m.id !== mod.id))
-  }
+  }, [modsDir])
 
   const handleDrop = useCallback(async (e: React.DragEvent) => {
     e.preventDefault()
@@ -163,8 +167,8 @@ export default function ModsTab({ modpack, modsDir, onCount }: Props) {
             icon={iconFor(mod)}
             enabled={!disabled.has(mod.id)}
             notInstalled={mod._notInstalled}
-            onToggle={(v) => handleToggle(mod, v)}
-            onDelete={() => handleDelete(mod)}
+            onToggle={handleToggle}
+            onDelete={handleDelete}
           />
         ))}
       </div>

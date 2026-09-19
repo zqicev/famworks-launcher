@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { memo, useState } from 'react'
 import { Mod } from '../../../types/modpack'
 import styles from '../styles/ModRow.module.css'
 
@@ -7,11 +7,11 @@ interface Props {
   icon?: string | null
   enabled: boolean
   notInstalled?: boolean
-  onToggle: (enabled: boolean) => void
-  onDelete: () => void
+  onToggle: (mod: Mod, enabled: boolean) => void
+  onDelete: (mod: Mod) => void
 }
 
-export default function ModRow({ mod, icon, enabled, notInstalled, onToggle, onDelete }: Props) {
+function ModRow({ mod, icon, enabled, notInstalled, onToggle, onDelete }: Props) {
   const locked = mod.required || !!notInstalled
   const [broken, setBroken] = useState(false)
   return (
@@ -36,7 +36,7 @@ export default function ModRow({ mod, icon, enabled, notInstalled, onToggle, onD
       {!mod.required && !notInstalled && (
         <button
           className={styles.deleteBtn}
-          onClick={onDelete}
+          onClick={() => onDelete(mod)}
           title="Удалить мод"
         >
           ✕
@@ -45,7 +45,7 @@ export default function ModRow({ mod, icon, enabled, notInstalled, onToggle, onD
 
       <button
         className={`${styles.toggle} ${enabled ? styles.toggleOn : ''} ${locked ? styles.toggleLocked : ''}`}
-        onClick={() => !locked && onToggle(!enabled)}
+        onClick={() => !locked && onToggle(mod, !enabled)}
         title={notInstalled ? 'Скачается при установке' : mod.required ? 'Обязательный мод' : enabled ? 'Выключить' : 'Включить'}
       >
         <span className={styles.thumb} />
@@ -53,3 +53,5 @@ export default function ModRow({ mod, icon, enabled, notInstalled, onToggle, onD
     </div>
   )
 }
+
+export default memo(ModRow);

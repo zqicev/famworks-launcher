@@ -1,6 +1,33 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 
 type IconMod = { modrinth_id?: string; filename: string }
+type IconMap = Record<string, string | null>
+
+const CHUNK = 24
+
+/** Грузит ключи пачками; каждая пачка сразу попадает в state. */
+async function fetchChunked(
+  keys: string[],
+  requested: Set<string>,
+  fetcher: (chunk: string[]) => Promise<IconMap>,
+  apply: (m: IconMap) => void,
+  alive: () => boolean
+) {
+  const todo = keys.filter(k => !requested.has(k))
+  todo.forEach(k => requested.add(k))
+
+  for (let i = 0; i < todo.length; i += CHUNK) {
+    const chunk = todo.slice(i, i + CHUNK)
+    try {
+      const map = await fetcher(chunk)
+      if (!alive()) return
+      // null = «иконки нет», чтобы не спрашивать повторно
+      apply(Object.fromEntries(chunk.map(k => [k, map[k] ?? null])))
+    } catch {
+      chunk.forEach(k => requested.delete(k)) // позволим повторить позже
+    }
+  }
+}
 
 /**
  * Иконки для списка контента (моды/ресурспаки/шейдеры).
@@ -14,24 +41,48 @@ export function useContentIcons(
   mods: IconMod[],
   present: Set<string>
 ): (mod: IconMod) => string | undefined {
-  const [remote, setRemote] = useState<Record<string, string | null>>({})
-  const [local, setLocal] = useState<Record<string, string | null>>({})
+  const [remote, setRemote] = useState<IconMap>({})
+  const [local, setLocal] = useState<IconMap>({})
+  const requestedRemote = useRef(new Set<string>())
+  const requestedLocal = useRef(new Set<string>())
+  const alive = useRef(true)
 
-  const remoteKey = [...new Set(mods.map(m => m.modrinth_id).filter(Boolean) as string[])].sort().join(',')
   useEffect(() => {
-    const ids = remoteKey ? remoteKey.split(',') : []
-    if (!ids.length) return
-    window.api.modrinth.icons(ids).then(map => setRemote(prev => ({ ...prev, ...map }))).catch(() => {})
+    alive.current = true
+    return () => { alive.current = false }
+  }, [])
+
+  // Порядок как в списке — верхние строки получают иконки первыми
+  const remoteIds = [...new Set(mods.map(m => m.modrinth_id).filter(Boolean) as string[])]
+  const remoteKey = remoteIds.join(',')
+  useEffect(() => {
+    fetchChunked(
+      remoteIds,
+      requestedRemote.current,
+      c => window.api.modrinth.icons(c) as Promise<IconMap>,
+      m => setRemote(p => ({ ...p, ...m })),
+      () => alive.current
+    )
   }, [remoteKey])
 
-  const localKey = [...new Set(mods.filter(m => !m.modrinth_id && present.has(m.filename)).map(m => m.filename))]
-    .sort().join('|')
+  const localFiles = [...new Set(
+    mods.filter(m => !m.modrinth_id && present.has(m.filename)).map(m => m.filename)
+  )]
+  const localKey = localFiles.join('|')
   useEffect(() => {
-    const files = localKey ? localKey.split('|') : []
-    if (!files.length || !dir) return
-    window.api.mods.localIcons(dir, files).then(map => setLocal(prev => ({ ...prev, ...map }))).catch(() => {})
+    if (!dir) return
+    fetchChunked(
+      localFiles,
+      requestedLocal.current,
+      c => window.api.mods.localIcons(dir, c) as Promise<IconMap>,
+      m => setLocal(p => ({ ...p, ...m })),
+      () => alive.current
+    )
   }, [localKey, dir])
 
-  return (mod: IconMod): string | undefined =>
-    (mod.modrinth_id ? remote[mod.modrinth_id] : local[mod.filename]) || undefined
+  return useCallback(
+    (mod: IconMod) =>
+      (mod.modrinth_id ? remote[mod.modrinth_id] : local[mod.filename]) || undefined,
+    [remote, local]
+  )
 }
