@@ -336,8 +336,9 @@ export default function Editor({ packKey, loaded, onSaved, onDeleted }: Props) {
               <div key={i} className={styles.srvRow}>
                 <input className={styles.srvName} value={s.name} placeholder="Название" onChange={e => updateServer(i, { name: e.target.value })} />
                 <input className={styles.srvIp} value={s.ip} placeholder="play.example.com" onChange={e => updateServer(i, { ip: e.target.value })} />
-                <input className={styles.srvPort} type="number" value={s.port ?? 25565} placeholder="25565"
-                  onChange={e => updateServer(i, { port: Number(e.target.value) || 25565 })} />
+                {/* Порт 0 (или пусто) = не писать порт вообще: сохранится как просто IP. */}
+                <input className={styles.srvPort} type="number" min={0} value={s.port ?? 0} placeholder="25565"
+                  onChange={e => { const n = Number(e.target.value); updateServer(i, { port: n > 0 ? n : undefined }) }} />
                 <button className={styles.delMod} onClick={() => removeServer(i)}>✕</button>
               </div>
             ))}
