@@ -30,14 +30,12 @@ function setActivity(details: string, state: string): void {
   }).catch(() => {})
 }
 
-/** При старте: если игра уже запущена (лаунчер перезапустили) — показываем «Играет». */
+/** При старте: если какой-то экземпляр ещё жив (лаунчер перезапустили) — показываем «Играет». */
 function restoreStatus(): void {
-  const pid = store.get('runningPid') as number | null
-  const name = store.get('runningModpackName') as string | null
-  if (pid && name) {
-    try { process.kill(pid, 0); setPlaying(name); return } catch { /* мёртв */ }
-  }
-  setIdle()
+  const insts = (store.get('runningInstances') as { pid: number; modpackName: string }[] | null) ?? []
+  const alive = insts.find(i => { try { process.kill(i.pid, 0); return true } catch { return false } })
+  if (alive) setPlaying(alive.modpackName)
+  else setIdle()
 }
 
 export function setIdle(): void {

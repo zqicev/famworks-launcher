@@ -18,9 +18,9 @@ interface StoreSchema {
   activeAccountId: string | null
   allocatedMemory: number        // общий дефолт ОЗУ (используется для сборок без своего значения)
   packMemory: Record<string, number> // ОЗУ per-пак: { [modpackId]: МБ }
-  runningPid: number | null
-  runningModpackId: string | null
-  runningModpackName: string | null
+  // Запущенные экземпляры игры (их может быть несколько). Переживает перезапуск лаунчера: при старте
+  // отсеиваем мёртвые pid (см. reattachInstances).
+  runningInstances: { instanceId: string; modpackId: string; modpackName: string; account: string; pid: number; startedAt: number }[]
   customModpacks: Modpack[]
   // Статистика запусков миров/серверов для сортировки «Продолжить игру»:
   // { [modpackId]: { 'w:<folder>' | 's:<ip>': { count, last } } }
@@ -39,9 +39,7 @@ export const store = new Store<StoreSchema>({
     activeAccountId: null,
     allocatedMemory: 4096,
     packMemory: {},
-    runningPid: null,
-    runningModpackId: null,
-    runningModpackName: null,
+    runningInstances: [],
     customModpacks: [],
     playStats: {},
     devMode: false,

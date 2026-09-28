@@ -59,8 +59,9 @@ contextBridge.exposeInMainWorld('api', {
     onProgress: (cb: (data: unknown) => void) => subscribe('install:progress', cb)
   },
   cancel: () => ipcRenderer.invoke('cancel'),
-  killGame: () => ipcRenderer.invoke('game:kill'),
-  gameRunning: () => ipcRenderer.invoke('game:running'),
+  killGame: (instanceId: string) => ipcRenderer.invoke('game:kill', instanceId),
+  gameInstances: () => ipcRenderer.invoke('game:instances'),
+  onInstancesChanged: (cb: () => void) => subscribe('instances:changed', cb),
   busyGet: () => ipcRenderer.invoke('busy:get'),
   onBusyChanged: (cb: (id: string | null) => void) => subscribe('busy:changed', cb),
   appVersion: () => ipcRenderer.invoke('app:version'),
@@ -92,10 +93,10 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.invoke('auth:ely-login', username, password, totp)
   },
   launch: {
-    start: (id: string, quickPlay?: unknown) => ipcRenderer.invoke('launch', id, quickPlay),
+    start: (id: string, quickPlay?: unknown, accountId?: string) => ipcRenderer.invoke('launch', id, quickPlay, accountId),
     onLog: (cb: (msg: { id: string; text: string }) => void) => subscribe('launch:log', cb),
     onStarting: (cb: (id: string) => void) => subscribe('launch:starting', cb),
-    onClose: (cb: (code: number) => void) => subscribe('launch:close', cb),
+    onClose: (cb: (data: { modpackId: string; instanceId: string; code: number }) => void) => subscribe('launch:close', cb),
     onError: (cb: (msg: string) => void) => subscribe('launch:error', cb),
     onSpawned: (cb: (id: string) => void) => subscribe('launch:spawned', cb)
   },

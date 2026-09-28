@@ -215,3 +215,18 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* Сплит-кнопка при запущенных экземплярах: «ИГРАТЬ (неактивно) | +». */
+.playGroup { display: flex; align-items: stretch; flex-shrink: 0; border-radius: 10px; overflow: hidden; border: 1px solid var(--border); }
+.playGroup .playBtn { border-radius: 0; border: none; min-width: 160px; }
+.playSep { width: 1px; background: var(--border); flex-shrink: 0; }
+.playPlus { display: flex; align-items: center; justify-content: center; width: 56px; flex-shrink: 0; background: var(--accent); color: #0a0a0a; transition: background 0.15s; }
+.playPlus:hover:not(:disabled) { background: var(--accent-dim); }
+.playPlus:disabled { opacity: 0.5; cursor: default; }
+
+/* Стоп: квадрат + выпадающий список экземпляров (когда их больше одного). */
+.stopWrap { position: relative; flex-shrink: 0; }
+.stopMenu { position: absolute; bottom: calc(100% + 8px); left: 0; min-width: 210px; padding: 6px; display: flex; flex-direction: column; gap: 2px; background: var(--bg-surface); border: 1px solid var(--border); border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.4); z-index: 50; }
+.stopMenuHead { font-size: 10px; font-weight: 600; letter-spacing: 0.5px; color: var(--text-dim); padding: 4px 8px 6px; }
+.stopMenuItem { display: flex; align-items: center; padding: 8px 10px; border-radius: 7px; font-size: 12px; color: var(--text-secondary); text-align: left; transition: background 0.12s, color 0.12s; }
+.stopMenuItem:hover { background: rgb(from var(--red) r g b / 0.14); color: var(--red); }

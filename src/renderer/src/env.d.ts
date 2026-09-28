@@ -42,8 +42,9 @@ interface Window {
       onProgress: (cb: (data: unknown) => void) => () => void
     }
     cancel: () => Promise<void>
-    killGame: () => Promise<boolean>
-    gameRunning: () => Promise<string | null>
+    killGame: (instanceId: string) => Promise<boolean>
+    gameInstances: () => Promise<{ instanceId: string; modpackId: string; modpackName: string; account: string; startedAt: number }[]>
+    onInstancesChanged: (cb: () => void) => () => void
     busyGet: () => Promise<string | null>
     onBusyChanged: (cb: (id: string | null) => void) => () => void
     appVersion: () => Promise<string>
@@ -73,10 +74,10 @@ interface Window {
       elyLogin: (username: string, password: string, totp?: string) => Promise<{ accessToken: string; clientToken: string; uuid: string; name: string }>
     }
     launch: {
-      start: (id: string, quickPlay?: { type: 'singleplayer' | 'multiplayer'; identifier: string }) => Promise<boolean>
+      start: (id: string, quickPlay?: { type: 'singleplayer' | 'multiplayer'; identifier: string }, accountId?: string) => Promise<boolean>
       onLog: (cb: (msg: { id: string; text: string }) => void) => () => void
       onStarting: (cb: (id: string) => void) => () => void
-      onClose: (cb: (code: number) => void) => () => void
+      onClose: (cb: (data: { modpackId: string; instanceId: string; code: number }) => void) => () => void
       onError: (cb: (msg: string) => void) => () => void
       onSpawned: (cb: (id: string) => void) => () => void
     }

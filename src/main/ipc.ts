@@ -1,12 +1,11 @@
 import { ipcMain, dialog, BrowserWindow, shell, app } from 'electron'
 import { copyFileSync, mkdirSync, rmSync, existsSync, readFileSync, writeFileSync } from 'fs'
 import { basename, join as pathJoin } from 'path'
-import { spawn } from 'child_process'
-import { setIdle } from './discord'
 import { store, getPackMemory, setPackMemory } from './store'
 import { fetchModpackIndex, fetchModpack } from './modpacks'
 import { checkAndInstallModpack, getModpackStatus, toggleMod, deleteMod, getInstalledMods, downloadModToDir, getModFileSizeBytes } from './installer'
-import { launchGame, offlineAuthorization, abortLaunch, markUserKill, QuickPlay } from './launcher'
+import { launchGame, offlineAuthorization, abortLaunch, QuickPlay } from './launcher'
+import { killInstance, listInstances, onInstancesChange, reattachInstances } from './instances'
 import { setupLoader, latestLoaderVersion, LoaderId } from './loaders'
 import { searchModrinth, getModVersions, getModrinthIcons } from './modrinth'
 import { microsoftLogin, microsoftRefresh } from './msAuth'
@@ -21,6 +20,11 @@ function getWindow(): BrowserWindow {
 export function setupIpcHandlers() {
   onBusyChange((id) => getWindow()?.webContents.send('busy:changed', id))
   ipcMain.handle('busy:get', () => getBusyId())
+
+  // Запущенные экземпляры игры: реаттач после перезапуска лаунчера + live-обновление рендерера.
+  reattachInstances()
+  onInstancesChange(() => getWindow()?.webContents.send('instances:changed'))
+  ipcMain.handle('game:instances', () => listInstances())
 
   ipcMain.handle('store:get', (_, key) => store.get(key))
   ipcMain.handle('store:set', (_, key, value) => store.set(key, value))
@@ -234,9 +238,12 @@ export function setupIpcHandlers() {
     return elyLogin(username, pw, clientToken)
   })
 
-  ipcMain.handle('launch', async (_, modpackId: string, quickPlay?: QuickPlay) => {
+  // accountId — под каким аккаунтом запускать (доп. экземпляр через «+»); иначе активный.
+  ipcMain.handle('launch', async (_, modpackId: string, quickPlay?: QuickPlay, accountId?: string) => {
     const win = getWindow()
-    if (getBusyId() && getBusyId() !== modpackId) return false // занята другая сборка
+    // Пока идёт любая подготовка/установка — новый запуск не начинаем (сериализуем фазу подготовки).
+    // После спавна busy снимается, поэтому пока игра ИДЁТ — запускать ещё экземпляры можно.
+    if (getBusyId()) return false
     beginOperation()
     setBusy(modpackId)
     try {
@@ -246,7 +253,8 @@ export function setupIpcHandlers() {
 
       const accounts = store.get('accounts') as Account[]
       const activeId = store.get('activeAccountId') as string | null
-      const account = accounts.find(a => a.id === activeId) ?? accounts[0]
+      // accountId задан (доп. экземпляр под выбранным аккаунтом) — берём его, иначе активный.
+      const account = (accountId ? accounts.find(a => a.id === accountId) : accounts.find(a => a.id === activeId)) ?? accounts[0]
 
       let authorization
       let authlibArgs: string[] = []
@@ -302,7 +310,7 @@ export function setupIpcHandlers() {
         win.webContents.send('launch:log', { id: modpackId, text: `[skins] ${String(e)}` })
       }
 
-      await launchGame(modpack, authorization, installPath, memory, win, quickPlay, authlibArgs)
+      await launchGame(modpack, authorization, installPath, memory, win, account?.username ?? 'Player', quickPlay, authlibArgs)
       return true
     } catch (e) {
       if (isCancelError(e)) {
@@ -324,45 +332,8 @@ export function setupIpcHandlers() {
     abortLaunch()     // скачивание ассетов Minecraft (убиваем воркер mclc)
   })
 
-  // Принудительно убить процесс запущенной игры
-  ipcMain.handle('game:kill', () => {
-    markUserKill() // не показываем диагностику краша — это пользователь закрыл
-    cancelCurrent() // на случай, если ещё идёт скачивание перед запуском
-    abortLaunch()
-    const pid = store.get('runningPid') as number | null
-    if (pid) {
-      try {
-        if (process.platform === 'win32') {
-          // убиваем всё дерево процессов (java + дочерние)
-          spawn('taskkill', ['/PID', String(pid), '/T', '/F'])
-        } else {
-          process.kill(pid, 'SIGKILL')
-        }
-      } catch { /* уже мёртв */ }
-    }
-    store.set('runningPid', null)
-    store.set('runningModpackId', null)
-    store.set('runningModpackName', null)
-    setBusy(null)
-    getWindow()?.webContents.send('launch:close', -1)
-    setIdle()
-    return true
-  })
-
-  // Какая сборка сейчас запущена (переживает перезапуск лаунчера через сохранённый PID)
-  ipcMain.handle('game:running', () => {
-    const pid = store.get('runningPid') as number | null
-    const id = store.get('runningModpackId') as string | null
-    if (!pid || !id) return null
-    try {
-      process.kill(pid, 0) // не убивает, только проверяет существование
-      return id
-    } catch {
-      store.set('runningPid', null)
-      store.set('runningModpackId', null)
-      return null
-    }
-  })
+  // Остановить один запущенный экземпляр по instanceId (кнопка «стоп» / выбор из списка).
+  ipcMain.handle('game:kill', (_, instanceId: string) => killInstance(instanceId))
 
   ipcMain.handle('dialog:pick-folder', async () => {
     const result = await dialog.showOpenDialog({ properties: ['openDirectory'] })
