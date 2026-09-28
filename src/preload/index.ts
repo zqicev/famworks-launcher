@@ -144,6 +144,12 @@ contextBridge.exposeInMainWorld('api', {
     get: (id: string) => ipcRenderer.invoke('memory:get', id),
     set: (id: string, mb: number) => ipcRenderer.invoke('memory:set', id, mb)
   },
+  portal: {
+    pair: (code: string) => ipcRenderer.invoke('portal:pair', code),
+    syncNick: () => ipcRenderer.invoke('portal:sync-nick'),
+    unpair: () => ipcRenderer.invoke('portal:unpair'),
+    status: () => ipcRenderer.invoke('portal:status')
+  },
   update: {
     install: () => ipcRenderer.invoke('update:install'),
     check: () => ipcRenderer.invoke('update:check'),

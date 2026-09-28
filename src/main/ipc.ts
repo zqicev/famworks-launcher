@@ -518,6 +518,12 @@ export function setupIpcHandlers() {
   ipcMain.handle('memory:get', (_, modpackId: string) => getPackMemory(modpackId))
   ipcMain.handle('memory:set', (_, modpackId: string, mb: number) => setPackMemory(modpackId, mb))
 
+  // Привязка к порталу FamWorks (подстановка ника). Discord-входа в лаунчере нет — только код.
+  ipcMain.handle('portal:pair', async (_, code: string) => { const { pair } = await import('./portal'); return pair(code) })
+  ipcMain.handle('portal:sync-nick', async () => { const { syncNick } = await import('./portal'); return syncNick() })
+  ipcMain.handle('portal:unpair', async () => { const { unpair } = await import('./portal'); return unpair() })
+  ipcMain.handle('portal:status', async () => { const { portalStatus } = await import('./portal'); return portalStatus() })
+
   ipcMain.handle('mods:file-size', (_, modsDir: string, filename: string) =>
     getModFileSizeBytes(modsDir, filename))
 

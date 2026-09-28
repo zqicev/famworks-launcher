@@ -24,8 +24,10 @@ function validateUsername(name: string): string | null {
 }
 
 // Сообщаем 3D-персонажу, что активный аккаунт сменился - он перезагрузит скин на лету.
+// Заодно отправляем новый ник на портал (no-op, если лаунчер не привязан).
 function notifyAccountChanged(): void {
   window.dispatchEvent(new Event('fw:account-changed'))
+  window.api.portal.syncNick().catch(() => {})
 }
 
 // Миграция старых аккаунтов ({username, type:'minecraft'}) к новой схеме.
@@ -54,6 +56,11 @@ export default function AccountPanel() {
   // Головы скинов лицензионных (microsoft) аккаунтов: uuid -> data-URL скина. Тянем один раз на uuid.
   const [heads, setHeads] = useState<Record<string, string>>({})
   const headFetched = useRef<Set<string>>(new Set())
+  // Привязка к порталу FamWorks (подстановка ника).
+  const [portalPaired, setPortalPaired] = useState(false)
+  const [portalCode, setPortalCode] = useState('')
+  const [portalMsg, setPortalMsg] = useState<{ text: string; ok: boolean } | null>(null)
+  const [portalBusy, setPortalBusy] = useState(false)
 
   const closeAll = (): void => { setOpen(false); setAdding(false); setElyForm(false); setError('') }
 
@@ -89,6 +96,43 @@ export default function AccountPanel() {
       }
     }
   }, [accounts])
+
+  // При старте один раз синкаем ник на портал (повторит неудавшийся ранее синк; no-op без привязки).
+  useEffect(() => { window.api.portal.syncNick().catch(() => {}) }, [])
+
+  // Статус привязки к порталу — при открытии панели.
+  useEffect(() => {
+    if (!open) return
+    window.api.portal.status().then(s => setPortalPaired(s.paired)).catch(() => {})
+  }, [open])
+
+  const pairPortal = async () => {
+    const code = portalCode.trim()
+    if (!code) return
+    setPortalBusy(true); setPortalMsg(null)
+    try {
+      const r = await window.api.portal.pair(code)
+      if (r.ok) {
+        setPortalPaired(true); setPortalCode('')
+        setPortalMsg({
+          ok: true,
+          text: r.applied === false
+            ? 'Привязано. На портале включён запрет замены ника.'
+            : `Привязано. Ник на портале: ${r.name ?? '—'}`
+        })
+      } else {
+        setPortalMsg({ ok: false, text: r.error ?? 'Не удалось привязать' })
+      }
+    } finally {
+      setPortalBusy(false)
+    }
+  }
+
+  const unpairPortal = async () => {
+    setPortalBusy(true)
+    try { await window.api.portal.unpair() } finally { setPortalBusy(false) }
+    setPortalPaired(false); setPortalMsg(null)
+  }
 
   const persist = async (list: Account[], active: string | null) => {
     setAccounts(list)
@@ -250,6 +294,38 @@ export default function AccountPanel() {
                       <button className={styles.addBtn2} onClick={() => { setAdding(true); setError('') }}>+ Офлайн-аккаунт</button>
                       <button className={styles.addBtn2} onClick={() => { setElyForm(true); setError('') }}>Ely.by</button>
                     </div>
+                  </div>
+
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8, paddingTop: 14, borderTop: '1px solid var(--border)' }}>
+                    <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: 1, color: 'var(--text-dim)' }}>ПОРТАЛ FAMWORKS</div>
+                    {portalPaired ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <span style={{ flex: 1, fontSize: 12, color: 'var(--text-secondary)' }}>✓ Привязан — ник подставляется на портале</span>
+                        <button className={styles.btnGhost} onClick={unpairPortal} disabled={portalBusy}>Отвязать</button>
+                      </div>
+                    ) : (
+                      <>
+                        <p style={{ margin: 0, fontSize: 12, lineHeight: 1.5, color: 'var(--text-dim)' }}>
+                          Привяжи лаунчер — и на портале подставится ник выбранного здесь аккаунта. Код возьми в своём профиле на портале.
+                        </p>
+                        <div style={{ display: 'flex', gap: 8 }}>
+                          <input
+                            className={styles.finput}
+                            placeholder="Код (напр. ABCD-2345)"
+                            value={portalCode}
+                            maxLength={12}
+                            onChange={e => { setPortalCode(e.target.value); setPortalMsg(null) }}
+                            onKeyDown={e => e.key === 'Enter' && pairPortal()}
+                          />
+                          <button className={styles.btnAccent} onClick={pairPortal} disabled={portalBusy || !portalCode.trim()} style={{ whiteSpace: 'nowrap' }}>
+                            {portalBusy ? '…' : 'Привязать'}
+                          </button>
+                        </div>
+                      </>
+                    )}
+                    {portalMsg && (
+                      <p style={{ margin: 0, fontSize: 12, lineHeight: 1.45, color: portalMsg.ok ? 'var(--accent)' : 'var(--red)' }}>{portalMsg.text}</p>
+                    )}
                   </div>
                 </>
               )}

@@ -145,6 +145,12 @@ interface Window {
       get: (id: string) => Promise<number>
       set: (id: string, mb: number) => Promise<void>
     }
+    portal: {
+      pair: (code: string) => Promise<{ ok: boolean; paired?: boolean; applied?: boolean; name?: string; error?: string }>
+      syncNick: () => Promise<{ ok: boolean; paired?: boolean; applied?: boolean; name?: string; error?: string }>
+      unpair: () => Promise<{ ok: boolean; paired?: boolean }>
+      status: () => Promise<{ paired: boolean }>
+    }
     update: {
       install: () => Promise<void>
       check: () => Promise<boolean>
