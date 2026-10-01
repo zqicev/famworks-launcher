@@ -163,6 +163,12 @@ async function famworksOutdated(modpack: Modpack, gameRoot: string): Promise<boo
   return false
 }
 
+/** Реальные установленные файлы famworks-модов сборки (famworks_id → {filename, sha512}).
+ *  Нужно списку модов: имя файла берётся с портала, а не из JSON сборки. */
+export function getFamworksTracking(installPath: string, modpackId: string): Record<string, FwTrack> {
+  return readFwTracking(join(installPath, modpackId))
+}
+
 /** Переустановить famworks-моды сборки под свежий канал (после переключения test/release). */
 export async function reinstallFamworks(modpack: Modpack, installPath: string, win: BrowserWindow): Promise<void> {
   for (const k of [...fwResolveCache.keys()]) if (k.startsWith(modpack.id + '|')) fwResolveCache.delete(k)

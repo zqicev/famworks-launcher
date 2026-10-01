@@ -549,6 +549,36 @@ export function setupIpcHandlers() {
     await reinstallFamworks(modpack, store.get('installPath') as string, getWindow())
     return true
   })
+  // Каталог модов FamWorks (для вкладки в браузере). Пусто при отсутствии права/связи.
+  ipcMain.handle('famworks:catalog', async (_, params: { mc_version?: string; loader?: string; kind?: string; q?: string }) => {
+    const { famworksCatalog } = await import('./portalMods')
+    try { return await famworksCatalog(params ?? {}) } catch { return [] }
+  })
+  // Реальные установленные файлы famworks-модов сборки (для списка модов).
+  ipcMain.handle('famworks:installed', async (_, packId: string) => {
+    const { getFamworksTracking } = await import('./installer')
+    return getFamworksTracking(store.get('installPath') as string, packId)
+  })
+  // Добавить мод/пак/шейдер из каталога FamWorks в ЛОКАЛЬНУЮ сборку (пишем famworks_id в её JSON + ставим файл).
+  ipcMain.handle('famworks:add-to-pack', async (_, packId: string, el: {
+    famworks_id: string; name: string; kind: 'mod' | 'resourcepack' | 'shader'
+    filename?: string; version?: string; size_mb?: number
+  }) => {
+    const list = store.get('customModpacks') as any[]
+    const mp = list.find(m => m.id === packId)
+    if (!mp) return { ok: false, error: 'Локальная сборка не найдена' }
+    const arr: 'mods' | 'resourcepacks' | 'shaders' = el.kind === 'resourcepack' ? 'resourcepacks' : el.kind === 'shader' ? 'shaders' : 'mods'
+    const item = {
+      id: el.famworks_id, name: el.name, famworks_id: el.famworks_id,
+      filename: el.filename || `${el.famworks_id}.jar`, version: el.version || '',
+      category: 'FamWorks', size_mb: el.size_mb ?? 0, required: false
+    }
+    mp[arr] = [...((mp[arr] as any[]) ?? []).filter(x => x.famworks_id !== el.famworks_id), item]
+    store.set('customModpacks', list)
+    const { reinstallFamworks } = await import('./installer')
+    await reinstallFamworks(mp, store.get('installPath') as string, getWindow())
+    return { ok: true, modpack: mp }
+  })
 
   ipcMain.handle('mods:file-size', (_, modsDir: string, filename: string) =>
     getModFileSizeBytes(modsDir, filename))

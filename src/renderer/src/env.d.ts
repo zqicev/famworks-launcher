@@ -156,6 +156,14 @@ interface Window {
     famworks: {
       access: () => Promise<{ paired: boolean; catalog: boolean; testing: boolean }>
       setChannel: (packId: string, famworksId: string, channel: string) => Promise<boolean>
+      installed: (packId: string) => Promise<Record<string, { filename: string; sha512: string }>>
+      catalog: (params: { mc_version?: string; loader?: string; kind?: string; q?: string }) => Promise<Array<{
+        id: string; name: string; kind: 'mod' | 'resourcepack' | 'shader'; description?: string
+        release: { version_number: string; files: { filename: string; size: number; primary?: boolean }[] } | null
+        test: unknown | null
+      }>>
+      addToPack: (packId: string, el: { famworks_id: string; name: string; kind: 'mod' | 'resourcepack' | 'shader'; filename?: string; version?: string; size_mb?: number }) =>
+        Promise<{ ok: boolean; error?: string; modpack?: import('../../types/modpack').Modpack }>
     }
     update: {
       install: () => Promise<void>

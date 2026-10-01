@@ -15,6 +15,11 @@ interface LocalMod extends Mod {
   _notInstalled?: boolean // заявлен в сборке, но файла ещё нет на диске (скачается при установке)
 }
 
+// У famworks-мода реальное имя файла — с портала (из трекинга), а не из JSON сборки.
+function realFile(mod: Mod, fw: Record<string, { filename: string }>): string {
+  return mod.famworks_id ? (fw[mod.famworks_id]?.filename ?? mod.filename) : mod.filename
+}
+
 export default function ModsTab({ modpack, modsDir, onCount }: Props) {
   const [search, setSearch] = useState('')
   const [disabled, setDisabled] = useState<Set<string>>(new Set())
@@ -25,6 +30,9 @@ export default function ModsTab({ modpack, modsDir, onCount }: Props) {
   // FamWorks: право тестера (показывать test/release) + выбранные ветки модов этой сборки.
   const [fwTesting, setFwTesting] = useState(false)
   const [fwChannels, setFwChannels] = useState<Record<string, string>>({})
+  // Реальные установленные файлы famworks-модов (famworks_id → {filename}). ref — для стабильных обработчиков.
+  const [fwInstalled, setFwInstalled] = useState<Record<string, { filename: string }>>({})
+  const fwInstalledRef = useRef<Record<string, { filename: string }>>({})
   // Стаггер играет один раз при монтировании вкладки, потом класс снимаем — поиск не дёргает список.
   const [staggerOn, setStaggerOn] = useState(true)
   useEffect(() => { const t = setTimeout(() => setStaggerOn(false), 700); return () => clearTimeout(t) }, [])
@@ -35,12 +43,15 @@ export default function ModsTab({ modpack, modsDir, onCount }: Props) {
     scanRef.current = true
     try {
       const files = await window.api.mods.installed(modsDir) as string[]
-      const knownFilenames = new Set(modpack.mods.map(m => m.filename))
+      const fw = await window.api.famworks.installed(modpack.id).catch(() => ({})) as Record<string, { filename: string }>
+      fwInstalledRef.current = fw
+      setFwInstalled(fw)
+      const knownFilenames = new Set(modpack.mods.map(m => realFile(m, fw)))
       const newDisabled = new Set<string>()
 
-      // Инициализируем disabled из реальных .disabled файлов
+      // Инициализируем disabled из реальных .disabled файлов (famworks — по реальному имени с портала)
       for (const mod of modpack.mods) {
-        const disabledFile = mod.filename + '.disabled'
+        const disabledFile = realFile(mod, fw) + '.disabled'
         if (files.includes(disabledFile)) newDisabled.add(mod.id)
       }
 
@@ -108,8 +119,8 @@ export default function ModsTab({ modpack, modsDir, onCount }: Props) {
   // Показываем все заявленные моды сборки сразу (в т.ч. до установки); ещё не скачанные помечаем.
   const packMods = useMemo<LocalMod[]>(() => modpack.mods.map(m => ({
     ...m,
-    _notInstalled: presentBases ? !presentBases.has(m.filename) : false
-  })), [modpack.mods, presentBases])
+    _notInstalled: presentBases ? !presentBases.has(realFile(m, fwInstalled)) : false
+  })), [modpack.mods, presentBases, fwInstalled])
 
   const allMods = useMemo(
     () => [...packMods, ...extraMods].filter(m => !deletedIds.has(m.id)),
@@ -130,7 +141,7 @@ export default function ModsTab({ modpack, modsDir, onCount }: Props) {
 
   const handleToggle = useCallback(async (mod: Mod, enabled: boolean) => {
     if (mod.required) return
-    await window.api.mods.toggle(modsDir, mod.filename, enabled)
+    await window.api.mods.toggle(modsDir, realFile(mod, fwInstalledRef.current), enabled)
     setDisabled(prev => {
       const next = new Set(prev)
       enabled ? next.delete(mod.id) : next.add(mod.id)
@@ -140,7 +151,7 @@ export default function ModsTab({ modpack, modsDir, onCount }: Props) {
 
   const handleDelete = useCallback(async (mod: Mod) => {
     if (mod.required) return
-    await window.api.mods.delete(modsDir, mod.filename)
+    await window.api.mods.delete(modsDir, realFile(mod, fwInstalledRef.current))
     setDeletedIds(prev => new Set(prev).add(mod.id))
     setExtraMods(prev => prev.filter(m => m.id !== mod.id))
   }, [modsDir])

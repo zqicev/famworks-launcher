@@ -1,6 +1,6 @@
 // Общие типы для раздела «Браузер» (поиск/установка контента).
 
-export type Source = 'modrinth' | 'curseforge'
+export type Source = 'modrinth' | 'curseforge' | 'famworks'
 
 /** Тип контента в браузере. */
 export type ContentType = 'modpack' | 'mod' | 'resourcepack' | 'shader'

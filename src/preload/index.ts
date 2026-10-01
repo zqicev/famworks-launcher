@@ -154,7 +154,10 @@ contextBridge.exposeInMainWorld('api', {
   },
   famworks: {
     access: () => ipcRenderer.invoke('famworks:access'),
-    setChannel: (packId: string, famworksId: string, channel: string) => ipcRenderer.invoke('famworks:set-channel', packId, famworksId, channel)
+    setChannel: (packId: string, famworksId: string, channel: string) => ipcRenderer.invoke('famworks:set-channel', packId, famworksId, channel),
+    installed: (packId: string) => ipcRenderer.invoke('famworks:installed', packId),
+    catalog: (params: { mc_version?: string; loader?: string; kind?: string; q?: string }) => ipcRenderer.invoke('famworks:catalog', params),
+    addToPack: (packId: string, el: unknown) => ipcRenderer.invoke('famworks:add-to-pack', packId, el)
   },
   update: {
     install: () => ipcRenderer.invoke('update:install'),
