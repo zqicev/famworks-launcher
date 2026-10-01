@@ -251,6 +251,14 @@ export function setupIpcHandlers() {
       const installPath = store.get('installPath') as string
       const memory = getPackMemory(modpackId)
 
+      // Хватит ли Windows памяти (RAM + подкачка) на игру с таким -Xmx; иначе спрашиваем.
+      const { confirmLaunchMemory } = await import('./sysmem')
+      if (!(await confirmLaunchMemory(win, memory))) {
+        win.webContents.send('install:progress', { phase: 'cancelled', message: 'Отменено' })
+        setBusy(null)
+        return false
+      }
+
       const accounts = store.get('accounts') as Account[]
       const activeId = store.get('activeAccountId') as string | null
       // accountId задан (доп. экземпляр под выбранным аккаунтом) — берём его, иначе активный.
@@ -513,6 +521,9 @@ export function setupIpcHandlers() {
     const os = await import('os')
     return Math.round(os.totalmem() / 1024 / 1024)
   })
+  ipcMain.handle('system:memory-health', async () => (await import('./sysmem')).getMemoryHealth())
+  ipcMain.handle('system:open-memory-settings', async (_, kind: 'pagefile' | 'storage') =>
+    (await import('./sysmem')).openMemorySettings(kind))
 
   // ОЗУ per-сборка (МБ). get отдаёт значение сборки или общий дефолт.
   ipcMain.handle('memory:get', (_, modpackId: string) => getPackMemory(modpackId))
@@ -523,6 +534,21 @@ export function setupIpcHandlers() {
   ipcMain.handle('portal:sync-nick', async () => { const { syncNick } = await import('./portal'); return syncNick() })
   ipcMain.handle('portal:unpair', async () => { const { unpair } = await import('./portal'); return unpair() })
   ipcMain.handle('portal:status', async () => { const { portalStatus } = await import('./portal'); return portalStatus() })
+
+  // Источник модов FamWorks: права (что показывать) и переключение ветки test/release у мода.
+  ipcMain.handle('famworks:access', async () => { const { famworksAccess } = await import('./portalMods'); return famworksAccess() })
+  ipcMain.handle('famworks:set-channel', async (_, packId: string, famworksId: string, channel: string) => {
+    const all = { ...((store.get('famworksChannels') as Record<string, Record<string, string>> | undefined) ?? {}) }
+    const pack = { ...(all[packId] ?? {}) }
+    if (channel === 'release') delete pack[famworksId]  // release — дефолт, не храним
+    else pack[famworksId] = channel
+    all[packId] = pack
+    store.set('famworksChannels', all)
+    const { reinstallFamworks } = await import('./installer')
+    const modpack = await fetchModpack(packId)
+    await reinstallFamworks(modpack, store.get('installPath') as string, getWindow())
+    return true
+  })
 
   ipcMain.handle('mods:file-size', (_, modsDir: string, filename: string) =>
     getModFileSizeBytes(modsDir, filename))

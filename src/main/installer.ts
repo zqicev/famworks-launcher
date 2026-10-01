@@ -163,6 +163,13 @@ async function famworksOutdated(modpack: Modpack, gameRoot: string): Promise<boo
   return false
 }
 
+/** Переустановить famworks-моды сборки под свежий канал (после переключения test/release). */
+export async function reinstallFamworks(modpack: Modpack, installPath: string, win: BrowserWindow): Promise<void> {
+  for (const k of [...fwResolveCache.keys()]) if (k.startsWith(modpack.id + '|')) fwResolveCache.delete(k)
+  await installFamworks(modpack, join(installPath, modpack.id), win)
+  emit(win, { phase: 'done', message: '' })
+}
+
 export async function checkAndInstallModpack(
   modpack: Modpack,
   installPath: string,

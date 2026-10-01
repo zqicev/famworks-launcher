@@ -140,6 +140,8 @@ interface Window {
     }
     system: {
       totalMemoryMb: () => Promise<number>
+      memoryHealth: () => Promise<import('../../types/system').MemoryHealth | null>
+      openMemorySettings: (kind: 'pagefile' | 'storage') => Promise<void>
     }
     memory: {
       get: (id: string) => Promise<number>
@@ -150,6 +152,10 @@ interface Window {
       syncNick: () => Promise<{ ok: boolean; paired?: boolean; applied?: boolean; name?: string; error?: string }>
       unpair: () => Promise<{ ok: boolean; paired?: boolean }>
       status: () => Promise<{ paired: boolean }>
+    }
+    famworks: {
+      access: () => Promise<{ paired: boolean; catalog: boolean; testing: boolean }>
+      setChannel: (packId: string, famworksId: string, channel: string) => Promise<boolean>
     }
     update: {
       install: () => Promise<void>

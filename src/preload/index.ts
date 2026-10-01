@@ -138,7 +138,9 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.invoke('browser:install', source, type, projectId, refId, mc, loader, packRoot)
   },
   system: {
-    totalMemoryMb: () => ipcRenderer.invoke('system:total-memory-mb')
+    totalMemoryMb: () => ipcRenderer.invoke('system:total-memory-mb'),
+    memoryHealth: () => ipcRenderer.invoke('system:memory-health'),
+    openMemorySettings: (kind: 'pagefile' | 'storage') => ipcRenderer.invoke('system:open-memory-settings', kind)
   },
   memory: {
     get: (id: string) => ipcRenderer.invoke('memory:get', id),
@@ -149,6 +151,10 @@ contextBridge.exposeInMainWorld('api', {
     syncNick: () => ipcRenderer.invoke('portal:sync-nick'),
     unpair: () => ipcRenderer.invoke('portal:unpair'),
     status: () => ipcRenderer.invoke('portal:status')
+  },
+  famworks: {
+    access: () => ipcRenderer.invoke('famworks:access'),
+    setChannel: (packId: string, famworksId: string, channel: string) => ipcRenderer.invoke('famworks:set-channel', packId, famworksId, channel)
   },
   update: {
     install: () => ipcRenderer.invoke('update:install'),

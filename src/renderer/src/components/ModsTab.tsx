@@ -22,6 +22,9 @@ export default function ModsTab({ modpack, modsDir, onCount }: Props) {
   const [deletedIds, setDeletedIds] = useState<Set<string>>(new Set())
   const [presentBases, setPresentBases] = useState<Set<string> | null>(null)
   const [dragging, setDragging] = useState(false)
+  // FamWorks: право тестера (показывать test/release) + выбранные ветки модов этой сборки.
+  const [fwTesting, setFwTesting] = useState(false)
+  const [fwChannels, setFwChannels] = useState<Record<string, string>>({})
   // Стаггер играет один раз при монтировании вкладки, потом класс снимаем — поиск не дёргает список.
   const [staggerOn, setStaggerOn] = useState(true)
   useEffect(() => { const t = setTimeout(() => setStaggerOn(false), 700); return () => clearTimeout(t) }, [])
@@ -85,6 +88,22 @@ export default function ModsTab({ modpack, modsDir, onCount }: Props) {
     })
     return off
   }, [modsDir])
+
+  // Право тестера и выбранные ветки famworks-модов этой сборки.
+  useEffect(() => {
+    window.api.famworks.access().then(a => setFwTesting(!!a.paired && !!a.testing)).catch(() => {})
+    window.api.store.get('famworksChannels').then(all => {
+      setFwChannels((all as Record<string, Record<string, string>> | null)?.[modpack.id] ?? {})
+    }).catch(() => {})
+  }, [modpack.id])
+
+  // Переключение ветки мода: сохраняем выбор, переустановка на стороне main эмитит 'done' → список пересканируется.
+  const handleChannel = useCallback(async (mod: Mod, channel: 'test' | 'release') => {
+    const fwid = mod.famworks_id
+    if (!fwid) return
+    setFwChannels(prev => ({ ...prev, [fwid]: channel }))
+    await window.api.famworks.setChannel(modpack.id, fwid, channel).catch(() => {})
+  }, [modpack.id])
 
   // Показываем все заявленные моды сборки сразу (в т.ч. до установки); ещё не скачанные помечаем.
   const packMods = useMemo<LocalMod[]>(() => modpack.mods.map(m => ({
@@ -167,6 +186,8 @@ export default function ModsTab({ modpack, modsDir, onCount }: Props) {
             icon={iconFor(mod)}
             enabled={!disabled.has(mod.id)}
             notInstalled={mod._notInstalled}
+            channel={fwTesting && mod.famworks_id ? ((fwChannels[mod.famworks_id] as 'test' | 'release') ?? 'release') : undefined}
+            onChannel={fwTesting && mod.famworks_id ? handleChannel : undefined}
             onToggle={handleToggle}
             onDelete={handleDelete}
           />
