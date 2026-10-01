@@ -1,5 +1,5 @@
 import { join, dirname, resolve, sep } from 'path'
-import { createWriteStream, createReadStream, existsSync, mkdirSync, renameSync, unlinkSync, readdirSync, statSync, writeFileSync } from 'fs'
+import { createWriteStream, createReadStream, existsSync, mkdirSync, renameSync, unlinkSync, readdirSync, statSync, writeFileSync, readFileSync } from 'fs'
 import { createHash } from 'crypto'
 import axios from 'axios'
 import AdmZip from 'adm-zip'
@@ -7,6 +7,8 @@ import { BrowserWindow } from 'electron'
 import { Modpack, Mod, ConfigFile } from '../types/modpack'
 import { opSignal, isCancelled } from './abort'
 import { loaderInstalled } from './loaders'
+import { store } from './store'
+import { resolveFamworks, FwResolve } from './portalMods'
 
 interface ResolvedMod {
   url: string
@@ -39,6 +41,128 @@ function emit(win: BrowserWindow, event: ProgressEvent) {
   win.webContents.send('install:progress', event)
 }
 
+// ───────────────────────── Моды FamWorks (источник — портал) ─────────────────────────
+
+interface FwItem { item: Mod; dir: string }
+interface FwTrack { filename: string; sha512: string }
+
+/** Элементы сборки (моды/ресурспаки/шейдеры) с famworks_id + папка каждого. */
+function collectFamworksItems(modpack: Modpack, gameRoot: string): FwItem[] {
+  const out: FwItem[] = []
+  for (const m of modpack.mods) if (m.famworks_id) out.push({ item: m, dir: join(gameRoot, 'mods') })
+  for (const p of modpack.resourcepacks ?? []) if (p.famworks_id) out.push({ item: p, dir: join(gameRoot, 'resourcepacks') })
+  for (const s of modpack.shaders ?? []) if (s.famworks_id) out.push({ item: s, dir: join(gameRoot, 'shaderpacks') })
+  return out
+}
+
+function fwTrackPath(gameRoot: string): string { return join(gameRoot, '.famworks-mods.json') }
+function readFwTracking(gameRoot: string): Record<string, FwTrack> {
+  try { return JSON.parse(readFileSync(fwTrackPath(gameRoot), 'utf8')) } catch { return {} }
+}
+function writeFwTracking(gameRoot: string, map: Record<string, FwTrack>): void {
+  try { writeFileSync(fwTrackPath(gameRoot), JSON.stringify(map, null, 2)) } catch { /* не критично */ }
+}
+
+/** Выбор ветки test/release для famworks-модов этой сборки (из electron-store). */
+function packChannels(modpackId: string): Record<string, string> {
+  const all = (store.get('famworksChannels') as Record<string, Record<string, string>> | undefined) ?? {}
+  return all[modpackId] ?? {}
+}
+
+// Один /resolve на сборку, с коротким кэшем — чтобы проверка статуса и установка не дёргали портал дважды.
+const fwResolveCache = new Map<string, { at: number; data: FwResolve }>()
+async function resolveForPack(modpack: Modpack, items: FwItem[]): Promise<FwResolve | null> {
+  if (!items.length) return { testing: false, mods: [] }
+  const channels = packChannels(modpack.id)
+  const reqMods = items.map(fi => ({
+    id: fi.item.famworks_id as string,
+    channel: channels[fi.item.famworks_id as string] || undefined,
+    version: fi.item.famworks_version || undefined
+  }))
+  const key = `${modpack.id}|${modpack.mc_version}|${modpack.loader}|${JSON.stringify(reqMods)}`
+  const cached = fwResolveCache.get(key)
+  if (cached && Date.now() - cached.at < 60000) return cached.data
+  try {
+    const data = await resolveFamworks(modpack.mc_version, modpack.loader, reqMods)
+    fwResolveCache.set(key, { at: Date.now(), data })
+    return data
+  } catch {
+    return null // портал недоступен — зовущий решает, что делать
+  }
+}
+
+/** Ставит/обновляет famworks-моды: качает актуальную версию и удаляет прежний файл при смене имени. */
+async function installFamworks(modpack: Modpack, gameRoot: string, win: BrowserWindow): Promise<void> {
+  const items = collectFamworksItems(modpack, gameRoot)
+  if (!items.length) return
+  emit(win, { phase: 'check', message: 'Проверка модов FamWorks...' })
+  const resolved = await resolveForPack(modpack, items)
+  if (!resolved) {
+    win.webContents.send('launch:log', { id: modpack.id, text: '[famworks] портал недоступен — моды FamWorks не проверены, оставляю что стоит' })
+    return
+  }
+  const byId = new Map(resolved.mods.map(e => [e.id, e]))
+  const tracking = readFwTracking(gameRoot)
+  let done = 0
+  for (const fi of items) {
+    if (isCancelled()) throw new DOMException('Aborted', 'AbortError')
+    const fwid = fi.item.famworks_id as string
+    const entry = byId.get(fwid)
+    if (!entry || entry.status !== 'ok' || !entry.version) {
+      if (entry?.status === 'not_found') win.webContents.send('launch:log', { id: modpack.id, text: `[famworks] «${fi.item.name}» не найден на портале` })
+      else if (entry?.status === 'no_compatible') win.webContents.send('launch:log', { id: modpack.id, text: `[famworks] «${fi.item.name}»: нет версии под ${modpack.mc_version}/${modpack.loader}` })
+      done++
+      continue
+    }
+    const file = entry.version.files.find(f => f.primary) ?? entry.version.files[0]
+    const sha = file?.hashes?.sha512
+    if (!file?.url || !sha) { done++; continue }
+    mkdirSync(fi.dir, { recursive: true })
+    const tracked = tracking[fwid]
+    // Уже стоит нужная версия (по sha512 + файл на месте)?
+    if (tracked?.sha512 === sha && (existsSync(join(fi.dir, tracked.filename)) || existsSync(join(fi.dir, tracked.filename + '.disabled')))) {
+      done++; continue
+    }
+    // Был ли мод выключен — новую версию ставим тоже выключенной.
+    const wasDisabled = !!tracked && existsSync(join(fi.dir, tracked.filename + '.disabled')) && !existsSync(join(fi.dir, tracked.filename))
+    const enabledPath = join(fi.dir, file.filename)
+    await downloadWithProgress(file.url, enabledPath, (bytes, total, speed) => {
+      emit(win, { phase: 'download', message: `Загрузка ${fi.item.name}`, current: done, total: items.length, bytesDownloaded: bytes, bytesTotal: total, speedBps: speed })
+    }, sha)
+    if (wasDisabled) { try { renameSync(enabledPath, enabledPath + '.disabled') } catch { /* перезапишется */ } }
+    // Удаляем прежний файл этого мода при смене имени (и .jar, и .jar.disabled).
+    if (tracked && tracked.filename !== file.filename) {
+      try { unlinkSync(join(fi.dir, tracked.filename)) } catch {}
+      try { unlinkSync(join(fi.dir, tracked.filename + '.disabled')) } catch {}
+    }
+    tracking[fwid] = { filename: file.filename, sha512: sha }
+    done++
+  }
+  writeFwTracking(gameRoot, tracking)
+}
+
+/** Нужно ли обновление famworks-модов (для статуса сборки). Портал недоступен → не считаем устаревшим. */
+async function famworksOutdated(modpack: Modpack, gameRoot: string): Promise<boolean> {
+  const items = collectFamworksItems(modpack, gameRoot)
+  if (!items.length) return false
+  const resolved = await resolveForPack(modpack, items)
+  if (!resolved) return false
+  const byId = new Map(resolved.mods.map(e => [e.id, e]))
+  const tracking = readFwTracking(gameRoot)
+  for (const fi of items) {
+    const fwid = fi.item.famworks_id as string
+    const entry = byId.get(fwid)
+    if (!entry || entry.status !== 'ok' || !entry.version) continue // не можем обновить — не блокируем
+    const file = entry.version.files.find(f => f.primary) ?? entry.version.files[0]
+    const sha = file?.hashes?.sha512
+    if (!sha) continue
+    const tracked = tracking[fwid]
+    if (!tracked) { if (fi.item.required) return true; continue } // обязательный ещё не стоит
+    if (tracked.sha512 !== sha) return true // стоит старая версия
+  }
+  return false
+}
+
 export async function checkAndInstallModpack(
   modpack: Modpack,
   installPath: string,
@@ -63,6 +187,7 @@ export async function checkAndInstallModpack(
 
   const missing: Mod[] = []
   for (const mod of modpack.mods) {
+    if (mod.famworks_id) continue // famworks-моды ставятся отдельно (installFamworks)
     const enabled = join(modsDir, mod.filename)
     const disabled = join(modsDir, mod.filename + '.disabled')
     if (!existsSync(enabled) && !existsSync(disabled)) {
@@ -93,9 +218,12 @@ export async function checkAndInstallModpack(
     done++
   }
 
-  // Ресурспаки и шейдеры (та же механика — папка + .disabled)
-  await installPacks(modpack.resourcepacks ?? [], join(gameRoot, 'resourcepacks'), 'Ресурспак', modpack, win)
-  await installPacks(modpack.shaders ?? [], join(gameRoot, 'shaderpacks'), 'Шейдер', modpack, win)
+  // Ресурспаки и шейдеры (та же механика — папка + .disabled). famworks_id — отдельно.
+  await installPacks((modpack.resourcepacks ?? []).filter(p => !p.famworks_id), join(gameRoot, 'resourcepacks'), 'Ресурспак', modpack, win)
+  await installPacks((modpack.shaders ?? []).filter(p => !p.famworks_id), join(gameRoot, 'shaderpacks'), 'Шейдер', modpack, win)
+
+  // Моды/паки/шейдеры с портала FamWorks (ставим актуальную версию, удаляем старый файл при обновлении)
+  await installFamworks(modpack, gameRoot, win)
 
   // Конфиги
   await installConfigs(modpack, gameRoot, win)
@@ -212,10 +340,10 @@ export async function getModpackStatus(
   // Если загрузчик ещё не подготовлен (профиль Fabric/Quilt или installer Forge/NeoForge) — не установлена
   if (!loaderInstalled(modpack, gameRoot)) return 'not_installed'
 
-  // Если нет всех обязательных модов — нужно обновление
+  // Если нет всех обязательных модов — нужно обновление (famworks — отдельной проверкой ниже)
   const modsDir = join(gameRoot, 'mods')
   for (const mod of modpack.mods) {
-    if (!mod.required) continue
+    if (!mod.required || mod.famworks_id) continue
     const enabled = join(modsDir, mod.filename)
     const disabled = join(modsDir, mod.filename + '.disabled')
     if (!existsSync(enabled) && !existsSync(disabled)) {
@@ -233,13 +361,16 @@ export async function getModpackStatus(
     if (dest && !existsSync(dest)) return 'outdated'
   }
 
-  // Если обязательный ресурспак/шейдер ещё не скачан — нужно обновление
+  // Если обязательный ресурспак/шейдер ещё не скачан — нужно обновление (famworks — ниже)
   const missingPack = (list: Mod[], folder: string) => {
     const d = join(gameRoot, folder)
-    return (list ?? []).some(p => p.required && !existsSync(join(d, p.filename)) && !existsSync(join(d, p.filename + '.disabled')))
+    return (list ?? []).some(p => p.required && !p.famworks_id && !existsSync(join(d, p.filename)) && !existsSync(join(d, p.filename + '.disabled')))
   }
   if (missingPack(modpack.resourcepacks ?? [], 'resourcepacks')) return 'outdated'
   if (missingPack(modpack.shaders ?? [], 'shaderpacks')) return 'outdated'
+
+  // Моды FamWorks: вышла новая версия (или обязательный ещё не стоит) → нужно обновление.
+  if (await famworksOutdated(modpack, gameRoot)) return 'outdated'
 
   return 'ready'
 }

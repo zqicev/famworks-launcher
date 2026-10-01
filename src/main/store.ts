@@ -22,6 +22,8 @@ interface StoreSchema {
   // отсеиваем мёртвые pid (см. reattachInstances).
   runningInstances: { instanceId: string; modpackId: string; modpackName: string; account: string; pid: number; startedAt: number }[]
   portalToken?: string           // токен привязки к порталу FamWorks (safeStorage-шифртекст, base64)
+  // Выбор ветки test/release для famworks-модов, per-сборка: { [packId]: { [famworks_id]: 'test'|'release' } }
+  famworksChannels?: Record<string, Record<string, string>>
   customModpacks: Modpack[]
   // Статистика запусков миров/серверов для сортировки «Продолжить игру»:
   // { [modpackId]: { 'w:<folder>' | 's:<ip>': { count, last } } }

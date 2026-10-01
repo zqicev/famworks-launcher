@@ -20,6 +20,10 @@ export interface Mod {
   /** Если задано — берётся именно эта версия Modrinth (а не последняя). Иначе — последняя совместимая. */
   modrinth_version_number?: string
   curseforge_id?: number
+  /** id мода на портале FamWorks (как mod id в fabric.mod.json). Лаунчер ставит и обновляет его с портала. */
+  famworks_id?: string
+  /** Необязательно: зафиксировать версию мода с портала. Иначе — последняя release под mc/loader сборки. */
+  famworks_version?: string
   filename: string
   version: string
   category: string

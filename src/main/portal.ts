@@ -106,3 +106,9 @@ export async function unpair(): Promise<PortalResult> {
 export function portalStatus(): { paired: boolean } {
   return { paired: !!loadToken() }
 }
+
+/** Токен привязки для прочих API портала (моды). null — лаунчер не привязан. Запросы модов
+ *  работают и без токена (отдаётся только release), поэтому null тут — нормальная ситуация. */
+export function getPortalToken(): string | null {
+  return loadToken()
+}
