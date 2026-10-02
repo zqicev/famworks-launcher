@@ -4,6 +4,7 @@ import { validateToken } from './github'
 import { loadWorkspace, saveModpack, deleteModpack, uploadCustomJar, uploadConfig, uploadResourcepack } from './service'
 import { searchModrinth, getLatestVersion, getVersions } from './modrinth'
 import { searchCurseforge, getCurseforgeFiles, validateCfKey, cfDownloadUrl, cfSha1, CfFile } from './curseforge'
+import { portalPair, portalStatus, portalUnpair, famworksCatalog, famworksVersions } from './portal'
 import { Modpack } from '../types/modpack'
 
 export function setupIpc() {
@@ -60,6 +61,13 @@ export function setupIpc() {
     if (!result.filePaths[0]) return null
     return uploadResourcepack(result.filePaths[0])
   })
+
+  // Портал FamWorks (привязка по коду + каталог модов)
+  ipcMain.handle('portal:pair', (_, code: string) => portalPair(code))
+  ipcMain.handle('portal:status', () => portalStatus())
+  ipcMain.handle('portal:unpair', () => { portalUnpair(); return { ok: true } })
+  ipcMain.handle('famworks:catalog', (_, params: { mc_version?: string; loader?: string; kind?: string; q?: string }) => famworksCatalog(params ?? {}))
+  ipcMain.handle('famworks:versions', (_, id: string) => famworksVersions(id))
 
   // Окно
   ipcMain.on('win:minimize', () => BrowserWindow.getFocusedWindow()?.minimize())

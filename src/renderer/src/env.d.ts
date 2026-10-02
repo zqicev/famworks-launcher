@@ -22,6 +22,17 @@ interface CfHit { id: number; name: string; summary: string; downloadCount: numb
 interface CfFile { id: number; fileName: string; displayName: string; downloadUrl: string | null; fileLength: number; hashes: { value: string; algo: number }[]; gameVersions: string[] }
 interface ConfigUpload { filename: string; download_url: string; sha512: string; suggestedPath: string }
 
+interface FwFile { filename: string; size: number; primary?: boolean }
+interface FwVersion { id: string; version_number: string; game_versions: string[]; loaders: string[]; files: FwFile[] }
+interface FwCatalogItem {
+  id: string
+  name: string
+  kind: 'mod' | 'resourcepack' | 'shader'
+  description?: string
+  release: FwVersion | null
+  test: FwVersion | null
+}
+
 declare global {
   interface Window {
     api: {
@@ -45,6 +56,15 @@ declare global {
         search: (q: string, mc: string, loader: string, type?: string) => Promise<CfHit[]>
         files: (modId: number, mc: string, loader: string, type?: string) => Promise<CfFile[]>
         resolve: (file: CfFile) => Promise<{ url: string | null; sha1?: string }>
+      }
+      portal: {
+        pair: (code: string) => Promise<{ ok: boolean; error?: string }>
+        status: () => Promise<{ paired: boolean }>
+        unpair: () => Promise<{ ok: boolean }>
+      }
+      famworks: {
+        catalog: (params: { mc_version?: string; loader?: string; kind?: string; q?: string }) => Promise<FwCatalogItem[]>
+        versions: (id: string) => Promise<FwVersion[]>
       }
       jar: { pickAndUpload: () => Promise<JarUpload | null> }
       config: { pickAndUpload: () => Promise<ConfigUpload | null> }

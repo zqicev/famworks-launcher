@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { LoadedModpack, Modpack, Mod, ServerEntry, ConfigFile } from '../../../types/modpack'
 import AddModrinthModal from './AddModrinthModal'
 import AddCurseforgeModal from './AddCurseforgeModal'
+import AddFamworksModal from './AddFamworksModal'
 import styles from '../styles/Editor.module.css'
 
 interface Props {
@@ -22,6 +23,9 @@ export default function Editor({ packKey, loaded, onSaved, onDeleted }: Props) {
   const [cfMod, setCfMod] = useState(false)
   const [cfRp, setCfRp] = useState(false)
   const [cfSh, setCfSh] = useState(false)
+  const [fwMod, setFwMod] = useState(false)
+  const [fwRp, setFwRp] = useState(false)
+  const [fwSh, setFwSh] = useState(false)
 
   console.log(loaded.data)
 
@@ -232,6 +236,7 @@ export default function Editor({ packKey, loaded, onSaved, onDeleted }: Props) {
             <div className={styles.modActions}>
               <button className={styles.addBtn} onClick={() => setAddOpen(true)}>+ Modrinth</button>
               <button className={styles.addBtn} onClick={() => setCfMod(true)}>+ CurseForge</button>
+              <button className={styles.addBtn} onClick={() => setFwMod(true)}>+ FamWorks</button>
               <button className={styles.jarBtn} onClick={uploadJar} disabled={busy}>↑ .jar</button>
             </div>
           </div>
@@ -243,7 +248,7 @@ export default function Editor({ packKey, loaded, onSaved, onDeleted }: Props) {
                 <div className={styles.modMain}>
                   <div className={styles.modName}>
                     {mod.name}
-                    {mod.modrinth_id ? <span className={styles.srcMod}>Modrinth</span> : <span className={styles.srcJar}>jar</span>}
+                    {mod.famworks_id ? <span className={styles.srcMod}>FamWorks</span> : mod.modrinth_id ? <span className={styles.srcMod}>Modrinth</span> : <span className={styles.srcJar}>jar</span>}
                   </div>
                   <div className={styles.modMeta}>{mod.filename} · {mod.size_mb} МБ{mod.version ? ` · ${mod.version}` : ''}</div>
                 </div>
@@ -269,6 +274,7 @@ export default function Editor({ packKey, loaded, onSaved, onDeleted }: Props) {
             <div className={styles.modActions}>
               <button className={styles.addBtn} onClick={() => setRpAddOpen(true)}>+ Modrinth</button>
               <button className={styles.addBtn} onClick={() => setCfRp(true)}>+ CurseForge</button>
+              <button className={styles.addBtn} onClick={() => setFwRp(true)}>+ FamWorks</button>
               <button className={styles.jarBtn} onClick={uploadRpZip} disabled={busy}>↑ .zip</button>
             </div>
           </div>
@@ -280,7 +286,7 @@ export default function Editor({ packKey, loaded, onSaved, onDeleted }: Props) {
                 <div className={styles.modMain}>
                   <div className={styles.modName}>
                     {p.name}
-                    {p.modrinth_id ? <span className={styles.srcMod}>Modrinth</span> : <span className={styles.srcJar}>zip</span>}
+                    {p.famworks_id ? <span className={styles.srcMod}>FamWorks</span> : p.modrinth_id ? <span className={styles.srcMod}>Modrinth</span> : <span className={styles.srcJar}>zip</span>}
                   </div>
                   <div className={styles.modMeta}>{p.filename} · {p.size_mb} МБ{p.version ? ` · ${p.version}` : ''}</div>
                 </div>
@@ -300,6 +306,7 @@ export default function Editor({ packKey, loaded, onSaved, onDeleted }: Props) {
             <div className={styles.modActions}>
               <button className={styles.addBtn} onClick={() => setShAddOpen(true)}>+ Modrinth</button>
               <button className={styles.addBtn} onClick={() => setCfSh(true)}>+ CurseForge</button>
+              <button className={styles.addBtn} onClick={() => setFwSh(true)}>+ FamWorks</button>
               <button className={styles.jarBtn} onClick={uploadShaderZip} disabled={busy}>↑ .zip</button>
             </div>
           </div>
@@ -311,7 +318,7 @@ export default function Editor({ packKey, loaded, onSaved, onDeleted }: Props) {
                 <div className={styles.modMain}>
                   <div className={styles.modName}>
                     {p.name}
-                    {p.modrinth_id ? <span className={styles.srcMod}>Modrinth</span> : <span className={styles.srcJar}>zip</span>}
+                    {p.famworks_id ? <span className={styles.srcMod}>FamWorks</span> : p.modrinth_id ? <span className={styles.srcMod}>Modrinth</span> : <span className={styles.srcJar}>zip</span>}
                   </div>
                   <div className={styles.modMeta}>{p.filename} · {p.size_mb} МБ{p.version ? ` · ${p.version}` : ''}</div>
                 </div>
@@ -448,6 +455,9 @@ export default function Editor({ packKey, loaded, onSaved, onDeleted }: Props) {
       {cfMod && <AddCurseforgeModal kind="mod" mcVersion={draft.mc_version} loader={draft.loader} existing={draft.mods.map(m => m.id)} onAdd={addMod} onClose={() => setCfMod(false)} />}
       {cfRp && <AddCurseforgeModal kind="resourcepack" mcVersion={draft.mc_version} loader={draft.loader} existing={resourcepacks.map(m => m.id)} onAdd={addRp} onClose={() => setCfRp(false)} />}
       {cfSh && <AddCurseforgeModal kind="shader" mcVersion={draft.mc_version} loader={draft.loader} existing={shaders.map(m => m.id)} onAdd={addShader} onClose={() => setCfSh(false)} />}
+      {fwMod && <AddFamworksModal kind="mod" mcVersion={draft.mc_version} loader={draft.loader} existing={draft.mods.map(m => m.id)} onAdd={m => { addMod(m); setFwMod(false) }} onClose={() => setFwMod(false)} />}
+      {fwRp && <AddFamworksModal kind="resourcepack" mcVersion={draft.mc_version} loader={draft.loader} existing={resourcepacks.map(m => m.id)} onAdd={m => { addRp(m); setFwRp(false) }} onClose={() => setFwRp(false)} />}
+      {fwSh && <AddFamworksModal kind="shader" mcVersion={draft.mc_version} loader={draft.loader} existing={shaders.map(m => m.id)} onAdd={m => { addShader(m); setFwSh(false) }} onClose={() => setFwSh(false)} />}
     </div>
   )
 }

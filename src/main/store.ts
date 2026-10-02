@@ -7,6 +7,7 @@ interface StoreSchema {
   repo: string
   branch: string
   modsReleaseTag: string
+  portalToken: string  // привязка к порталу FamWorks (код из профиля), для каталога модов
 }
 
 export const store = new Store<StoreSchema>({
@@ -16,6 +17,7 @@ export const store = new Store<StoreSchema>({
     owner: 'zqicev',
     repo: 'famworks-builds',
     branch: 'main',
-    modsReleaseTag: 'mods'
+    modsReleaseTag: 'mods',
+    portalToken: ''
   }
 })

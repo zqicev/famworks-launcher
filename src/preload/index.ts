@@ -23,6 +23,15 @@ contextBridge.exposeInMainWorld('api', {
     files: (modId: number, mc: string, loader: string, type?: string) => ipcRenderer.invoke('cf:files', modId, mc, loader, type),
     resolve: (file: unknown) => ipcRenderer.invoke('cf:resolve', file)
   },
+  portal: {
+    pair: (code: string) => ipcRenderer.invoke('portal:pair', code),
+    status: () => ipcRenderer.invoke('portal:status'),
+    unpair: () => ipcRenderer.invoke('portal:unpair')
+  },
+  famworks: {
+    catalog: (params: { mc_version?: string; loader?: string; kind?: string; q?: string }) => ipcRenderer.invoke('famworks:catalog', params),
+    versions: (id: string) => ipcRenderer.invoke('famworks:versions', id)
+  },
   jar: {
     pickAndUpload: () => ipcRenderer.invoke('jar:pick-and-upload')
   },
