@@ -118,6 +118,9 @@ export interface ModrinthVersion {
   version_number: string
   files: { url: string; filename: string; primary: boolean; size: number; hashes?: { sha512?: string } }[]
   dependencies?: ModrinthDependency[]
+  project_id?: string
+  version_type?: string    // release | beta | alpha
+  date_published?: string  // ISO
 }
 
 export async function getModVersions(projectId: string, mcVersion: string, loader: string, type = 'mod'): Promise<ModrinthVersion[]> {
@@ -133,6 +136,16 @@ export async function getModVersions(projectId: string, mcVersion: string, loade
 export async function getModrinthVersion(id: string): Promise<ModrinthVersion | null> {
   try {
     const res = await axios.get(`${BASE}/version/${id}`, { headers: HEADERS })
+    return res.data
+  } catch {
+    return null
+  }
+}
+
+/** Версия Modrinth по sha1 файла - чтобы понять, что за мод лежит в папке. null - файл не с Modrinth. */
+export async function getModrinthVersionByHash(sha1: string): Promise<ModrinthVersion | null> {
+  try {
+    const res = await axios.get(`${BASE}/version_file/${sha1}`, { headers: HEADERS, params: { algorithm: 'sha1' } })
     return res.data
   } catch {
     return null

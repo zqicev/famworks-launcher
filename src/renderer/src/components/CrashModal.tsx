@@ -9,7 +9,7 @@ export interface CrashData {
   culprit?: string
   reportPath?: string
   copyText: string
-  fix?: { kind: string; label: string; query?: string; version?: string; mod?: string }
+  fixes?: { kind: string; label: string; query?: string; version?: string; mod?: string; file?: string }[]
 }
 
 const CAT: Record<CrashData['category'], { label: string; cls: string }> = {
@@ -31,10 +31,11 @@ export default function CrashModal({ data, onClose }: { data: CrashData; onClose
     try { await navigator.clipboard.writeText(data.copyText); setCopied(true); setTimeout(() => setCopied(false), 1800) } catch { /* noop */ }
   }
 
-  const tryFix = async () => {
-    if (!data.fix) return
+  const fixes = data.fixes ?? []
+
+  const tryFix = async (fix: NonNullable<CrashData['fixes']>[number]) => {
     setFixState('applying'); setFixMsg('')
-    const r = await window.api.crash.applyFix(data.modpackId, data.fix)
+    const r = await window.api.crash.applyFix(data.modpackId, fix)
     if (r.ok) { setFixState('done'); setFixMsg(r.message ?? 'Готово') }
     else { setFixState('error'); setFixMsg(r.error ?? 'Не удалось') }
   }
@@ -59,14 +60,14 @@ export default function CrashModal({ data, onClose }: { data: CrashData; onClose
           </div>
         )}
 
-        {data.fix && fixState !== 'done' && (
-          <div className={styles.fixBox}>
-            <div className={styles.fixText}>Возможное решение: <b>{data.fix.label}</b></div>
-            <button className={styles.fixBtn} onClick={tryFix} disabled={fixState === 'applying'}>
-              {fixState === 'applying' ? 'Чиню…' : 'Попробовать решить'}
+        {fixState !== 'done' && fixes.map((fix, i) => (
+          <div className={styles.fixBox} key={fix.kind + i}>
+            <div className={styles.fixText}>{i === 0 ? 'Возможное решение' : 'Или'}: <b>{fix.label}</b></div>
+            <button className={styles.fixBtn} onClick={() => tryFix(fix)} disabled={fixState === 'applying'}>
+              {fixState === 'applying' ? 'Чиню…' : i === 0 ? 'Попробовать решить' : 'Выбрать'}
             </button>
           </div>
-        )}
+        ))}
         {fixState === 'error' && <div className={styles.fixErr}>{fixMsg}</div>}
         {fixState === 'done' && (
           <div className={styles.fixOk}>

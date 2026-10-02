@@ -1,11 +1,13 @@
 import { join } from 'path'
-import { existsSync, readdirSync, renameSync } from 'fs'
+import { createHash } from 'crypto'
+import { existsSync, readdirSync, readFileSync, renameSync, unlinkSync } from 'fs'
 import { store, getPackMemory, setPackMemory } from './store'
 import { fetchModpack } from './modpacks'
-import { searchModrinth, getModVersions } from './modrinth'
+import { searchModrinth, getModVersions, getModrinthVersionByHash } from './modrinth'
 import { downloadModToDir } from './installer'
+import { matchModFile } from './modFiles'
 
-interface Fix { kind: string; label?: string; query?: string; version?: string; mod?: string }
+interface Fix { kind: string; label?: string; query?: string; version?: string; mod?: string; file?: string }
 
 /** Исполняет починку из диагноза краша. */
 export async function applyCrashFix(modpackId: string, fix: Fix): Promise<{ ok: boolean; message?: string; error?: string }> {
@@ -40,15 +42,35 @@ export async function applyCrashFix(modpackId: string, fix: Fix): Promise<{ ok: 
     return { ok: true, message: `Память увеличена до ${(next / 1024).toFixed(1)} ГБ` }
   }
 
+  // Обновить мод-виновник до свежей версии с Modrinth (файл опознаём по хэшу, старый удаляем)
+  if (fix.kind === 'update-mod') {
+    const name = fix.mod ?? fix.file ?? 'мод'
+    const path = fix.file ? join(modsDir, fix.file) : ''
+    if (!path || !existsSync(path)) return { ok: false, error: `Не нашёл файл мода «${name}» в папке модов` }
+    const sha1 = createHash('sha1').update(readFileSync(path)).digest('hex')
+    const cur = await getModrinthVersionByHash(sha1)
+    if (!cur?.project_id) return { ok: false, error: `«${name}» не найден на Modrinth - обновите его вручную или отключите` }
+    const versions = await getModVersions(cur.project_id, modpack.mc_version, modpack.loader, 'mod')
+    // Только то, что новее установленного; из них релиз предпочитаем бете.
+    const newer = versions.filter(v => v.id !== cur.id && (v.date_published ?? '') > (cur.date_published ?? ''))
+    const next = newer.find(v => v.version_type === 'release') ?? newer[0]
+    if (!next) {
+      return { ok: false, error: `Уже стоит последняя версия «${name}» (${cur.version_number}) под ${modpack.loader} ${modpack.mc_version}. Остаётся отключить мод.` }
+    }
+    const file = (next.files ?? []).find(f => f.primary) ?? next.files?.[0]
+    if (!file) return { ok: false, error: 'У новой версии нет файла для скачивания' }
+    await downloadModToDir(file.url, file.filename, modsDir, undefined, file.hashes?.sha512)
+    if (file.filename !== fix.file) unlinkSync(path)
+    return { ok: true, message: `${name}: ${cur.version_number} → ${next.version_number}` }
+  }
+
   // Отключить конфликтующий мод
   if (fix.kind === 'disable-mod') {
     if (!fix.mod) return { ok: false, error: 'Неизвестно, какой мод отключить' }
     if (!existsSync(modsDir)) return { ok: false, error: 'Папка модов не найдена' }
-    const slug = fix.mod.toLowerCase().replace(/[^a-z0-9]+/g, '')
-    const file = readdirSync(modsDir).find(f =>
-      f.toLowerCase().endsWith('.jar') && slug.length >= 3 && f.toLowerCase().replace(/[^a-z0-9]+/g, '').includes(slug)
-    )
-    if (!file) return { ok: false, error: `Не нашёл файл мода «${fix.mod}» в папке модов` }
+    // Точное имя файла из диагноза; без него - по названию, но только если файл определяется однозначно.
+    const file = fix.file && existsSync(join(modsDir, fix.file)) ? fix.file : matchModFile(readdirSync(modsDir), fix.mod)
+    if (!file) return { ok: false, error: `Не удалось однозначно найти файл мода «${fix.mod}» - отключите его во вкладке «Моды»` }
     renameSync(join(modsDir, file), join(modsDir, file + '.disabled'))
     return { ok: true, message: `Отключён ${file}` }
   }
