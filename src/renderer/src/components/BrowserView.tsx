@@ -56,6 +56,8 @@ export default function BrowserView({ installPath, packs, contextPack, initialTy
   const [fwCatalog, setFwCatalog] = useState(false) // показывать источник FamWorks (право «Каталог»)
   const [fwPick, setFwPick] = useState<Hit | null>(null) // выбор локальной сборки для установки из FamWorks
   const reqRef = useRef(0) // токен запроса — отбрасываем устаревшие ответы при быстром переключении
+  const typingTimer = useRef<ReturnType<typeof setTimeout>>() // пауза живого поиска
+  const lastFilter = useRef<string | null>(null) // источник+тип прошлого запроса: отличаем их смену от набора текста
 
   const customPacks = packs.filter(p => p.id.startsWith('custom-'))
 
@@ -115,11 +117,20 @@ export default function BrowserView({ installPath, packs, contextPack, initialTy
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [source])
 
-  // Популярное при открытии и смене источника/типа (или текущий запрос).
+  // Популярное при открытии; при смене источника/типа - сразу; пока печатают запрос - живой поиск
+  // с паузой, чтобы не дёргать API на каждую букву (устаревшие ответы отбрасывает reqRef).
   useEffect(() => {
-    load()
+    const filter = `${source}|${type}`
+    const typing = lastFilter.current === filter
+    lastFilter.current = filter
+    if (!typing) { load(); return }
+    typingTimer.current = setTimeout(() => load(), 350)
+    return () => clearTimeout(typingTimer.current)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [source, type])
+  }, [source, type, query])
+
+  // Enter / «Найти» - искать сразу, не дожидаясь паузы.
+  const searchNow = (): void => { clearTimeout(typingTimer.current); load() }
 
   const installFamworksInto = async (hit: Hit, packId: string) => {
     setFwPick(null)
@@ -211,8 +222,8 @@ export default function BrowserView({ installPath, packs, contextPack, initialTy
 
         <div className={styles.searchRow}>
           <input className={styles.input} placeholder={`Поиск на ${source === 'modrinth' ? 'Modrinth' : source === 'curseforge' ? 'CurseForge' : 'FamWorks'}…`}
-            value={query} onChange={e => setQuery(e.target.value)} onKeyDown={e => e.key === 'Enter' && load()} autoFocus />
-          <button className={styles.searchBtn} onClick={() => load()}>Найти</button>
+            value={query} onChange={e => setQuery(e.target.value)} onKeyDown={e => e.key === 'Enter' && searchNow()} autoFocus />
+          <button className={styles.searchBtn} onClick={searchNow}>Найти</button>
         </div>
         {notice && <div className={styles.notice}>{notice}</div>}
       </div>
