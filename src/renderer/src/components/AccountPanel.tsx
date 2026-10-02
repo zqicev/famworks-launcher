@@ -300,7 +300,7 @@ export default function AccountPanel() {
                     <div style={{ fontSize: 10, fontWeight: 600, letterSpacing: 1, color: 'var(--text-dim)' }}>ПОРТАЛ FAMWORKS</div>
                     {portalPaired ? (
                       <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                        <span style={{ flex: 1, fontSize: 12, color: 'var(--text-secondary)' }}>✓ Привязан — ник подставляется на портале</span>
+                        <span style={{ flex: 1, fontSize: 12, color: 'var(--text-secondary)' }}>✓ Привязан - ник подставляется на портале</span>
                         <button className={styles.btnGhost} onClick={unpairPortal} disabled={portalBusy}>Отвязать</button>
                       </div>
                     ) : (
