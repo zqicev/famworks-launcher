@@ -230,3 +230,16 @@
 .stopMenuHead { font-size: 10px; font-weight: 600; letter-spacing: 0.5px; color: var(--text-dim); padding: 4px 8px 6px; }
 .stopMenuItem { display: flex; align-items: center; padding: 8px 10px; border-radius: 7px; font-size: 12px; color: var(--text-secondary); text-align: left; transition: background 0.12s, color 0.12s; }
 .stopMenuItem:hover { background: rgb(from var(--red) r g b / 0.14); color: var(--red); }
+.statusWarn { color: #e0b341; }
+
+.statusLink {
+  padding: 0;
+  background: none;
+  border: none;
+  font-size: 11px;
+  color: var(--accent);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.statusLink:hover { color: var(--text); }

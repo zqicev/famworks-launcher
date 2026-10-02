@@ -1,14 +1,16 @@
 import { useState, useRef, useEffect } from 'react'
+import { formatGb } from '../lib/memory'
 import styles from '../styles/MemorySelect.module.css'
 
 interface Props {
   value: number          // в МБ
   options: number[]      // в МБ
+  safeMax?: number       // выше этого (МБ) - предупреждаем о риске вылета
   disabled?: boolean
   onChange: (mb: number) => void
 }
 
-export default function MemorySelect({ value, options, disabled, onChange }: Props) {
+export default function MemorySelect({ value, options, safeMax, disabled, onChange }: Props) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -22,6 +24,8 @@ export default function MemorySelect({ value, options, disabled, onChange }: Pro
   }, [open])
 
   const label = (mb: number) => `${mb / 1024} ГБ`
+  const risky = (mb: number) => safeMax !== undefined && mb > safeMax
+  const recommended = options.filter(mb => !risky(mb)).pop()
 
   return (
     <div className={styles.wrap} ref={ref}>
@@ -29,8 +33,12 @@ export default function MemorySelect({ value, options, disabled, onChange }: Pro
         className={styles.trigger}
         onClick={() => !disabled && setOpen(o => !o)}
         disabled={disabled}
+        title={risky(value) ? 'Слишком много памяти для этой системы - игра может вылетать' : undefined}
       >
-        <span className={styles.value}>{label(value)}</span>
+        <span className={`${styles.value} ${risky(value) ? styles.valueWarn : ''}`}>
+          {risky(value) && <span className={styles.warnIcon}>⚠</span>}
+          {label(value)}
+        </span>
         <span className={styles.chevron}>{open ? '∧' : '∨'}</span>
       </button>
 
@@ -39,13 +47,18 @@ export default function MemorySelect({ value, options, disabled, onChange }: Pro
           {options.map(mb => (
             <button
               key={mb}
-              className={`${styles.option} ${mb === value ? styles.optionActive : ''}`}
+              className={`${styles.option} ${mb === value ? styles.optionActive : ''} ${risky(mb) ? styles.optionWarn : ''}`}
               onClick={() => { onChange(mb); setOpen(false) }}
             >
               {label(mb)}
-              {mb === value && <span className={styles.tick}>✓</span>}
+              {mb === value ? <span className={styles.tick}>✓</span> : risky(mb) && <span className={styles.warnIcon}>⚠</span>}
             </button>
           ))}
+          {recommended !== undefined && options.some(risky) && (
+            <div className={styles.note}>
+              Больше {formatGb(recommended)} ГБ - риск вылета: Windows и драйверу видеокарты не хватит памяти
+            </div>
+          )}
         </div>
       )}
     </div>

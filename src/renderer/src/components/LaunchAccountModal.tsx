@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import SkinHead from './SkinHead'
+import { safeMemoryMb, formatGb, formatRamGb } from '../lib/memory'
 import styles from '../styles/SettingsModal.module.css'
 
 interface Account {
@@ -11,6 +12,8 @@ interface Account {
 
 interface Props {
   memoryMb: number
+  runningMb: number   // ОЗУ, уже отданное запущенным экземплярам (всех сборок)
+  totalRamMb: number
   onPick: (accountId: string) => void
   onClose: () => void
 }
@@ -18,7 +21,7 @@ interface Props {
 const TYPE_LABEL: Record<Account['type'], string> = { offline: 'ОФФЛАЙН', ely: 'ELY.BY', microsoft: 'MICROSOFT' }
 
 /** Запуск ещё одного экземпляра: предупреждение про ОЗУ + выбор аккаунта, под которым запустить. */
-export default function LaunchAccountModal({ memoryMb, onPick, onClose }: Props): JSX.Element {
+export default function LaunchAccountModal({ memoryMb, runningMb, totalRamMb, onPick, onClose }: Props): JSX.Element {
   const [accounts, setAccounts] = useState<Account[]>([])
   const [activeId, setActiveId] = useState<string | null>(null)
   const [heads, setHeads] = useState<Record<string, string>>({})
@@ -37,7 +40,9 @@ export default function LaunchAccountModal({ memoryMb, onPick, onClose }: Props)
     }
   }, [accounts])
 
-  const gb = memoryMb % 1024 === 0 ? String(memoryMb / 1024) : (memoryMb / 1024).toFixed(1)
+  const gb = formatGb(memoryMb)
+  const totalAfter = runningMb + memoryMb
+  const risky = totalAfter > safeMemoryMb(totalRamMb)
 
   return (
     <div className={styles.overlay} onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}>
@@ -49,8 +54,17 @@ export default function LaunchAccountModal({ memoryMb, onPick, onClose }: Props)
         <div className={styles.body} style={{ gap: 12 }}>
           <p className={styles.hint} style={{ margin: 0, color: 'var(--text-secondary)', lineHeight: 1.55 }}>
             Каждый экземпляр получит <b style={{ color: 'var(--text)' }}>{gb} ГБ</b> ОЗУ. Несколько копий Minecraft
-            сразу ощутимо нагружают память и процессор — запускайте с запасом. Под каким аккаунтом запустить новый?
+            сразу ощутимо нагружают память и процессор - запускайте с запасом. Под каким аккаунтом запустить новый?
           </p>
+          {risky && (
+            <div style={{
+              padding: '8px 10px', borderRadius: 8, fontSize: 12, lineHeight: 1.5, color: '#e0b341',
+              background: 'rgba(224, 179, 65, 0.08)', border: '1px solid rgba(224, 179, 65, 0.35)'
+            }}>
+              ⚠ Вместе с уже запущенными будет {formatGb(totalAfter)} ГБ из {formatRamGb(totalRamMb)} ГБ ОЗУ -
+              высокий риск вылета. Уменьшите память сборки или закройте лишний экземпляр.
+            </div>
+          )}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {accounts.length === 0 && (
               <div className={styles.hint} style={{ margin: 0 }}>Нет аккаунтов — добавьте в панели аккаунта.</div>

@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Modpack } from '../../../types/modpack'
+import type { MemoryHealth } from '../../../types/system'
 import MemorySelect from './MemorySelect'
 import LaunchAccountModal from './LaunchAccountModal'
 import { formatBytes, formatSpeed } from '../lib/format'
+import { safeMemoryMb, formatGb, formatRamGb } from '../lib/memory'
 import styles from '../styles/BottomBar.module.css'
 
 // Базовые варианты ОЗУ (МБ); реальные опции фильтруются по объёму системы
@@ -48,6 +50,8 @@ export default function BottomBar({ modpack, activeMods = 0, totalMods = 0 }: Pr
   const [instances, setInstances] = useState<Instance[]>([])
   const [stopOpen, setStopOpen] = useState(false)
   const [pickOpen, setPickOpen] = useState(false)
+  const [runningMb, setRunningMb] = useState(0)
+  const [health, setHealth] = useState<MemoryHealth | null>(null)
   const clearTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const myInstances = instances.filter(i => i.modpackId === modpack.id)
@@ -139,6 +143,14 @@ export default function BottomBar({ modpack, activeMods = 0, totalMods = 0 }: Pr
     return () => clearInterval(t)
   }, [running, refreshInstances])
 
+  // Подкачка/место на диске: перечитываем при возврате в окно - игрок мог освободить место (main кэширует на 30 с).
+  useEffect(() => {
+    const load = (): void => { window.api.system.memoryHealth().then(setHealth).catch(() => {}) }
+    load()
+    window.addEventListener('focus', load)
+    return () => window.removeEventListener('focus', load)
+  }, [])
+
   useEffect(() => {
     window.api.system.totalMemoryMb().then(mb => setTotalRamMb(mb)).catch(() => {})
     window.api.busyGet().then(setBusyId).catch(() => {})
@@ -168,6 +180,10 @@ export default function BottomBar({ modpack, activeMods = 0, totalMods = 0 }: Pr
   // Не даём выбрать больше, чем есть в системе (оставляем запас под ОС).
   const memoryOptions = MEMORY_OPTIONS.filter(mb => mb <= totalRamMb - 1024)
   const safeOptions = memoryOptions.length ? memoryOptions : [2048]
+  // Выше порога не запрещаем, но предупреждаем: слишком большой -Xmx на машине без запаса = вылеты.
+  const safeMax = safeMemoryMb(totalRamMb)
+  const memoryRisky = memory > safeMax
+  const recommendedMb = safeOptions.filter(mb => mb <= safeMax).pop()
 
   useEffect(() => {
     const max = safeOptions[safeOptions.length - 1]
@@ -205,6 +221,16 @@ export default function BottomBar({ modpack, activeMods = 0, totalMods = 0 }: Pr
         refreshInstances()
       } catch { setStatus('ready') }
     }
+  }
+
+  // Перед окном запуска ещё одного экземпляра считаем, сколько ОЗУ уже занято запущенными (всех сборок).
+  const openPick = async () => {
+    if (lockedByOther) return
+    const mbs = await Promise.all(instances.map(i =>
+      i.modpackId === modpack.id ? memory : window.api.memory.get(i.modpackId).catch(() => memory)
+    ))
+    setRunningMb(mbs.reduce((a, b) => a + b, 0))
+    setPickOpen(true)
   }
 
   // Запуск ещё одного экземпляра под выбранным аккаунтом (из окна LaunchAccountModal).
@@ -274,7 +300,7 @@ export default function BottomBar({ modpack, activeMods = 0, totalMods = 0 }: Pr
           <div className={styles.divider} />
           <div className={styles.stat}>
             <span className={styles.statLabel}>ПАМЯТЬ</span>
-            <MemorySelect value={memory} options={safeOptions} disabled={isBusy} onChange={handleMemoryChange} />
+            <MemorySelect value={memory} options={safeOptions} safeMax={safeMax} disabled={isBusy} onChange={handleMemoryChange} />
           </div>
           <div className={styles.divider} />
           <div className={styles.stat}>
@@ -300,6 +326,38 @@ export default function BottomBar({ modpack, activeMods = 0, totalMods = 0 }: Pr
             <div className={styles.statusMsg}>Запущено экземпляров: {myInstances.length}</div>
           ) : status === 'checking' ? (
             <div className={styles.statusMsg}>Проверка<span className={styles.dots} /></div>
+          ) : health?.issue ? (
+            <>
+              <div className={`${styles.statusMsg} ${styles.statusWarn}`}>
+                {health.issue === 'disk-low'
+                  ? `⚠ На диске ${health.issueDrive} свободно ${formatGb(health.issueDriveFreeMb ?? 0)} ГБ - игра может вылетать`
+                  : health.issue === 'pagefile-off'
+                    ? '⚠ Файл подкачки отключён - игра может вылетать'
+                    : `⚠ Файл подкачки ограничен ${formatGb(health.potentialPagefileMb)} ГБ - игра может вылетать`}
+              </div>
+              <div className={styles.statusSub}>
+                {health.issue === 'disk-low' ? (
+                  <>
+                    <span>Windows не может увеличить файл подкачки</span>
+                    <button className={styles.statusLink} onClick={() => window.api.system.openMemorySettings('storage')}>Освободить место</button>
+                  </>
+                ) : (
+                  <>
+                    <span>Включите автоматический размер: «Дополнительно» → «Изменить»</span>
+                    <button className={styles.statusLink} onClick={() => window.api.system.openMemorySettings('pagefile')}>Открыть настройки</button>
+                  </>
+                )}
+              </div>
+            </>
+          ) : memoryRisky ? (
+            <>
+              <div className={`${styles.statusMsg} ${styles.statusWarn}`}>
+                ⚠ Выделено {formatGb(memory)} ГБ из {formatRamGb(totalRamMb)} ГБ ОЗУ - игра может вылетать
+              </div>
+              <div className={styles.statusSub}>
+                <span>Системе и видеокарте тоже нужна память{recommendedMb ? `. Рекомендуем до ${formatGb(recommendedMb)} ГБ` : ''}</span>
+              </div>
+            </>
           ) : null}
         </div>
 
@@ -340,7 +398,7 @@ export default function BottomBar({ modpack, activeMods = 0, totalMods = 0 }: Pr
                 <span className={styles.playSub}>{myInstances.length} запущено · {modpack.name}</span>
               </button>
               <div className={styles.playSep} />
-              <button className={styles.playPlus} onClick={() => !lockedByOther && setPickOpen(true)} disabled={lockedByOther} title="Запустить ещё экземпляр">
+              <button className={styles.playPlus} onClick={openPick} disabled={lockedByOther} title="Запустить ещё экземпляр">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
                   <path d="M12 5v14M5 12h14" />
                 </svg>
@@ -362,7 +420,12 @@ export default function BottomBar({ modpack, activeMods = 0, totalMods = 0 }: Pr
         )}
       </div>
 
-      {pickOpen && <LaunchAccountModal memoryMb={memory} onPick={launchWith} onClose={() => setPickOpen(false)} />}
+      {pickOpen && (
+        <LaunchAccountModal
+          memoryMb={memory} runningMb={runningMb} totalRamMb={totalRamMb}
+          onPick={launchWith} onClose={() => setPickOpen(false)}
+        />
+      )}
     </div>
   )
 }

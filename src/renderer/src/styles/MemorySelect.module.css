@@ -68,3 +68,24 @@
   font-size: 11px;
   color: var(--accent);
 }
+
+.valueWarn { color: #e0b341; }
+
+.warnIcon {
+  font-size: 11px;
+  color: #e0b341;
+  margin-right: 4px;
+}
+
+.optionWarn { color: #c9a24a; }
+.optionWarn:hover { color: #e0b341; }
+
+.note {
+  width: 190px;
+  padding: 6px 10px 4px;
+  margin-top: 2px;
+  border-top: 1px solid var(--border);
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-dim);
+}
