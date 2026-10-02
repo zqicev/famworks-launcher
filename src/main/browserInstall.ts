@@ -1,19 +1,13 @@
 import { BrowserWindow } from 'electron'
-import { join } from 'path'
-import { readdirSync } from 'fs'
+import { join, dirname } from 'path'
+import { readdirSync, unlinkSync } from 'fs'
 import { getModVersions, getModrinthVersion, ModrinthVersion } from './modrinth'
 import { getCurseforgeFiles, cfSha1, CfFile } from './curseforge'
-import { downloadModToDir } from './installer'
+import { downloadModToDir, managedModFiles } from './installer'
+import { modStem, otherVersions, fileKey } from './modFiles'
 
 const FOLDER: Record<string, string> = { mod: 'mods', resourcepack: 'resourcepacks', shader: 'shaderpacks' }
 const MAX_DEPTH = 8 // страховка от слишком длинных цепочек зависимостей
-
-/** «Основа» имени файла без версии: fabric-api-0.116.7+1.21.1.jar → fabric-api */
-function modStem(filename: string): string {
-  const base = filename.replace(/\.disabled$/i, '').replace(/\.(jar|zip)$/i, '')
-  const m = base.match(/^(.+?)[-_]v?\d/)
-  return (m ? m[1] : base).toLowerCase()
-}
 
 /** Уже есть файл того же мода (любой версии) в папке? Чтобы не ставить зависимость дважды. */
 function alreadyInstalled(dir: string, filename: string): boolean {
@@ -22,6 +16,18 @@ function alreadyInstalled(dir: string, filename: string): boolean {
   let files: string[]
   try { files = readdirSync(dir) } catch { return false }
   return files.some(f => /\.(jar|zip)(\.disabled)?$/i.test(f) && modStem(f) === stem)
+}
+
+/** Игрок поставил мод из браузера: убираем другие версии этого мода, чтобы не осталось двух.
+ *  Файлы, которые ставит сама сборка, не трогаем - иначе она сочтёт себя устаревшей и вернёт их. */
+function removeOtherVersions(packRoot: string, modsDir: string, filename: string): void {
+  let files: string[]
+  try { files = readdirSync(modsDir) } catch { return }
+  const managed = managedModFiles(packRoot)
+  for (const f of otherVersions(files, filename)) {
+    if (managed.has(fileKey(f))) continue
+    try { unlinkSync(join(modsDir, f)) } catch { /* файл занят игрой */ }
+  }
 }
 
 /**
@@ -76,6 +82,7 @@ async function walkModrinth(
   // Зависимость уже установлена (пусть и другой версии) — оставляем её, дубль не ставим
   if (!isRoot && alreadyInstalled(modsDir, file.filename)) return
   await downloadModToDir(file.url, file.filename, isRoot ? mainDir : modsDir, win, file.hashes?.sha512)
+  if (isRoot && rootType === 'mod') removeOtherVersions(dirname(modsDir), modsDir, file.filename)
   installed.push(file.filename)
 
   for (const dep of version.dependencies ?? []) {
@@ -99,6 +106,7 @@ async function walkCurseforge(
   if (!file?.downloadUrl) return
   if (!isRoot && alreadyInstalled(modsDir, file.fileName)) return
   await downloadModToDir(file.downloadUrl, file.fileName, isRoot ? mainDir : modsDir, win, undefined, cfSha1(file))
+  if (isRoot && rootType === 'mod') removeOtherVersions(dirname(modsDir), modsDir, file.fileName)
   installed.push(file.fileName)
 
   for (const dep of file.dependencies ?? []) {

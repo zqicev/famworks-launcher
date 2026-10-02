@@ -9,6 +9,7 @@ import { opSignal, isCancelled } from './abort'
 import { loaderInstalled } from './loaders'
 import { store } from './store'
 import { resolveFamworks, FwResolve } from './portalMods'
+import { otherVersions, fileKey } from './modFiles'
 
 interface ResolvedMod {
   url: string
@@ -176,6 +177,101 @@ export async function reinstallFamworks(modpack: Modpack, installPath: string, w
   emit(win, { phase: 'done', message: '' })
 }
 
+// ───────────────────────── Моды из манифеста сборки: прежние версии ─────────────────────────
+// Манифест задаёт мод именем файла. Сменилась версия → имя другое → старый файл надо убрать,
+// иначе в mods лежат две версии (Fabric молча берёт новейшую, Forge/NeoForge не запускается).
+
+function manifestTrackPath(gameRoot: string): string { return join(gameRoot, '.famworks-manifest.json') }
+/** Какой файл установщик поставил под каждый мод манифеста: mod.id → filename. */
+function readManifestTracking(gameRoot: string): Record<string, string> {
+  try { return JSON.parse(readFileSync(manifestTrackPath(gameRoot), 'utf8')).mods ?? {} } catch { return {} }
+}
+function writeManifestTracking(gameRoot: string, mods: Record<string, string>): void {
+  try { writeFileSync(manifestTrackPath(gameRoot), JSON.stringify({ mods }, null, 2)) } catch { /* не критично */ }
+}
+
+/** Файлы в mods, которыми управляет лаунчер (манифест сборки + моды FamWorks) - в нижнем регистре. */
+export function managedModFiles(gameRoot: string): Set<string> {
+  return new Set([
+    ...Object.values(readManifestTracking(gameRoot)),
+    ...Object.values(readFwTracking(gameRoot)).map(t => t.filename)
+  ].map(fileKey))
+}
+
+/** Файлы, принадлежащие позициям сборки - «прежней версией» другого мода их считать нельзя. */
+function claimedFiles(modpack: Modpack, gameRoot: string): Set<string> {
+  return new Set([
+    ...modpack.mods.map(m => m.filename),
+    ...Object.values(readFwTracking(gameRoot)).map(t => t.filename)
+  ].map(fileKey))
+}
+
+/**
+ * Оставшиеся в папке файлы прежней версии мода из манифеста.
+ * tracked - что установщик ставил под этот мод раньше; undefined - трекинга ещё нет (ставил старый лаунчер),
+ * тогда прежнюю версию узнаём по имени файла без версии.
+ * fresh - новая версия только что скачана (а не стояла раньше).
+ */
+function previousVersions(
+  mod: Mod, files: string[], tracked: string | undefined, claimed: Set<string>, fresh: boolean
+): string[] {
+  if (tracked !== undefined) {
+    if (fileKey(tracked) === fileKey(mod.filename) || claimed.has(fileKey(tracked))) return []
+    return files.filter(f => fileKey(f) === fileKey(tracked))
+  }
+  return otherVersions(files, mod.filename).filter(f =>
+    !claimed.has(fileKey(f))
+    // Выключенный файл рядом с уже стоящей версией не трогаем - его мог оставить игрок.
+    && (fresh || !/\.disabled$/i.test(f))
+  )
+}
+
+function listDir(dir: string): string[] {
+  try { return readdirSync(dir) } catch { return [] }
+}
+
+/** Есть ли в mods прежние версии модов сборки, которые уберёт «Обновить». */
+function hasStaleModVersions(modpack: Modpack, gameRoot: string): boolean {
+  const modsDir = join(gameRoot, 'mods')
+  const files = listDir(modsDir)
+  const present = new Set(files.map(fileKey))
+  const tracking = readManifestTracking(gameRoot)
+  const claimed = claimedFiles(modpack, gameRoot)
+  return modpack.mods.some(mod =>
+    !mod.famworks_id && present.has(fileKey(mod.filename))
+    && previousVersions(mod, files, tracking[mod.id], claimed, false).length > 0
+  )
+}
+
+/** Убирает прежние версии модов манифеста и запоминает, какой файл стоит под каждым модом. */
+function cleanupPreviousVersions(modpack: Modpack, gameRoot: string, downloaded: Set<Mod>): void {
+  const modsDir = join(gameRoot, 'mods')
+  const tracking = readManifestTracking(gameRoot)
+  const claimed = claimedFiles(modpack, gameRoot)
+  const next: Record<string, string> = {}
+  for (const mod of modpack.mods) {
+    if (mod.famworks_id) continue
+    const enabled = join(modsDir, mod.filename)
+    const disabled = enabled + '.disabled'
+    if (!existsSync(enabled) && !existsSync(disabled)) {
+      // Новая версия не скачалась (нет URL) - прежнюю не трогаем и помним её дальше.
+      if (tracking[mod.id]) next[mod.id] = tracking[mod.id]
+      continue
+    }
+    const fresh = downloaded.has(mod)
+    const old = previousVersions(mod, listDir(modsDir), tracking[mod.id], claimed, fresh)
+    // Прежняя версия была выключена - новую ставим тоже выключенной.
+    if (fresh && old.length && old.every(f => /\.disabled$/i.test(f))) {
+      try { renameSync(enabled, disabled) } catch { /* останется включённой */ }
+    }
+    for (const f of old) {
+      try { unlinkSync(join(modsDir, f)) } catch { /* файл занят игрой - уберём в следующий раз */ }
+    }
+    next[mod.id] = mod.filename
+  }
+  writeManifestTracking(gameRoot, next)
+}
+
 export async function checkAndInstallModpack(
   modpack: Modpack,
   installPath: string,
@@ -209,6 +305,7 @@ export async function checkAndInstallModpack(
   }
 
   let done = 0
+  const downloaded = new Set<Mod>()
   for (const mod of missing) {
     if (isCancelled()) throw new DOMException('Aborted', 'AbortError')
     const resolved = await resolveModUrl(mod, modpack.mc_version, modpack.loader)
@@ -228,8 +325,12 @@ export async function checkAndInstallModpack(
         speedBps: speed
       })
     }, resolved.sha512, resolved.sha1)
+    downloaded.add(mod)
     done++
   }
+
+  // Новые версии на месте - убираем прежние (и переносим на новую состояние «выключен»)
+  cleanupPreviousVersions(modpack, gameRoot, downloaded)
 
   // Ресурспаки и шейдеры (та же механика — папка + .disabled). famworks_id — отдельно.
   await installPacks((modpack.resourcepacks ?? []).filter(p => !p.famworks_id), join(gameRoot, 'resourcepacks'), 'Ресурспак', modpack, win)
@@ -363,6 +464,9 @@ export async function getModpackStatus(
       return 'outdated'
     }
   }
+
+  // Остались прежние версии модов сборки (две версии одного мода) - «Обновить» их уберёт
+  if (hasStaleModVersions(modpack, gameRoot)) return 'outdated'
 
   // Если какой-то конфиг сборки ещё не установлен — нужно обновление
   for (const cfg of modpack.configs ?? []) {
