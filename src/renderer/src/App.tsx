@@ -14,7 +14,14 @@ import CrashModal, { CrashData } from './components/CrashModal'
 import { ensureLogCapture } from './gameLog'
 import { uniqueId } from '../../shared/slug'
 import { applyAccent } from './lib/theme'
+import { Source } from './lib/browser'
 import styles from './styles/App.module.css'
+
+type BrowserDetail = { source: Source; id: string }
+
+const SIDEBAR_MIN = 200
+const SIDEBAR_MAX = 420
+const SIDEBAR_DEFAULT = 230
 
 export default function App() {
   const [modpackIndex, setModpackIndex] = useState<ModpackIndex | null>(null)
@@ -37,10 +44,30 @@ export default function App() {
   const [crash, setCrash] = useState<CrashData | null>(null)
   const [view, setView] = useState<'modpack' | 'browser'>('modpack')
   const [browserKey, setBrowserKey] = useState(0) // remount браузера при каждом открытии — свежее состояние/контекст
-  const [browserInit, setBrowserInit] = useState<{ type: string; packId: string | null }>({ type: 'modpack', packId: null })
+  const [browserInit, setBrowserInit] = useState<{ type: string; packId: string | null; detail: BrowserDetail | null }>({ type: 'modpack', packId: null, detail: null })
+  const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT)
 
-  const openBrowser = useCallback((type: string, packId: string | null) => {
-    setBrowserInit({ type, packId })
+  // Перетаскивание правого края сайдбара: ширина в пределах [MIN, MAX], запоминается в store.
+  const startSidebarResize = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+    const onMove = (ev: MouseEvent): void => {
+      setSidebarWidth(Math.min(SIDEBAR_MAX, Math.max(SIDEBAR_MIN, ev.clientX)))
+    }
+    const onUp = (): void => {
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+      setSidebarWidth(w => { window.api.store.set('sidebarWidth', w).catch(() => {}); return w })
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }, [])
+
+  const openBrowser = useCallback((type: string, packId: string | null, detail: BrowserDetail | null = null) => {
+    setBrowserInit({ type, packId, detail })
     setBrowserKey(k => k + 1)
     setView('browser')
   }, [])
@@ -92,6 +119,16 @@ export default function App() {
   // Диагностика краша игры
   useEffect(() => window.api.crash.onReport(d => setCrash(d as CrashData)), [])
 
+  // Клик по строке мода/пака/шейдера — открыть его страницу во встроенном браузере лаунчера.
+  useEffect(() => {
+    const handler = (e: Event): void => {
+      const d = (e as CustomEvent).detail as { source: Source; type: string; id: string }
+      if (d?.id) openBrowser(d.type, selectedId, { source: d.source, id: d.id })
+    }
+    window.addEventListener('fw:open-project', handler)
+    return () => window.removeEventListener('fw:open-project', handler)
+  }, [openBrowser, selectedId])
+
   // Импорт по ассоциации файла (двойной клик по .fwpack)
   useEffect(() => {
     return window.api.onModpackImported((res) => {
@@ -109,6 +146,9 @@ export default function App() {
     const init = async () => {
       const path = await window.api.store.get('installPath') as string
       window.api.store.get('devMode').then(v => setDevMode(!!v)).catch(() => {})
+      window.api.store.get('sidebarWidth').then(w => {
+        if (typeof w === 'number' && w >= SIDEBAR_MIN && w <= SIDEBAR_MAX) setSidebarWidth(w)
+      }).catch(() => {})
       window.api.store.get('accentColor').then(c => { if (typeof c === 'string' && c) applyAccent(c) }).catch(() => {})
       window.api.bg.get().then(setBgImage).catch(() => {})
       if (!path) { setNeedsSetup(true); setLoading(false); return }
@@ -214,6 +254,7 @@ export default function App() {
       ) : (
         <div className={styles.layout}>
           <Sidebar
+            width={sidebarWidth}
             index={modpackIndex}
             customPacks={customPacks}
             selectedId={view === 'browser' ? null : selectedId}
@@ -228,6 +269,7 @@ export default function App() {
             browserActive={view === 'browser'}
             onOpenBrowser={() => openBrowser('modpack', null)}
           />
+          <div className={styles.resizer} onMouseDown={startSidebarResize} title="Потяните, чтобы изменить ширину" />
           {view === 'browser' ? (() => {
             const allPacks = [...(modpackIndex?.modpacks ?? []), ...customPacks].map(p => ({ id: p.id, name: p.name, mc_version: p.mc_version, loader: p.loader }))
             const ctx = browserInit.packId ? allPacks.find(p => p.id === browserInit.packId) ?? null : null
@@ -238,6 +280,7 @@ export default function App() {
                 packs={allPacks}
                 contextPack={ctx}
                 initialType={browserInit.type as 'modpack' | 'mod' | 'resourcepack' | 'shader'}
+                initialDetail={browserInit.detail}
                 onImported={(mp) => { loadCustom(); setSelectedId(mp.id); setView('modpack') }}
                 showToast={showToast}
               />

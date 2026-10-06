@@ -151,8 +151,8 @@ export default function MainPanel({ modpack, installPath, loading, error, devMod
 
       <div className={styles.content} key={`${modpack.id}-${tab}`}>
         {tab === 'mods' && <ModsTab modpack={modpack} modsDir={modsDir} onCount={(total, active) => setCounts(c => ({ ...c, modsTotal: total, modsActive: active }))} />}
-        {tab === 'resourcepacks' && <PackTab dir={rpDir} items={modpack.resourcepacks ?? []} noun="ресурспаков" onCount={n => setCounts(c => ({ ...c, rp: n }))} />}
-        {tab === 'shaders' && <PackTab dir={shDir} items={modpack.shaders ?? []} noun="шейдеров" onCount={n => setCounts(c => ({ ...c, sh: n }))} />}
+        {tab === 'resourcepacks' && <PackTab dir={rpDir} items={modpack.resourcepacks ?? []} noun="ресурспаков" type="resourcepack" onCount={n => setCounts(c => ({ ...c, rp: n }))} />}
+        {tab === 'shaders' && <PackTab dir={shDir} items={modpack.shaders ?? []} noun="шейдеров" type="shader" onCount={n => setCounts(c => ({ ...c, sh: n }))} />}
         {tab === 'overview' && <OverviewTab modpack={modpack} packBytes={packBytes} busyId={busyId} onModpackReload={onModpackReload} />}
         {tab === 'logs' && <LogsTab modpackId={modpack.id} />}
         {tab === 'dev' && devMode && <DevTab modpackId={modpack.id} loader={modpack.loader} mcVersion={modpack.mc_version} />}

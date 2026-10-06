@@ -2,6 +2,8 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { Modpack, Mod } from '../../../types/modpack'
 import ModRow from './ModRow'
 import { useContentIcons } from '../lib/useContentIcons'
+import { useContentMeta } from '../lib/useContentMeta'
+import { useModrinthAuthors } from '../lib/useModrinthAuthors'
 import styles from '../styles/ModsTab.module.css'
 
 interface Props {
@@ -128,6 +130,8 @@ export default function ModsTab({ modpack, modsDir, onCount }: Props) {
   )
   const enabledCount = allMods.filter(m => !disabled.has(m.id)).length
   const iconFor = useContentIcons(modsDir, allMods, presentBases ?? new Set())
+  const metaFor = useContentMeta(modsDir, [...(presentBases ?? new Set<string>())])
+  const authorFor = useModrinthAuthors(allMods.map(m => m.modrinth_id))
 
   // Отдаём родителю фактическое число модов и сколько из них включено
   useEffect(() => {
@@ -190,19 +194,29 @@ export default function ModsTab({ modpack, modsDir, onCount }: Props) {
       </div>
 
       <div className={`${styles.list} ${staggerOn ? 'fw-stagger' : ''}`}>
-        {filtered.map(mod => (
-          <ModRow
-            key={mod.id}
-            mod={mod}
-            icon={iconFor(mod)}
-            enabled={!disabled.has(mod.id)}
-            notInstalled={mod._notInstalled}
-            channel={fwTesting && mod.famworks_id ? ((fwChannels[mod.famworks_id] as 'test' | 'release') ?? 'release') : undefined}
-            onChannel={fwTesting && mod.famworks_id ? handleChannel : undefined}
-            onToggle={handleToggle}
-            onDelete={handleDelete}
-          />
-        ))}
+        {filtered.map(mod => {
+          const file = realFile(mod, fwInstalled)
+          const meta = metaFor(file)
+          const mAuthor = mod.modrinth_id ? authorFor(mod.modrinth_id) : undefined
+          return (
+            <ModRow
+              key={mod.id}
+              mod={mod}
+              type="mod"
+              icon={iconFor(mod)}
+              author={mAuthor?.author ?? meta?.author ?? null}
+              authorAvatar={mAuthor?.avatar ?? null}
+              version={meta?.version ?? null}
+              filename={file}
+              enabled={!disabled.has(mod.id)}
+              notInstalled={mod._notInstalled}
+              channel={fwTesting && mod.famworks_id ? ((fwChannels[mod.famworks_id] as 'test' | 'release') ?? 'release') : undefined}
+              onChannel={fwTesting && mod.famworks_id ? handleChannel : undefined}
+              onToggle={handleToggle}
+              onDelete={handleDelete}
+            />
+          )
+        })}
       </div>
     </div>
   )

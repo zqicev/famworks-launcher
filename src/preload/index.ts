@@ -30,6 +30,7 @@ contextBridge.exposeInMainWorld('api', {
   mods: {
     installed: (modsDir: string) => ipcRenderer.invoke('mods:installed', modsDir),
     localIcons: (dir: string, filenames: string[]) => ipcRenderer.invoke('mods:local-icons', dir, filenames),
+    localMeta: (dir: string, filenames: string[]) => ipcRenderer.invoke('mods:local-meta', dir, filenames),
     toggle: (modsDir: string, filename: string, enabled: boolean) =>
       ipcRenderer.invoke('mods:toggle', modsDir, filename, enabled),
     delete: (modsDir: string, filename: string) => ipcRenderer.invoke('mods:delete', modsDir, filename),
@@ -44,7 +45,8 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.invoke('modrinth:versions', projectId, mcVersion, loader, type),
     download: (url: string, filename: string, modsDir: string, sha512?: string) =>
       ipcRenderer.invoke('modrinth:download', url, filename, modsDir, sha512),
-    icons: (ids: string[]) => ipcRenderer.invoke('modrinth:icons', ids)
+    icons: (ids: string[]) => ipcRenderer.invoke('modrinth:icons', ids),
+    authors: (ids: string[]) => ipcRenderer.invoke('modrinth:authors', ids)
   },
   curseforge: {
     search: (query: string, mcVersion: string, loader: string, type?: string) =>

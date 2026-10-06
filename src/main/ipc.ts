@@ -7,7 +7,7 @@ import { checkAndInstallModpack, getModpackStatus, toggleMod, deleteMod, getInst
 import { launchGame, offlineAuthorization, abortLaunch, QuickPlay } from './launcher'
 import { killInstance, listInstances, onInstancesChange, reattachInstances } from './instances'
 import { setupLoader, latestLoaderVersion, LoaderId } from './loaders'
-import { searchModrinth, getModVersions, getModrinthIcons } from './modrinth'
+import { searchModrinth, getModVersions, getModrinthIcons, getModrinthAuthors } from './modrinth'
 import { microsoftLogin, microsoftRefresh } from './msAuth'
 import { Account } from './store'
 import { beginOperation, endOperation, cancelCurrent, isCancelError } from './abort'
@@ -165,6 +165,10 @@ export function setupIpcHandlers() {
     const { getLocalIcons } = await import('./localicons')
     return getLocalIcons(dir, filenames)
   })
+  ipcMain.handle('mods:local-meta', async (_, dir: string, filenames: string[]) => {
+    const { getLocalMeta } = await import('./localicons')
+    return getLocalMeta(dir, filenames)
+  })
   ipcMain.handle('mods:toggle', (_, modsDir: string, filename: string, enabled: boolean) =>
     toggleMod(modsDir, filename, enabled))
   ipcMain.handle('mods:delete', (_, modsDir: string, filename: string) =>
@@ -180,6 +184,7 @@ export function setupIpcHandlers() {
   ipcMain.handle('modrinth:versions', (_, projectId: string, mcVersion: string, loader: string, type?: string) =>
     getModVersions(projectId, mcVersion, loader, type))
   ipcMain.handle('modrinth:icons', (_, ids: string[]) => getModrinthIcons(ids))
+  ipcMain.handle('modrinth:authors', (_, ids: string[]) => getModrinthAuthors(ids))
   ipcMain.handle('modrinth:download', async (_, url: string, filename: string, modsDir: string, sha512?: string) => {
     await downloadModToDir(url, filename, modsDir, getWindow(), sha512)
     return filename

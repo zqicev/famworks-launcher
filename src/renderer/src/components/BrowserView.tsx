@@ -11,6 +11,7 @@ interface Props {
   packs: TargetPack[]
   contextPack: TargetPack | null // если браузер открыт из сборки — фильтруем по её версии/загрузчику
   initialType: ContentType
+  initialDetail?: { source: Source; id: string } | null // открыть сразу на странице проекта
   onImported: (mp: Modpack) => void
   showToast: (text: string, kind: 'info' | 'success' | 'error') => void
 }
@@ -43,15 +44,15 @@ function Icon({ src, title }: { src: string | null; title: string }) {
   return <img src={src} alt="" onError={() => setBroken(true)} />
 }
 
-export default function BrowserView({ installPath, packs, contextPack, initialType, onImported, showToast }: Props) {
-  const [source, setSource] = useState<Source>('modrinth')
+export default function BrowserView({ installPath, packs, contextPack, initialType, initialDetail, onImported, showToast }: Props) {
+  const [source, setSource] = useState<Source>(initialDetail?.source ?? 'modrinth')
   const [type, setType] = useState<ContentType>(initialType)
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<Hit[]>([])
   const [loading, setLoading] = useState(false)
   const [notice, setNotice] = useState('')
   const [busyId, setBusyId] = useState<string | null>(null)
-  const [detailId, setDetailId] = useState<string | null>(null)
+  const [detailId, setDetailId] = useState<string | null>(initialDetail?.id ?? null)
   const [installItem, setInstallItem] = useState<{ id: string; title: string } | null>(null)
   const [fwCatalog, setFwCatalog] = useState(false) // показывать источник FamWorks (право «Каталог»)
   const [fwPick, setFwPick] = useState<Hit | null>(null) // выбор локальной сборки для установки из FamWorks

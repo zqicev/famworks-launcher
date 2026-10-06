@@ -11,6 +11,22 @@
   overflow: hidden;
 }
 
+/* Перетаскиваемая граница сайдбара. Узкая полоса поверх правого края,
+   с увеличенной зоной захвата (margin отрицательный). */
+.resizer {
+  width: 5px;
+  margin: 0 -2px;
+  flex-shrink: 0;
+  cursor: col-resize;
+  background: transparent;
+  z-index: 5;
+  transition: background 0.15s;
+}
+.resizer:hover,
+.resizer:active {
+  background: rgb(from var(--accent) r g b / 0.5);
+}
+
 /* Пользовательский фон: приглушённая, размытая картинка позади всего интерфейса.
    scale скрывает прозрачные края, которые даёт blur. Затемнение довершает
    полупрозрачный базовый фон (--bg под body.has-bg). */

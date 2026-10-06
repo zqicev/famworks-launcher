@@ -20,6 +20,7 @@ interface Window {
     mods: {
       installed: (modsDir: string) => Promise<string[]>
       localIcons: (dir: string, filenames: string[]) => Promise<Record<string, string | null>>
+      localMeta: (dir: string, filenames: string[]) => Promise<Record<string, { author: string | null; version: string | null }>>
       toggle: (modsDir: string, filename: string, enabled: boolean) => Promise<void>
       delete: (modsDir: string, filename: string) => Promise<void>
       addFile: (exts?: string[]) => Promise<string | null>
@@ -31,6 +32,7 @@ interface Window {
       versions: (projectId: string, mcVersion: string, loader: string, type?: string) => Promise<unknown[]>
       download: (url: string, filename: string, modsDir: string, sha512?: string) => Promise<string>
       icons: (ids: string[]) => Promise<Record<string, string | null>>
+      authors: (ids: string[]) => Promise<Record<string, { author: string | null; avatar: string | null }>>
     }
     curseforge: {
       search: (query: string, mcVersion: string, loader: string, type?: string) => Promise<unknown[]>

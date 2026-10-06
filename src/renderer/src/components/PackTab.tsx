@@ -2,16 +2,19 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Mod } from '../../../types/modpack'
 import ModRow from './ModRow'
 import { useContentIcons } from '../lib/useContentIcons'
+import { useContentMeta } from '../lib/useContentMeta'
+import { useModrinthAuthors } from '../lib/useModrinthAuthors'
 import styles from '../styles/ModsTab.module.css'
 
 interface Props {
   dir: string                       // папка resourcepacks/ или shaderpacks/
   items: Mod[]                      // modpack.resourcepacks / modpack.shaders
   noun: string                      // "ресурспаков" / "шейдеров"
+  type: 'resourcepack' | 'shader'   // для ссылки на страницу проекта
   onCount?: (n: number) => void
 }
 
-export default function PackTab({ dir, items, noun, onCount }: Props) {
+export default function PackTab({ dir, items, noun, type, onCount }: Props) {
   const [search, setSearch] = useState('')
   const [present, setPresent] = useState<Set<string>>(new Set())
   const [sizes, setSizes] = useState<Record<string, number>>({})
@@ -69,6 +72,8 @@ export default function PackTab({ dir, items, noun, onCount }: Props) {
   const filtered = all.filter(m => m.name.toLowerCase().includes(search.toLowerCase()))
   const enabledCount = all.filter(p => !disabled.has(p.filename)).length
   const iconFor = useContentIcons(dir, all, present)
+  const metaFor = useContentMeta(dir, [...present])
+  const authorFor = useModrinthAuthors(all.map(p => p.modrinth_id))
 
   useEffect(() => { onCount?.(all.length) }, [all.length])
 
@@ -111,9 +116,24 @@ export default function PackTab({ dir, items, noun, onCount }: Props) {
       </div>
       <div className={`${styles.list} ${staggerOn ? 'fw-stagger' : ''}`}>
         {all.length === 0 && <div style={{ padding: 18, textAlign: 'center', color: 'var(--text-dim)', fontSize: 13 }}>Пусто</div>}
-        {filtered.map(p => (
-          <ModRow key={p.id} mod={p} icon={iconFor(p)} enabled={!disabled.has(p.filename)} onToggle={handleToggle} onDelete={handleDelete} />
-        ))}
+        {filtered.map(p => {
+          const meta = metaFor(p.filename)
+          const mAuthor = p.modrinth_id ? authorFor(p.modrinth_id) : undefined
+          return (
+            <ModRow
+              key={p.id}
+              mod={p}
+              type={type}
+              icon={iconFor(p)}
+              author={mAuthor?.author ?? meta?.author ?? null}
+              authorAvatar={mAuthor?.avatar ?? null}
+              version={meta?.version ?? null}
+              enabled={!disabled.has(p.filename)}
+              onToggle={handleToggle}
+              onDelete={handleDelete}
+            />
+          )
+        })}
       </div>
     </div>
   )

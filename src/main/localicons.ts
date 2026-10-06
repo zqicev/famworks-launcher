@@ -158,3 +158,79 @@ export async function getLocalIcons(dir: string, filenames: string[]): Promise<R
   const icons = await mapLimit(names, CONCURRENCY, n => iconFor(dir, n))
   return Object.fromEntries(names.map((n, i) => [n, icons[i]]))
 }
+
+// ——— Метаданные из архива: автор и версия (для строк модов/паков/шейдеров) ———
+
+export interface LocalMeta { author: string | null; version: string | null }
+
+// Кэш по сигнатуре файла (путь|размер|mtime): переключение вкладок не перечитывает архивы.
+const metaCache = new Map<string, LocalMeta>()
+
+/** `${file.jarVersion}` и прочие плейсхолдеры — не настоящая версия. */
+const realVersion = (v: unknown): string | null =>
+  typeof v === 'string' && v.trim() && !v.includes('${') ? v.trim() : null
+
+/** authors: ["A", {name:"B"}] | "A, B" -> "A, B". */
+function parseAuthors(a: unknown): string | null {
+  if (typeof a === 'string') return a.trim() || null
+  if (Array.isArray(a)) {
+    const names = a.map(x => (typeof x === 'string' ? x : (x as { name?: string })?.name)).filter(Boolean) as string[]
+    if (names.length) return names.join(', ')
+  }
+  return null
+}
+
+async function metaFromZip(zip: Zip): Promise<LocalMeta> {
+  // Fabric
+  const fabric = await zip.read('fabric.mod.json')
+  if (fabric) {
+    try {
+      const j = JSON.parse(fabric.toString('utf8'))
+      return { author: parseAuthors(j.authors), version: realVersion(j.version) }
+    } catch { /* битый json */ }
+  }
+  // Quilt
+  const quilt = await zip.read('quilt.mod.json')
+  if (quilt) {
+    try {
+      const q = JSON.parse(quilt.toString('utf8'))?.quilt_loader
+      const contrib = q?.metadata?.contributors
+      const author = contrib && typeof contrib === 'object' ? (Object.keys(contrib).join(', ') || null) : parseAuthors(q?.metadata?.authors)
+      return { author, version: realVersion(q?.version) }
+    } catch { /* битый json */ }
+  }
+  // Forge / NeoForge: mods.toml
+  const toml = (await zip.read('META-INF/mods.toml')) ?? (await zip.read('META-INF/neoforge.mods.toml'))
+  if (toml) {
+    const s = toml.toString('utf8')
+    const author = /authors\s*=\s*["']([^"']+)["']/.exec(s)?.[1]?.trim() || null
+    return { author, version: realVersion(/version\s*=\s*["']([^"']+)["']/.exec(s)?.[1]) }
+  }
+  return { author: null, version: null }
+}
+
+async function metaForFile(dir: string, name: string): Promise<LocalMeta> {
+  try {
+    const st = await statAny(join(dir, name))
+    if (!st) return { author: null, version: null }
+    const key = `${st.real}|${st.size}|${st.mtimeMs}`
+    const cached = metaCache.get(key)
+    if (cached) return cached
+    let meta: LocalMeta = { author: null, version: null }
+    const zip = await openZip(st.real)
+    if (zip) {
+      try { meta = await metaFromZip(zip) } finally { zip.close() }
+    }
+    metaCache.set(key, meta)
+    return meta
+  } catch {
+    return { author: null, version: null }
+  }
+}
+
+/** filename -> {author, version} для архивов в папке dir. */
+export async function getLocalMeta(dir: string, filenames: string[]): Promise<Record<string, LocalMeta>> {
+  const names = [...new Set(filenames.filter(Boolean))]
+  const metas = await mapLimit(names, CONCURRENCY, n => metaForFile(dir, n))
+  return Object.fromEntries(names.map((n, i) => [n, metas[i]]))
+}

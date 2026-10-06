@@ -68,6 +68,41 @@ export async function getModrinthMembers(id: string): Promise<string[]> {
   return (res.data as { user?: { username?: string } }[]).map(m => m.user?.username).filter((n): n is string => !!n)
 }
 
+// Автор (владелец проекта) + его аватар для строк модов. Кэш по id на время сессии.
+export interface ModrinthAuthor { author: string | null; avatar: string | null }
+const authorCache = new Map<string, ModrinthAuthor>()
+
+async function fetchAuthor(id: string): Promise<ModrinthAuthor> {
+  const cached = authorCache.get(id)
+  if (cached) return cached
+  let result: ModrinthAuthor = { author: null, avatar: null }
+  try {
+    const res = await axios.get(`${BASE}/project/${id}/members`, { headers: HEADERS })
+    const members = (res.data ?? []) as { role?: string; user?: { username?: string; name?: string; avatar_url?: string } }[]
+    const owner = members.find(m => m.role === 'Owner') ?? members[0]
+    if (owner?.user) {
+      result = { author: owner.user.name || owner.user.username || null, avatar: owner.user.avatar_url ?? null }
+    }
+  } catch { /* нет сети/проекта - вернётся пусто */ }
+  authorCache.set(id, result)
+  return result
+}
+
+/** id -> {author, avatar} владельца проекта Modrinth. Ограниченный параллелизм. */
+export async function getModrinthAuthors(ids: string[]): Promise<Record<string, ModrinthAuthor>> {
+  const uniq = [...new Set(ids.filter(Boolean))]
+  const out: Record<string, ModrinthAuthor> = {}
+  let next = 0
+  const worker = async (): Promise<void> => {
+    while (next < uniq.length) {
+      const id = uniq[next++]
+      out[id] = await fetchAuthor(id)
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(6, uniq.length) }, worker))
+  return out
+}
+
 /** Обязательные зависимости проекта — то, БЕЗ чего он не работает («от кого он зависит»).
  *  Берём required-зависимости самой свежей версии и подтягиваем к ним названия/иконки. */
 export async function getModrinthDependencies(id: string): Promise<{ name: string; icon: string | null; slug: string }[]> {

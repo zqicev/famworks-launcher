@@ -4,6 +4,7 @@ import AccountPanel from './AccountPanel'
 import styles from '../styles/Sidebar.module.css'
 
 interface Props {
+  width?: number
   index: ModpackIndex | null
   customPacks: Modpack[]
   selectedId: string | null
@@ -47,7 +48,7 @@ const DropdownIcon = () => (
   </svg>
 )
 
-export default function Sidebar({ index, customPacks, selectedId, seenUpdates, onSelect, onSettings, onRefresh, onCreate, onDeleteCustom, onImport, onExport, browserActive, onOpenBrowser }: Props) {
+export default function Sidebar({ width, index, customPacks, selectedId, seenUpdates, onSelect, onSettings, onRefresh, onCreate, onDeleteCustom, onImport, onExport, browserActive, onOpenBrowser }: Props) {
   const [version, setVersion] = useState('')
   const [icons, setIcons] = useState<Record<string, string>>({})
   useEffect(() => { window.api.appVersion().then(setVersion).catch(() => {}) }, [])
@@ -72,7 +73,7 @@ export default function Sidebar({ index, customPacks, selectedId, seenUpdates, o
     )
 
   return (
-    <aside className={styles.sidebar}>
+    <aside className={styles.sidebar} style={width ? { width } : undefined}>
       <div className={styles.logoRow}>
         <div className={styles.logo}>
           <span className={styles.logoF}>FAM</span>
