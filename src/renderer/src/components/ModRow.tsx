@@ -38,7 +38,7 @@ function ModRow({ mod, type, icon, author, authorAvatar, version, filename, enab
   const url = projectUrl(mod, type)
   const projectId = mod.modrinth_id ?? (mod.curseforge_id != null ? String(mod.curseforge_id) : '')
   const file = filename ?? mod.filename
-  const ver = (mod.version || version || '').trim()
+  const ver = (version ?? '').trim()
   const displayAuthor = author || (src === 'local' ? 'Локальный' : src === 'famworks' ? 'FamWorks' : '')
 
   // Открываем страницу проекта во встроенном браузере лаунчера (не во внешнем).

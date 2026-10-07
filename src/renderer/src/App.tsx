@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { ModpackIndex, Modpack } from '../../types/modpack'
 import Sidebar from './components/Sidebar'
-import MainPanel from './components/MainPanel'
+import MainPanel, { MainTab } from './components/MainPanel'
 import BrowserView from './components/BrowserView'
 import TitleBar from './components/TitleBar'
 import SetupModal from './components/SetupModal'
@@ -45,6 +45,7 @@ export default function App() {
   const [view, setView] = useState<'modpack' | 'browser'>('modpack')
   const [browserKey, setBrowserKey] = useState(0) // remount браузера при каждом открытии — свежее состояние/контекст
   const [browserInit, setBrowserInit] = useState<{ type: string; packId: string | null; detail: BrowserDetail | null }>({ type: 'modpack', packId: null, detail: null })
+  const [mainTab, setMainTab] = useState<MainTab>('overview')
   const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT)
 
   // Перетаскивание правого края сайдбара: ширина в пределах [MIN, MAX], запоминается в store.
@@ -121,9 +122,12 @@ export default function App() {
 
   // Клик по строке мода/пака/шейдера — открыть его страницу во встроенном браузере лаунчера.
   useEffect(() => {
+    const tabFor: Record<string, MainTab> = { mod: 'mods', resourcepack: 'resourcepacks', shader: 'shaders' }
     const handler = (e: Event): void => {
       const d = (e as CustomEvent).detail as { source: Source; type: string; id: string }
-      if (d?.id) openBrowser(d.type, selectedId, { source: d.source, id: d.id })
+      if (!d?.id) return
+      if (tabFor[d.type]) setMainTab(tabFor[d.type]) // чтобы «назад» вернуло на ту же вкладку
+      openBrowser(d.type, selectedId, { source: d.source, id: d.id })
     }
     window.addEventListener('fw:open-project', handler)
     return () => window.removeEventListener('fw:open-project', handler)
@@ -281,6 +285,7 @@ export default function App() {
                 contextPack={ctx}
                 initialType={browserInit.type as 'modpack' | 'mod' | 'resourcepack' | 'shader'}
                 initialDetail={browserInit.detail}
+                onBackToCaller={browserInit.detail ? () => setView('modpack') : undefined}
                 onImported={(mp) => { loadCustom(); setSelectedId(mp.id); setView('modpack') }}
                 showToast={showToast}
               />
@@ -293,6 +298,8 @@ export default function App() {
               error={error}
               devMode={devMode}
               selectedId={selectedId}
+              tab={mainTab}
+              setTab={setMainTab}
               onOpenBrowser={(type) => openBrowser(type, selectedId)}
               onModpackReload={() => { if (selectedId) window.api.modpacks.get(selectedId).then(setModpack).catch(() => {}) }}
             />

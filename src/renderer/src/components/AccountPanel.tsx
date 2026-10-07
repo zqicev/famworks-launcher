@@ -279,8 +279,8 @@ export default function AccountPanel() {
                           <button
                             className={`${styles.cSkin} ${acc.customSkins ? styles.cSkinOn : ''}`}
                             onClick={e => toggleSkins(acc.id, e)}
-                            title={acc.customSkins ? 'Скины по нику: вкл' : 'Скины по нику: выкл'}
-                          >СКИНЫ</button>
+                            title={acc.customSkins ? 'Скины по нику включены - нажмите, чтобы выключить' : 'Скины по нику выключены - нажмите, чтобы включить'}
+                          ><span className={styles.cSkinDot} />СКИНЫ</button>
                         )}
                         {acc.id === activeId && <span className={styles.cCheck}>✓</span>}
                         <button className={styles.cDel} onClick={e => deleteAccount(acc.id, e)} title="Удалить">✕</button>

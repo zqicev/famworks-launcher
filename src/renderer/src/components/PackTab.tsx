@@ -4,7 +4,10 @@ import ModRow from './ModRow'
 import { useContentIcons } from '../lib/useContentIcons'
 import { useContentMeta } from '../lib/useContentMeta'
 import { useModrinthAuthors } from '../lib/useModrinthAuthors'
+import { useLocalSources } from '../lib/useLocalSources'
 import styles from '../styles/ModsTab.module.css'
+
+const isUnsourced = (m: Mod): boolean => !m.modrinth_id && !m.curseforge_id && !m.famworks_id
 
 interface Props {
   dir: string                       // папка resourcepacks/ или shaderpacks/
@@ -73,7 +76,9 @@ export default function PackTab({ dir, items, noun, type, onCount }: Props) {
   const enabledCount = all.filter(p => !disabled.has(p.filename)).length
   const iconFor = useContentIcons(dir, all, present)
   const metaFor = useContentMeta(dir, [...present])
-  const authorFor = useModrinthAuthors(all.map(p => p.modrinth_id))
+  const unsourcedFiles = all.filter(p => isUnsourced(p) && present.has(p.filename)).map(p => p.filename)
+  const sourceFor = useLocalSources(dir, unsourcedFiles)
+  const authorFor = useModrinthAuthors(all.map(p => p.modrinth_id ?? (isUnsourced(p) ? (sourceFor(p.filename) ?? undefined) : undefined)))
 
   useEffect(() => { onCount?.(all.length) }, [all.length])
 
@@ -118,16 +123,18 @@ export default function PackTab({ dir, items, noun, type, onCount }: Props) {
         {all.length === 0 && <div style={{ padding: 18, textAlign: 'center', color: 'var(--text-dim)', fontSize: 13 }}>Пусто</div>}
         {filtered.map(p => {
           const meta = metaFor(p.filename)
-          const mAuthor = p.modrinth_id ? authorFor(p.modrinth_id) : undefined
+          const rid = p.modrinth_id ?? (isUnsourced(p) ? (sourceFor(p.filename) ?? undefined) : undefined)
+          const effMod = rid && rid !== p.modrinth_id ? { ...p, modrinth_id: rid } : p
+          const mAuthor = rid ? authorFor(rid) : undefined
           return (
             <ModRow
               key={p.id}
-              mod={p}
+              mod={effMod}
               type={type}
               icon={iconFor(p)}
               author={mAuthor?.author ?? meta?.author ?? null}
               authorAvatar={mAuthor?.avatar ?? null}
-              version={meta?.version ?? null}
+              version={(p.version || meta?.version) || null}
               enabled={!disabled.has(p.filename)}
               onToggle={handleToggle}
               onDelete={handleDelete}

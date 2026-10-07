@@ -4,7 +4,11 @@ import ModRow from './ModRow'
 import { useContentIcons } from '../lib/useContentIcons'
 import { useContentMeta } from '../lib/useContentMeta'
 import { useModrinthAuthors } from '../lib/useModrinthAuthors'
+import { useLocalSources } from '../lib/useLocalSources'
 import styles from '../styles/ModsTab.module.css'
+
+// Нет известного источника — кандидат на определение по хэшу файла (локальные сборки).
+const isUnsourced = (m: Mod): boolean => !m.modrinth_id && !m.curseforge_id && !m.famworks_id
 
 interface Props {
   modpack: Modpack
@@ -131,7 +135,14 @@ export default function ModsTab({ modpack, modsDir, onCount }: Props) {
   const enabledCount = allMods.filter(m => !disabled.has(m.id)).length
   const iconFor = useContentIcons(modsDir, allMods, presentBases ?? new Set())
   const metaFor = useContentMeta(modsDir, [...(presentBases ?? new Set<string>())])
-  const authorFor = useModrinthAuthors(allMods.map(m => m.modrinth_id))
+  // Локальные (без источника) моды, реально лежащие на диске — определим их проект Modrinth по хэшу.
+  const unsourcedFiles = allMods
+    .filter(m => isUnsourced(m) && (presentBases?.has(realFile(m, fwInstalled)) ?? false))
+    .map(m => realFile(m, fwInstalled))
+  const sourceFor = useLocalSources(modsDir, unsourcedFiles)
+  const resolvedId = (mod: Mod): string | undefined =>
+    (isUnsourced(mod) ? (sourceFor(realFile(mod, fwInstalled)) ?? undefined) : undefined)
+  const authorFor = useModrinthAuthors(allMods.map(m => m.modrinth_id ?? resolvedId(m)))
 
   // Отдаём родителю фактическое число модов и сколько из них включено
   useEffect(() => {
@@ -197,16 +208,19 @@ export default function ModsTab({ modpack, modsDir, onCount }: Props) {
         {filtered.map(mod => {
           const file = realFile(mod, fwInstalled)
           const meta = metaFor(file)
-          const mAuthor = mod.modrinth_id ? authorFor(mod.modrinth_id) : undefined
+          // У локальных модов подставляем определённый по хэшу modrinth_id — тогда строка кликабельна.
+          const rid = mod.modrinth_id ?? resolvedId(mod)
+          const effMod = rid && rid !== mod.modrinth_id ? { ...mod, modrinth_id: rid } : mod
+          const mAuthor = rid ? authorFor(rid) : undefined
           return (
             <ModRow
               key={mod.id}
-              mod={mod}
+              mod={effMod}
               type="mod"
               icon={iconFor(mod)}
               author={mAuthor?.author ?? meta?.author ?? null}
               authorAvatar={mAuthor?.avatar ?? null}
-              version={meta?.version ?? null}
+              version={(mod.famworks_id ? (meta?.version || mod.version) : (mod.version || meta?.version)) || null}
               filename={file}
               enabled={!disabled.has(mod.id)}
               notInstalled={mod._notInstalled}

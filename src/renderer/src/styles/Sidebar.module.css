@@ -85,6 +85,7 @@
   letter-spacing: 1px;
   color: var(--text-dim);
   text-transform: uppercase;
+  cursor: pointer;
   transition: .2s;
 }
 .sectionHeaderDropdown:hover {
@@ -134,6 +135,26 @@
 
 .item:hover { background: var(--bg-hover); }
 .active { background: var(--bg-active) !important; }
+
+.avatarWrap {
+  position: relative;
+  flex-shrink: 0;
+  cursor: pointer;
+  border-radius: 8px;
+}
+.avatarEdit {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  color: #fff;
+  background: rgba(0, 0, 0, 0.55);
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.avatarWrap:hover .avatarEdit { opacity: 1; }
 
 .avatarImg {
   width: 100%;
@@ -272,7 +293,7 @@
 
 .itemActions {
   display: flex; align-items: center; gap: 2px; flex-shrink: 0;
-  opacity: 0; transition: opacity 0.15s;
+  opacity: 0.4; transition: opacity 0.15s;
 }
 .item:hover .itemActions { opacity: 1; }
 .actBtn {

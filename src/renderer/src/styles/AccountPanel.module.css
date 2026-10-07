@@ -192,6 +192,9 @@
 .cBadgeAccent { color: var(--accent); }
 
 .cSkin {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
   font-size: 8px;
   font-weight: 700;
   letter-spacing: 0.5px;
@@ -204,12 +207,22 @@
   flex-shrink: 0;
 }
 .cSkin:hover { color: var(--text); border-color: #555; }
+.cSkinDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-dim);
+  transition: background 0.15s;
+}
+.cSkin:hover .cSkinDot { background: var(--text-secondary); }
 .cSkinOn {
   color: #0a0a0a;
   background: var(--accent);
   border-color: var(--accent);
 }
 .cSkinOn:hover { color: #0a0a0a; }
+.cSkinOn .cSkinDot,
+.cSkinOn:hover .cSkinDot { background: #0a0a0a; }
 
 .cCheck {
   color: var(--accent);

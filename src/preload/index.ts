@@ -31,6 +31,7 @@ contextBridge.exposeInMainWorld('api', {
     installed: (modsDir: string) => ipcRenderer.invoke('mods:installed', modsDir),
     localIcons: (dir: string, filenames: string[]) => ipcRenderer.invoke('mods:local-icons', dir, filenames),
     localMeta: (dir: string, filenames: string[]) => ipcRenderer.invoke('mods:local-meta', dir, filenames),
+    resolveSources: (dir: string, filenames: string[]) => ipcRenderer.invoke('mods:resolve-sources', dir, filenames),
     toggle: (modsDir: string, filename: string, enabled: boolean) =>
       ipcRenderer.invoke('mods:toggle', modsDir, filename, enabled),
     delete: (modsDir: string, filename: string) => ipcRenderer.invoke('mods:delete', modsDir, filename),

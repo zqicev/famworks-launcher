@@ -98,7 +98,13 @@ export default function OverviewTab({ modpack, packBytes, busyId, onModpackReloa
                 const img = e.kind === 'server' ? (st?.data?.favicon || e.icon) : e.icon
                 const version = e.kind === 'world' ? e.version : st?.data?.version
                 return (
-                  <div key={e.kind === 'world' ? 'w:' + e.folder : 's:' + e.ip} className={styles.recentCard}>
+                  <div
+                    key={e.kind === 'world' ? 'w:' + e.folder : 's:' + e.ip}
+                    className={`${styles.recentCard} ${locked ? styles.recentLocked : ''}`}
+                    onClick={() => !locked && play(e)}
+                    role="button"
+                    title={locked ? 'Дождитесь завершения' : e.kind === 'world' ? 'Запустить мир' : 'Подключиться к серверу'}
+                  >
                     <div className={styles.recentIcon}>
                       {img
                         ? <img src={img} alt="" className={styles.iconImg} />
@@ -115,7 +121,7 @@ export default function OverviewTab({ modpack, packBytes, busyId, onModpackReloa
                           : <ServerStatus state={st} />}
                       </div>
                     </div>
-                    <button className={styles.recentPlay} onClick={() => play(e)} disabled={locked} title="Играть">▶</button>
+                    <span className={styles.recentPlay} aria-hidden="true">▶</span>
                   </div>
                 )
               })}
@@ -146,7 +152,7 @@ export default function OverviewTab({ modpack, packBytes, busyId, onModpackReloa
           <div className={styles.animGroup}>
             <button className={styles.animMain} onClick={() => setSceneOpen(true)} title="Загрузить свою модель и анимацию (.gltf)">
               <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <polygon points="5 3 19 12 5 21 5 3" />
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" />
               </svg>
               Сменить анимацию
             </button>

@@ -69,9 +69,12 @@
 .recentCard {
   display: flex; align-items: center; gap: 12px; padding: 10px 12px;
   background: var(--bg-surface); border: 1px solid var(--border); border-radius: 12px;
+  cursor: pointer;
   transition: border-color 0.15s, background 0.15s;
 }
-.recentCard:hover { border-color: #3a3a3a; background: var(--bg-hover); }
+.recentCard:hover { border-color: rgb(from var(--accent) r g b / 0.5); background: var(--bg-hover); }
+.recentLocked { cursor: default; opacity: 0.6; }
+.recentLocked:hover { border-color: var(--border); background: var(--bg-surface); }
 .recentIcon {
   width: 46px; height: 46px; border-radius: 10px; background: var(--bg-active);
   display: flex; align-items: center; justify-content: center; font-size: 20px;
@@ -102,10 +105,10 @@
 
 .recentPlay {
   width: 32px; height: 32px; border-radius: 9px; background: var(--accent); color: #0a0a0a;
-  font-size: 12px; flex-shrink: 0; transition: background 0.15s;
+  font-size: 12px; flex-shrink: 0; transition: background 0.15s, transform 0.15s;
+  display: flex; align-items: center; justify-content: center;
 }
-.recentPlay:hover:not(:disabled) { background: var(--accent-dim); }
-.recentPlay:disabled { opacity: 0.4; cursor: default; }
+.recentCard:not(.recentLocked):hover .recentPlay { background: var(--accent-dim); transform: scale(1.06); }
 
 .changelog { display: flex; flex-direction: column; gap: 10px; }
 

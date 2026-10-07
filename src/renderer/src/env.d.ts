@@ -21,6 +21,7 @@ interface Window {
       installed: (modsDir: string) => Promise<string[]>
       localIcons: (dir: string, filenames: string[]) => Promise<Record<string, string | null>>
       localMeta: (dir: string, filenames: string[]) => Promise<Record<string, { author: string | null; version: string | null }>>
+      resolveSources: (dir: string, filenames: string[]) => Promise<Record<string, string | null>>
       toggle: (modsDir: string, filename: string, enabled: boolean) => Promise<void>
       delete: (modsDir: string, filename: string) => Promise<void>
       addFile: (exts?: string[]) => Promise<string | null>

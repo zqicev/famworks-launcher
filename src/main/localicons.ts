@@ -234,3 +234,37 @@ export async function getLocalMeta(dir: string, filenames: string[]): Promise<Re
   const metas = await mapLimit(names, CONCURRENCY, n => metaForFile(dir, n))
   return Object.fromEntries(names.map((n, i) => [n, metas[i]]))
 }
+
+// ——— Определение проекта Modrinth по хэшу файла (для локальных сборок без modrinth_id) ———
+
+// Кэш по сигнатуре файла: project_id|null (null = проверяли, на Modrinth нет).
+const srcCache = new Map<string, string | null>()
+
+async function sha1Of(real: string): Promise<string | null> {
+  try { return createHash('sha1').update(await fs.readFile(real)).digest('hex') } catch { return null }
+}
+
+async function sigAndHash(dir: string, name: string): Promise<{ name: string; key: string; sha1: string | null; cached: boolean }> {
+  const st = await statAny(join(dir, name))
+  if (!st) return { name, key: '', sha1: null, cached: false }
+  const key = `${st.real}|${st.size}|${st.mtimeMs}`
+  if (srcCache.has(key)) return { name, key, sha1: null, cached: true }
+  return { name, key, sha1: await sha1Of(st.real), cached: false }
+}
+
+/** filename -> project_id Modrinth|null, по sha1 файлов. Для локальных .jar/.zip без известного источника. */
+export async function resolveLocalModrinth(dir: string, filenames: string[]): Promise<Record<string, string | null>> {
+  const names = [...new Set(filenames.filter(Boolean))]
+  const out: Record<string, string | null> = {}
+  const infos = await mapLimit(names, CONCURRENCY, n => sigAndHash(dir, n))
+  const toQuery = infos.filter(i => !i.cached && i.sha1)
+  const { getProjectIdsByHashes } = await import('./modrinth')
+  const map = toQuery.length ? await getProjectIdsByHashes(toQuery.map(i => i.sha1 as string)) : {}
+  for (const i of infos) {
+    if (i.cached) { out[i.name] = srcCache.get(i.key) ?? null; continue }
+    const pid = i.sha1 ? (map[i.sha1] ?? null) : null
+    if (i.key) srcCache.set(i.key, pid)
+    out[i.name] = pid
+  }
+  return out
+}

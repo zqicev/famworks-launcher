@@ -61,16 +61,20 @@ export default function Sidebar({ width, index, customPacks, selectedId, seenUpd
     if (r?.filename) setIcons(prev => ({ ...prev, [id]: r.filename! }))
   }
 
-  const Avatar = ({ name, active, icon }: { name: string; active: boolean; icon?: string }): JSX.Element =>
-    icon ? (
-      <div className={styles.avatar}>
-        <img className={styles.avatarImg} src={`fwbg://icon/${icon}`} alt="" />
-      </div>
-    ) : (
-      <div className={styles.avatar} style={{ background: active ? 'var(--accent)' : 'var(--bg-active)' }}>
-        <span style={{ color: active ? '#0a0a0a' : 'var(--text)' }}>{(name[0] ?? '?').toUpperCase()}</span>
-      </div>
-    )
+  const Avatar = ({ name, active, icon, onEdit }: { name: string; active: boolean; icon?: string; onEdit: () => void }): JSX.Element => (
+    <div className={styles.avatarWrap} onClick={(e) => { e.stopPropagation(); onEdit() }} title="Сменить картинку сборки">
+      {icon ? (
+        <div className={styles.avatar}>
+          <img className={styles.avatarImg} src={`fwbg://icon/${icon}`} alt="" />
+        </div>
+      ) : (
+        <div className={styles.avatar} style={{ background: active ? 'var(--accent)' : 'var(--bg-active)' }}>
+          <span style={{ color: active ? '#0a0a0a' : 'var(--text)' }}>{(name[0] ?? '?').toUpperCase()}</span>
+        </div>
+      )}
+      <span className={styles.avatarEdit}><ImageIcon /></span>
+    </div>
+  )
 
   return (
     <aside className={styles.sidebar} style={width ? { width } : undefined}>
@@ -108,13 +112,12 @@ export default function Sidebar({ width, index, customPacks, selectedId, seenUpd
               const active = selectedId === pack.id
               return (
                 <button key={pack.id} className={`${styles.item} ${active ? styles.active : ''}`} onClick={() => onSelect(pack.id)}>
-                  <Avatar name={pack.name} active={active} icon={icons[pack.id]} />
+                  <Avatar name={pack.name} active={active} icon={icons[pack.id]} onEdit={() => setPackIcon(pack.id)} />
                   <div className={styles.info}>
                     <div className={styles.name}>{pack.name}{hasUpdate && <span className={styles.updateBadge}>ОБНОВЛЕНО</span>}</div>
                     <div className={styles.meta}>{pack.loader.charAt(0).toUpperCase() + pack.loader.slice(1)} · {pack.mc_version}</div>
                   </div>
                   <div className={styles.itemActions}>
-                    <button className={styles.actBtn} onClick={(e) => { e.stopPropagation(); setPackIcon(pack.id) }} title="Сменить картинку сборки"><ImageIcon /></button>
                     <button className={styles.actBtn} onClick={(e) => { e.stopPropagation(); onExport(pack.id) }} title="Экспорт сборки в .fwpack"><ExportIcon /></button>
                   </div>
                   <div className={`${styles.dot} ${active ? styles.dotActive : ''}`} />
@@ -144,13 +147,12 @@ export default function Sidebar({ width, index, customPacks, selectedId, seenUpd
                 const active = selectedId === pack.id
                 return (
                   <button key={pack.id} className={`${styles.item} ${active ? styles.active : ''}`} onClick={() => onSelect(pack.id)}>
-                    <Avatar name={pack.name} active={active} icon={icons[pack.id]} />
+                    <Avatar name={pack.name} active={active} icon={icons[pack.id]} onEdit={() => setPackIcon(pack.id)} />
                     <div className={styles.info}>
                       <div className={styles.name}>{pack.name}{hasUpdate && <span className={styles.updateBadge}>ОБНОВЛЕНО</span>}</div>
                       <div className={styles.meta}>{pack.loader.charAt(0).toUpperCase() + pack.loader.slice(1)} · {pack.mc_version}</div>
                     </div>
                     <div className={styles.itemActions}>
-                      <button className={styles.actBtn} onClick={(e) => { e.stopPropagation(); setPackIcon(pack.id) }} title="Сменить картинку сборки"><ImageIcon /></button>
                       <button className={styles.actBtn} onClick={(e) => { e.stopPropagation(); onExport(pack.id) }} title="Экспорт сборки в .fwpack"><ExportIcon /></button>
                     </div>
                     <div className={`${styles.dot} ${active ? styles.dotActive : ''}`} />
@@ -183,13 +185,12 @@ export default function Sidebar({ width, index, customPacks, selectedId, seenUpd
               const active = selectedId === pack.id
               return (
                 <button key={pack.id} className={`${styles.item} ${active ? styles.active : ''}`} onClick={() => onSelect(pack.id)}>
-                  <Avatar name={pack.name} active={active} icon={icons[pack.id]} />
+                  <Avatar name={pack.name} active={active} icon={icons[pack.id]} onEdit={() => setPackIcon(pack.id)} />
                   <div className={styles.info}>
                     <div className={styles.name}>{pack.name}</div>
                     <div className={styles.meta}>{pack.loader.charAt(0).toUpperCase() + pack.loader.slice(1)} · {pack.mc_version}</div>
                   </div>
                   <div className={styles.itemActions}>
-                    <button className={styles.actBtn} onClick={(e) => { e.stopPropagation(); setPackIcon(pack.id) }} title="Сменить картинку сборки"><ImageIcon /></button>
                     <button className={styles.actBtn} onClick={(e) => { e.stopPropagation(); onExport(pack.id) }} title="Экспорт сборки в файл"><ExportIcon /></button>
                     <button className={styles.actBtn} onClick={(e) => { e.stopPropagation(); onDeleteCustom(pack.id) }} title="Удалить сборку"><span className={styles.del}>✕</span></button>
                   </div>

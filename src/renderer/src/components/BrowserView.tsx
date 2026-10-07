@@ -12,6 +12,7 @@ interface Props {
   contextPack: TargetPack | null // если браузер открыт из сборки — фильтруем по её версии/загрузчику
   initialType: ContentType
   initialDetail?: { source: Source; id: string } | null // открыть сразу на странице проекта
+  onBackToCaller?: () => void // «назад» со стартовой страницы проекта → туда, откуда пришли (не в поиск)
   onImported: (mp: Modpack) => void
   showToast: (text: string, kind: 'info' | 'success' | 'error') => void
 }
@@ -44,7 +45,7 @@ function Icon({ src, title }: { src: string | null; title: string }) {
   return <img src={src} alt="" onError={() => setBroken(true)} />
 }
 
-export default function BrowserView({ installPath, packs, contextPack, initialType, initialDetail, onImported, showToast }: Props) {
+export default function BrowserView({ installPath, packs, contextPack, initialType, initialDetail, onBackToCaller, onImported, showToast }: Props) {
   const [source, setSource] = useState<Source>(initialDetail?.source ?? 'modrinth')
   const [type, setType] = useState<ContentType>(initialType)
   const [query, setQuery] = useState('')
@@ -188,7 +189,11 @@ export default function BrowserView({ installPath, packs, contextPack, initialTy
         packs={packs}
         preferredPackId={contextPack?.id ?? null}
         installPath={installPath}
-        onBack={() => setDetailId(null)}
+        onBack={() => {
+          // Если это стартовая страница (открыли по ссылке из сборки) — вернуться туда, откуда пришли.
+          if (initialDetail && detailId === initialDetail.id && onBackToCaller) onBackToCaller()
+          else setDetailId(null)
+        }}
         onImported={onImported}
         showToast={showToast}
       />

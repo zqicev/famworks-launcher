@@ -9,6 +9,8 @@ import BottomBar from './BottomBar'
 import { formatSizeMb, formatBytes } from '../lib/format'
 import styles from '../styles/MainPanel.module.css'
 
+export type MainTab = 'mods' | 'resourcepacks' | 'shaders' | 'overview' | 'logs' | 'dev'
+
 interface Props {
   modpack: Modpack | null
   installPath: string
@@ -16,6 +18,8 @@ interface Props {
   error: string | null
   devMode: boolean
   selectedId: string | null
+  tab: MainTab
+  setTab: (t: MainTab) => void
   onOpenBrowser: (type: string) => void
   onModpackReload?: () => void
 }
@@ -30,8 +34,7 @@ async function countDir(dir: string, ext: string): Promise<{ total: number; enab
   return { total, enabled }
 }
 
-export default function MainPanel({ modpack, installPath, loading, error, devMode, selectedId, onOpenBrowser, onModpackReload }: Props) {
-  const [tab, setTab] = useState<'mods' | 'resourcepacks' | 'shaders' | 'overview' | 'logs' | 'dev'>('overview')
+export default function MainPanel({ modpack, installPath, loading, error, devMode, selectedId, tab, setTab, onOpenBrowser, onModpackReload }: Props) {
   const [counts, setCounts] = useState({ modsTotal: 0, modsActive: 0, rp: 0, sh: 0 })
   const [busyId, setBusyId] = useState<string | null>(null)
   // Реальный вес папки сборки (installPath/<id>). 0 — пока не установлена / ещё считается.
@@ -100,7 +103,7 @@ export default function MainPanel({ modpack, installPath, loading, error, devMod
     <main className={styles.main}>
       <div className={styles.header} key={modpack.id}>
         <div className={styles.badge}>
-          ОБНОВЛЕНО · {modpack.loader.toUpperCase()} {modpack.mc_version}
+          {modpack.loader.toUpperCase()} · {modpack.mc_version}
         </div>
         <h1 className={styles.title}>{modpack.name}</h1>
         <p className={styles.desc}>{modpack.description}</p>
