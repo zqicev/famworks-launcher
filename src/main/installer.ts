@@ -1,5 +1,5 @@
 import { join, dirname, resolve, sep } from 'path'
-import { createWriteStream, createReadStream, existsSync, mkdirSync, renameSync, unlinkSync, readdirSync, statSync, writeFileSync, readFileSync } from 'fs'
+import { createWriteStream, createReadStream, existsSync, mkdirSync, renameSync, unlinkSync, rmSync, readdirSync, statSync, writeFileSync, readFileSync } from 'fs'
 import { createHash } from 'crypto'
 import axios from 'axios'
 import AdmZip from 'adm-zip'
@@ -158,8 +158,11 @@ async function famworksOutdated(modpack: Modpack, gameRoot: string): Promise<boo
     const sha = file?.hashes?.sha512
     if (!sha) continue
     const tracked = tracking[fwid]
-    if (!tracked) { if (fi.item.required) return true; continue } // обязательный ещё не стоит
-    if (tracked.sha512 !== sha) return true // стоит старая версия
+    // «Уже стоит нужная версия» — та же проверка, что в installFamworks: sha совпал И файл реально на диске
+    // (включённый или .disabled). Иначе нужно установить/обновить — для любого мода, не только required.
+    const installed = tracked?.sha512 === sha
+      && (existsSync(join(fi.dir, tracked.filename)) || existsSync(join(fi.dir, tracked.filename + '.disabled')))
+    if (!installed) return true
   }
   return false
 }
@@ -454,15 +457,17 @@ export async function getModpackStatus(
   // Если загрузчик ещё не подготовлен (профиль Fabric/Quilt или installer Forge/NeoForge) — не установлена
   if (!loaderInstalled(modpack, gameRoot)) return 'not_installed'
 
-  // Если нет всех обязательных модов — нужно обновление (famworks — отдельной проверкой ниже)
+  // Недостающие моды сборки → нужно обновление (famworks — отдельной проверкой ниже).
+  // Обязательные — всегда. Необязательные — только если мы их ещё НЕ ставили (новый мод в сборке);
+  // если ставили, а файла нет — значит игрок удалил сам, не навязываем переустановку.
   const modsDir = join(gameRoot, 'mods')
+  const manifestTracked = readManifestTracking(gameRoot)
   for (const mod of modpack.mods) {
-    if (!mod.required || mod.famworks_id) continue
+    if (mod.famworks_id) continue
     const enabled = join(modsDir, mod.filename)
     const disabled = join(modsDir, mod.filename + '.disabled')
-    if (!existsSync(enabled) && !existsSync(disabled)) {
-      return 'outdated'
-    }
+    if (existsSync(enabled) || existsSync(disabled)) continue
+    if (mod.required || !manifestTracked[mod.id]) return 'outdated'
   }
 
   // Остались прежние версии модов сборки (две версии одного мода) - «Обновить» их уберёт
@@ -612,15 +617,29 @@ export function toggleMod(modsDir: string, filename: string, enabled: boolean) {
 }
 
 export function deleteMod(modsDir: string, filename: string) {
-  const enabledPath = join(modsDir, filename)
-  const disabledPath = join(modsDir, filename + '.disabled')
-  if (existsSync(enabledPath)) unlinkSync(enabledPath)
-  if (existsSync(disabledPath)) unlinkSync(disabledPath)
+  // Ресурспак/шейдер может быть папкой — тогда unlinkSync не сработает, нужен rmSync recursive.
+  for (const p of [join(modsDir, filename), join(modsDir, filename + '.disabled')]) {
+    try {
+      if (!existsSync(p)) continue
+      if (statSync(p).isDirectory()) rmSync(p, { recursive: true, force: true })
+      else unlinkSync(p)
+    } catch { /* занято игрой — уберётся позже */ }
+  }
 }
 
 export function getInstalledMods(modsDir: string): string[] {
   if (!existsSync(modsDir)) return []
   return readdirSync(modsDir)
+}
+
+/** Записи папки с пометкой «это каталог» — чтобы распознавать папки-ресурспаки/шейдеры. */
+export function getInstalledEntries(dir: string): { name: string; isDir: boolean }[] {
+  if (!existsSync(dir)) return []
+  try {
+    return readdirSync(dir, { withFileTypes: true }).map(d => ({ name: d.name, isDir: d.isDirectory() }))
+  } catch {
+    return []
+  }
 }
 
 export function getModFileSizeBytes(modsDir: string, filename: string): number {

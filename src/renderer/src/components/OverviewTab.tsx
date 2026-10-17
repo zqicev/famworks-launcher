@@ -4,9 +4,16 @@ import { formatSizeMb, formatBytes } from '../lib/format'
 import CharacterStage from './CharacterStage'
 import SceneStage from './SceneStage'
 import SceneGuideModal from './SceneGuideModal'
+import ChangeVersionModal from './ChangeVersionModal'
 import styles from '../styles/OverviewTab.module.css'
 
-interface Props { modpack: Modpack; packBytes: number; busyId: string | null; onModpackReload?: () => void }
+interface Props {
+  modpack: Modpack
+  packBytes: number
+  busyId: string | null
+  showToast: (text: string, kind: 'info' | 'success' | 'error') => void
+  onModpackReload?: () => void
+}
 
 type World = { kind: 'world'; folder: string; name: string; lastPlayed: number; mode: string; version: string; icon: string | null; score: number }
 type Server = { kind: 'server'; name: string; ip: string; icon: string | null; score: number }
@@ -14,8 +21,9 @@ type Entry = World | Server
 type PingResult = { online: number; max: number; favicon: string | null; ping: number; motd: string; version: string } | null
 type PingState = { loading: boolean; data: PingResult }
 
-export default function OverviewTab({ modpack, packBytes, busyId, onModpackReload }: Props) {
+export default function OverviewTab({ modpack, packBytes, busyId, showToast, onModpackReload }: Props) {
   const [sceneOpen, setSceneOpen] = useState(false)
+  const [verOpen, setVerOpen] = useState(false)
   const isCustom = modpack.id.startsWith('custom-')
 
   // Размер = полный вес папки сборки (считает MainPanel и передаёт сюда). Пока не установлена
@@ -183,7 +191,10 @@ export default function OverviewTab({ modpack, packBytes, busyId, onModpackReloa
         </div>
         <div className={styles.paramRow}>
           <span className={styles.paramKey}>ВЕРСИЯ MC</span>
-          <span className={styles.paramVal}>{modpack.mc_version}</span>
+          <span className={styles.paramVal}>
+            {modpack.mc_version}
+            {isCustom && <button className={styles.verEdit} onClick={() => setVerOpen(true)} title="Сменить версию Minecraft">изменить</button>}
+          </span>
         </div>
         <div className={styles.paramRow}>
           <span className={styles.paramKey}>РАЗМЕР</span>
@@ -207,6 +218,17 @@ export default function OverviewTab({ modpack, packBytes, busyId, onModpackReloa
 
       {sceneOpen && (
         <SceneGuideModal onClose={() => setSceneOpen(false)} onApply={applyScene} />
+      )}
+
+      {verOpen && (
+        <ChangeVersionModal
+          packId={modpack.id}
+          loader={modpack.loader}
+          currentMc={modpack.mc_version}
+          showToast={showToast}
+          onApplied={() => onModpackReload?.()}
+          onClose={() => setVerOpen(false)}
+        />
       )}
     </div>
   )

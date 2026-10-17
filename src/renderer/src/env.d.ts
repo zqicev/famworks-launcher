@@ -19,6 +19,7 @@ interface Window {
     getPathForFile: (file: File) => string
     mods: {
       installed: (modsDir: string) => Promise<string[]>
+      installedEntries: (dir: string) => Promise<{ name: string; isDir: boolean }[]>
       localIcons: (dir: string, filenames: string[]) => Promise<Record<string, string | null>>
       localMeta: (dir: string, filenames: string[]) => Promise<Record<string, { author: string | null; version: string | null }>>
       resolveSources: (dir: string, filenames: string[]) => Promise<Record<string, string | null>>
@@ -39,6 +40,27 @@ interface Window {
       search: (query: string, mcVersion: string, loader: string, type?: string) => Promise<unknown[]>
       files: (modId: number, mcVersion: string, loader: string, type?: string) => Promise<unknown[]>
       download: (url: string, filename: string, modsDir: string, sha1?: string) => Promise<string>
+    }
+    version: {
+      plan: (packId: string, newMc: string) => Promise<{
+        packId: string
+        oldMc: string
+        newMc: string
+        loader: string
+        loaderVersion: string | null
+        fabricApiVersion: string | null
+        items: {
+          kind: 'mod' | 'resourcepack' | 'shader'
+          id: string
+          name: string
+          source: 'modrinth' | 'curseforge' | 'famworks' | 'download' | 'local'
+          compatible: boolean
+          oldFilename: string
+          newFilename?: string
+          newVersion?: string
+        }[]
+      }>
+      apply: (packId: string, plan: unknown, decisions: Record<string, 'keep' | 'disable' | 'delete'>) => Promise<{ ok: boolean; error?: string }>
     }
     install: {
       modpack: (id: string) => Promise<boolean>
@@ -108,7 +130,7 @@ interface Window {
       clearOverride: (id: string) => Promise<void>
     }
     skin: {
-      get: () => Promise<{ dataUrl: string; slim: boolean } | null>
+      get: () => Promise<{ dataUrl: string; slim: boolean; stale?: boolean } | null>
       head: (uuid: string) => Promise<string | null>
     }
     scene: {

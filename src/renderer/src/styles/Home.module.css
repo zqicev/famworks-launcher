@@ -1,0 +1,224 @@
+.main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.header {
+  padding: 28px 32px 16px;
+  flex-shrink: 0;
+  animation: fadeIn 0.25s ease;
+}
+
+.badge {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 1px;
+  color: var(--accent);
+  margin-bottom: 8px;
+}
+
+.title {
+  font-family: var(--font-display);
+  font-size: 48px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--text);
+  margin-bottom: 8px;
+  letter-spacing: 1px;
+}
+
+.desc {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-bottom: 18px;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.spacer { flex: 1; }
+
+.addCat {
+  height: 32px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-surface);
+  color: var(--text-secondary);
+  font-size: 12px;
+  font-weight: 600;
+  transition: border-color 0.15s, color 0.15s;
+}
+.addCat:hover { color: var(--accent); border-color: var(--accent); }
+
+.catInput {
+  height: 32px;
+  width: 200px;
+  padding: 0 12px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
+  background: var(--bg-active);
+  color: var(--text);
+  font-size: 13px;
+}
+
+.viewToggle {
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--bg-surface);
+}
+.viewBtn {
+  width: 30px;
+  height: 26px;
+  border-radius: 6px;
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s, background 0.15s;
+}
+.viewBtn:hover { color: var(--text); }
+.viewOn { color: #0a0a0a; background: var(--accent); }
+.viewOn:hover { color: #0a0a0a; }
+
+.content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 32px 24px;
+  animation: slideUp 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ── Секции-категории (и drop-цели) ── */
+.section {
+  margin-bottom: 20px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  padding: 6px;
+  margin-left: -6px;
+  margin-right: -6px;
+  transition: border-color 0.15s, background 0.15s;
+}
+.sectionOver {
+  border-color: var(--accent);
+  background: rgb(from var(--accent) r g b / 0.06);
+}
+
+.sectionHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 2px 6px 10px;
+}
+.sectionTitle {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.sectionCount {
+  background: var(--bg-active);
+  color: var(--text-secondary);
+  border-radius: 4px;
+  padding: 1px 6px;
+  font-size: 10px;
+}
+.catDel {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-dim);
+  padding: 3px 7px;
+  border-radius: 5px;
+  transition: color 0.15s, background 0.15s;
+}
+.catDel:hover { color: var(--red); background: rgb(from var(--red) r g b / 0.12); }
+
+.sectionEmpty {
+  font-size: 12px;
+  color: var(--text-dim);
+  padding: 14px;
+  text-align: center;
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+}
+
+/* ── Раскладки ── */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+  gap: 12px;
+}
+.listView {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* ── Карточка сборки ── */
+.card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, transform 0.12s;
+}
+.card:hover {
+  border-color: rgb(from var(--accent) r g b / 0.5);
+  background: var(--bg-hover);
+  transform: translateY(-1px);
+}
+.card:active { cursor: grabbing; }
+
+.cardIcon {
+  width: 46px;
+  height: 46px;
+  border-radius: 10px;
+  overflow: hidden;
+  flex-shrink: 0;
+  background: var(--bg-active);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.cardImg { width: 100%; height: 100%; object-fit: cover; image-rendering: auto; }
+.cardLetter { font-family: var(--font-display); font-size: 20px; font-weight: 700; color: var(--text); }
+
+.cardInfo { flex: 1; min-width: 0; }
+.cardName {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.cardMeta {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 3px;
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+.mapBadge {
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.4px;
+  color: var(--accent);
+  background: rgb(from var(--accent) r g b / 0.14);
+  padding: 1px 5px;
+  border-radius: 4px;
+}

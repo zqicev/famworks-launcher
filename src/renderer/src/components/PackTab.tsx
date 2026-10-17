@@ -20,6 +20,7 @@ interface Props {
 export default function PackTab({ dir, items, noun, type, onCount }: Props) {
   const [search, setSearch] = useState('')
   const [present, setPresent] = useState<Set<string>>(new Set())
+  const [dirBases, setDirBases] = useState<Set<string>>(new Set()) // базовые имена, которые на диске — папки
   const [sizes, setSizes] = useState<Record<string, number>>({})
   const [disabled, setDisabled] = useState<Set<string>>(new Set())
   const [extra, setExtra] = useState<Mod[]>([])
@@ -30,28 +31,35 @@ export default function PackTab({ dir, items, noun, type, onCount }: Props) {
   useEffect(() => { const t = setTimeout(() => setStaggerOn(false), 700); return () => clearTimeout(t) }, [])
 
   const scan = useCallback(async () => {
-    const files = await window.api.mods.installed(dir).catch(() => [] as string[])
-    setPresent(new Set(files.map(f => f.replace(/\.disabled$/, ''))))
+    const entries = await window.api.mods.installedEntries(dir).catch(() => [] as { name: string; isDir: boolean }[])
+    const pres = new Set<string>()
+    const dirs = new Set<string>()
     const dis = new Set<string>()
     const known = new Set(items.map(p => p.filename))
     const seen = new Set<string>()
     const ex: Mod[] = []
-    for (const f of files) {
-      const isDis = f.endsWith('.disabled')
-      const base = f.replace(/\.disabled$/, '')
-      if (!base.toLowerCase().endsWith('.zip')) continue
+    const fileBases: string[] = [] // только файлы — у них считаем размер
+    for (const e of entries) {
+      const isDis = e.name.endsWith('.disabled')
+      const base = isDis ? e.name.replace(/\.disabled$/, '') : e.name
+      // Распознаём .zip-файлы и папки (папка-ресурспак/шейдер). Остальное игнорируем.
+      if (!e.isDir && !base.toLowerCase().endsWith('.zip')) continue
+      pres.add(base)
+      if (e.isDir) dirs.add(base)
+      else fileBases.push(base)
       if (isDis) dis.add(base)
       if (known.has(base) || seen.has(base)) continue
       seen.add(base)
-      ex.push({ id: base, name: base.replace(/\.zip$/i, ''), filename: base, version: '', category: 'Локальный', size_mb: 0, required: false })
+      ex.push({ id: base, name: e.isDir ? base : base.replace(/\.zip$/i, ''), filename: base, version: '', category: 'Локальный', size_mb: 0, required: false })
     }
-    const names = [...new Set(files.map(f => f.replace(/\.disabled$/, '')))]
-      .filter(b => b.toLowerCase().endsWith('.zip'))
+    const names = [...new Set(fileBases)]
     const bytes = await Promise.all(
       names.map(b => window.api.mods.fileSize(dir, b).catch(() => 0) as Promise<number>)
     )
     const sz: Record<string, number> = {}
     names.forEach((b, i) => { sz[b] = Math.round(bytes[i] / 1024 / 1024 * 10) / 10 })
+    setPresent(pres)
+    setDirBases(dirs)
     setSizes(sz)
     setDisabled(dis)
     setExtra(ex)
@@ -132,6 +140,7 @@ export default function PackTab({ dir, items, noun, type, onCount }: Props) {
               mod={effMod}
               type={type}
               icon={iconFor(p)}
+              isDir={dirBases.has(p.filename)}
               author={mAuthor?.author ?? meta?.author ?? null}
               authorAvatar={mAuthor?.avatar ?? null}
               version={(p.version || meta?.version) || null}

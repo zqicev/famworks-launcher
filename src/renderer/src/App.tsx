@@ -3,6 +3,7 @@ import { ModpackIndex, Modpack } from '../../types/modpack'
 import Sidebar from './components/Sidebar'
 import MainPanel, { MainTab } from './components/MainPanel'
 import BrowserView from './components/BrowserView'
+import HomeView from './components/HomeView'
 import TitleBar from './components/TitleBar'
 import SetupModal from './components/SetupModal'
 import SettingsModal from './components/SettingsModal'
@@ -42,7 +43,7 @@ export default function App() {
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [devMode, setDevMode] = useState(false)
   const [crash, setCrash] = useState<CrashData | null>(null)
-  const [view, setView] = useState<'modpack' | 'browser'>('modpack')
+  const [view, setView] = useState<'home' | 'modpack' | 'browser'>('home')
   const [browserKey, setBrowserKey] = useState(0) // remount браузера при каждом открытии — свежее состояние/контекст
   const [browserInit, setBrowserInit] = useState<{ type: string; packId: string | null; detail: BrowserDetail | null }>({ type: 'modpack', packId: null, detail: null })
   const [mainTab, setMainTab] = useState<MainTab>('overview')
@@ -261,7 +262,7 @@ export default function App() {
             width={sidebarWidth}
             index={modpackIndex}
             customPacks={customPacks}
-            selectedId={view === 'browser' ? null : selectedId}
+            selectedId={view === 'modpack' ? selectedId : null}
             seenUpdates={seenUpdates}
             onSelect={(id) => { setSelectedId(id); setView('modpack') }}
             onSettings={() => setSettingsOpen(true)}
@@ -270,6 +271,8 @@ export default function App() {
             onDeleteCustom={handleDeleteCustom}
             onImport={handleImport}
             onExport={handleExportCustom}
+            homeActive={view === 'home'}
+            onOpenHome={() => setView('home')}
             browserActive={view === 'browser'}
             onOpenBrowser={() => openBrowser('modpack', null)}
           />
@@ -290,7 +293,15 @@ export default function App() {
                 showToast={showToast}
               />
             )
-          })() : (
+          })() : view === 'home' ? (
+            <HomeView
+              packs={[
+                ...(modpackIndex?.modpacks ?? []).map(p => ({ id: p.id, name: p.name, loader: p.loader, mc_version: p.mc_version, for_map: p.for_map, custom: false })),
+                ...customPacks.map(p => ({ id: p.id, name: p.name, loader: p.loader, mc_version: p.mc_version, for_map: p.for_map, custom: true }))
+              ]}
+              onOpen={(id) => { setSelectedId(id); setView('modpack') }}
+            />
+          ) : (
             <MainPanel
               modpack={modpack}
               installPath={installPath}
@@ -300,6 +311,7 @@ export default function App() {
               selectedId={selectedId}
               tab={mainTab}
               setTab={setMainTab}
+              showToast={showToast}
               onOpenBrowser={(type) => openBrowser(type, selectedId)}
               onModpackReload={() => { if (selectedId) window.api.modpacks.get(selectedId).then(setModpack).catch(() => {}) }}
             />

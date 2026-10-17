@@ -3,7 +3,7 @@ import { copyFileSync, mkdirSync, rmSync, existsSync, readFileSync, writeFileSyn
 import { basename, join as pathJoin } from 'path'
 import { store, getPackMemory, setPackMemory } from './store'
 import { fetchModpackIndex, fetchModpack } from './modpacks'
-import { checkAndInstallModpack, getModpackStatus, toggleMod, deleteMod, getInstalledMods, downloadModToDir, getModFileSizeBytes } from './installer'
+import { checkAndInstallModpack, getModpackStatus, toggleMod, deleteMod, getInstalledMods, getInstalledEntries, downloadModToDir, getModFileSizeBytes } from './installer'
 import { launchGame, offlineAuthorization, abortLaunch, QuickPlay } from './launcher'
 import { killInstance, listInstances, onInstancesChange, reattachInstances } from './instances'
 import { setupLoader, latestLoaderVersion, LoaderId } from './loaders'
@@ -161,6 +161,7 @@ export function setupIpcHandlers() {
   })
 
   ipcMain.handle('mods:installed', (_, modsDir: string) => getInstalledMods(modsDir))
+  ipcMain.handle('mods:installed-entries', (_, dir: string) => getInstalledEntries(dir))
   ipcMain.handle('mods:local-icons', async (_, dir: string, filenames: string[]) => {
     const { getLocalIcons } = await import('./localicons')
     return getLocalIcons(dir, filenames)
@@ -276,8 +277,13 @@ export function setupIpcHandlers() {
       let authorization
       let authlibArgs: string[] = []
       if (account?.type === 'microsoft' && account.refreshToken) {
-        // Обновляем токен перед запуском (Minecraft-токен живёт ~24ч)
-        const res = await microsoftRefresh(account.refreshToken)
+        // Обновляем токен перед запуском (Minecraft-токен живёт ~24ч). При сбоях связи повторяем.
+        const res = await microsoftRefresh(account.refreshToken, (attempt, max) => {
+          win.webContents.send('install:progress', {
+            phase: 'check',
+            message: attempt === 1 ? 'Вход через Microsoft...' : `Соединение с Microsoft (попытка ${attempt} из ${max})...`
+          })
+        })
         // Сохраняем свежий refresh-токен
         const updated = accounts.map(a => a.id === account.id
           ? { ...a, username: res.username, uuid: res.uuid, refreshToken: res.refreshToken }
@@ -422,6 +428,16 @@ export function setupIpcHandlers() {
 
   // Последняя версия выбранного загрузчика под версию MC (для создания кастомной сборки)
   ipcMain.handle('loader:latest', (_, loader: LoaderId, mc: string) => latestLoaderVersion(loader, mc))
+
+  // Смена версии Minecraft у пользовательской сборки: план совместимости + применение.
+  ipcMain.handle('version:plan', async (_, packId: string, newMc: string) => {
+    const { planVersionChange } = await import('./versionChange')
+    return planVersionChange(packId, newMc)
+  })
+  ipcMain.handle('version:apply', async (_, packId: string, plan: unknown, decisions: unknown) => {
+    const { applyVersionChange } = await import('./versionChange')
+    return applyVersionChange(packId, plan as never, (decisions ?? {}) as never, getWindow())
+  })
   ipcMain.handle('mc:versions', async (_, loader?: LoaderId) => {
     const { loaderMcVersions } = await import('./loaders')
     return loaderMcVersions(loader)

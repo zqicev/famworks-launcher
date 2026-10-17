@@ -253,8 +253,8 @@
 .createTitle { font-size: 13px; font-weight: 600; color: var(--text); }
 .createSub { font-size: 11px; color: var(--text-dim); margin-top: 1px; }
 
-/* Навигация: Браузер (поиск контента) */
-.navBlock { padding: 0 12px 10px; }
+/* Навигация: Главная + Браузер */
+.navBlock { padding: 0 12px 10px; display: flex; flex-direction: column; gap: 6px; }
 .navBtn {
   display: flex;
   align-items: center;
@@ -263,7 +263,7 @@
   padding: 9px 10px;
   border-radius: 8px;
   border: 1px solid var(--border);
-  background: var(--bg-surface);
+  background: none;
   text-align: left;
   transition: border-color 0.15s, background 0.15s;
 }

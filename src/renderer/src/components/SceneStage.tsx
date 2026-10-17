@@ -130,9 +130,14 @@ export default function SceneStage({ scene: sceneUrl }: Props): JSX.Element {
     }
 
     // Скин аккаунта (иначе дефолтный Steve) как текстура для материала игрока.
-    const loadSkinTexture = async (): Promise<THREE.Texture> => {
+    // live=false — пришёл дефолт или устаревший (кэшированный) скин: превью повторит запрос позже.
+    const loadSkinTexture = async (): Promise<{ tex: THREE.Texture; live: boolean }> => {
       let url = steveUrl
-      try { const res = await window.api.skin.get(); if (res?.dataUrl) url = res.dataUrl } catch { /* дефолт */ }
+      let live = false
+      try {
+        const res = await window.api.skin.get()
+        if (res?.dataUrl) { url = res.dataUrl; live = !res.stale }
+      } catch { /* дефолт */ }
       const tex = await new THREE.TextureLoader().loadAsync(url)
       tex.flipY = false
       tex.colorSpace = THREE.SRGBColorSpace
@@ -140,7 +145,7 @@ export default function SceneStage({ scene: sceneUrl }: Props): JSX.Element {
       tex.minFilter = THREE.NearestFilter
       tex.generateMipmaps = false
       tex.needsUpdate = true
-      return tex
+      return { tex, live }
     }
 
     // Материалы игрока (общие для его частей) + текущая текстура-скин - держим ссылки,
@@ -157,23 +162,43 @@ export default function SceneStage({ scene: sceneUrl }: Props): JSX.Element {
         std.needsUpdate = true
       }
     }
+    const putSkin = (tex: THREE.Texture): void => {
+      applySkin(tex)
+      if (currentSkinTex && currentSkinTex !== tex) currentSkinTex.dispose()
+      currentSkinTex = tex
+    }
+
+    // Пока скин не настоящий (дефолт/кэш из-за оффлайна) — раз в минуту повторяем запрос,
+    // и как только придёт живой скin — ставим его и прекращаем попытки.
+    let skinRetry: ReturnType<typeof setInterval> | null = null
+    const clearSkinRetry = (): void => { if (skinRetry) { clearInterval(skinRetry); skinRetry = null } }
+    const scheduleSkinRetry = (): void => {
+      if (skinRetry) return
+      skinRetry = setInterval(async () => {
+        if (disposed || playerMats.size === 0) return
+        const { tex, live } = await loadSkinTexture()
+        if (disposed || !live) { tex.dispose(); return } // дефолт/кэш повторно не навязываем
+        putSkin(tex)
+        clearSkinRetry()
+      }, 60000)
+    }
+
     // Активный аккаунт сменился (событие из панели) - подтягиваем новый скин без ребилда сцены.
     const reloadSkin = async (): Promise<void> => {
       if (disposed || playerMats.size === 0) return
       try {
-        const tex = await loadSkinTexture()
+        const { tex, live } = await loadSkinTexture()
         if (disposed) { tex.dispose(); return }
-        applySkin(tex)
-        if (currentSkinTex && currentSkinTex !== tex) currentSkinTex.dispose()
-        currentSkinTex = tex
+        putSkin(tex)
+        if (live) clearSkinRetry(); else scheduleSkinRetry()
       } catch { /* сеть/скин недоступны - оставляем текущий */ }
     }
     window.addEventListener('fw:account-changed', reloadSkin)
 
     const gltfLoader = new GLTFLoader()
     Promise.all([gltfLoader.loadAsync(bustCache(sceneUrl)), loadSkinTexture()])
-      .then(([gltf, skinTex]) => {
-        if (disposed) { disposeTree(gltf.scene); skinTex.dispose(); return }
+      .then(([gltf, skinInfo]) => {
+        if (disposed) { disposeTree(gltf.scene); skinInfo.tex.dispose(); return }
         scene.add(gltf.scene)
 
         // Собираем материалы игрока (общие для его частей) и кладём на них скин аккаунта.
@@ -183,8 +208,8 @@ export default function SceneStage({ scene: sceneUrl }: Props): JSX.Element {
           const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
           for (const m of mats) playerMats.add(m as THREE.MeshStandardMaterial)
         })
-        applySkin(skinTex)
-        currentSkinTex = skinTex
+        putSkin(skinInfo.tex)
+        if (!skinInfo.live) scheduleSkinRetry() // дефолт/кэш — повторим запрос позже
 
         // Анимации: если есть клип "init" — проигрываем его один раз при загрузке,
         // а по завершении включаем зацикленный "idle" (и любые прочие клипы). Иначе — сразу idle.
@@ -241,6 +266,7 @@ export default function SceneStage({ scene: sceneUrl }: Props): JSX.Element {
 
     return () => {
       disposed = true
+      clearSkinRetry()
       window.removeEventListener('fw:account-changed', reloadSkin)
       cancelAnimationFrame(raf)
       ro.disconnect()

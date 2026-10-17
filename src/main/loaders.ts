@@ -195,16 +195,16 @@ async function runClientInstaller(javaPath: string, installer: string, gameRoot:
 // Порядок — от новых к старым.
 let mcCache: string[] | null = null
 export async function mcVersions(): Promise<string[]> {
-  if (mcCache) return mcCache
+  if (mcCache && mcCache.length) return mcCache
   try {
     const { data } = await axios.get('https://piston-meta.mojang.com/mc/game/version_manifest_v2.json', { timeout: 8000 })
     mcCache = (data as { versions: { id: string; type: string }[] }).versions
       .filter(v => v.type === 'release')
       .map(v => v.id)
+    return mcCache
   } catch {
-    mcCache = []
+    return [] // не кэшируем ошибку — повторим при следующем вызове
   }
-  return mcCache
 }
 
 // Сравнение версий «1.21.1» по компонентам, по убыванию (новые — первыми).
@@ -255,7 +255,7 @@ export async function loaderMcVersions(loader?: LoaderId): Promise<string[]> {
   } catch {
     list = []
   }
-  loaderMcCache.set(key, list)
+  if (list.length) loaderMcCache.set(key, list) // пустой результат не кэшируем — дадим повторить
   return list
 }
 

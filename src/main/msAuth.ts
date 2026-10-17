@@ -38,6 +38,24 @@ function makeAuth() {
     : new Auth({ client_id: CLIENT_ID, redirect: REDIRECT, prompt: 'select_account' })
 }
 
+const MS_REFRESH_ATTEMPTS = 3
+const delay = (ms: number): Promise<void> => new Promise(r => setTimeout(r, ms))
+
+/** Похоже ли на проблему соединения (а не отказ сервера/авторизации) — тогда имеет смысл повторить. */
+function isConnectionError(e: unknown): boolean {
+  const err = e as { code?: string; cause?: { code?: string }; response?: { status?: number }; ts?: string; message?: string }
+  // Сервер ответил http-статусом — это отказ (403/400 и т.п.), а не проблема связи: повтор не поможет.
+  if (err?.response && typeof err.response.status === 'number') return false
+  // Известные auth-коды msmc — тоже не сетевые.
+  if (typeof err?.ts === 'string' && /minecraft|xsts|xbox|gui\.closed/i.test(err.ts)) return false
+  const code = String(err?.code ?? err?.cause?.code ?? '')
+  if (/ENOTFOUND|ECONNREFUSED|ETIMEDOUT|ECONNRESET|EAI_AGAIN|ENETUNREACH|ECONNABORTED|ERR_NETWORK|UND_ERR/i.test(code)) return true
+  const msg = String(err?.message ?? '')
+  if (/network|timeout|getaddrinfo|ENOTFOUND|ECONNREFUSED|socket hang up|fetch failed|failed to fetch|unable to connect/i.test(msg)) return true
+  // Нет http-ответа и нет известного auth-кода — трактуем как проблему соединения.
+  return !err?.response
+}
+
 /** Превращает ошибку msmc в человеко-читаемое сообщение. */
 function friendlyError(e: unknown): Error {
   const err = e as { ts?: string; response?: { status?: number }; message?: string }
@@ -82,13 +100,24 @@ export async function microsoftLogin(): Promise<MsLoginResult> {
   }
 }
 
-/** Тихий повторный вход по refresh-токену (перед запуском игры). */
-export async function microsoftRefresh(refreshToken: string): Promise<MsLoginResult> {
-  try {
-    const auth = makeAuth()
-    const xbox = await auth.refresh(refreshToken)
-    return await finish(xbox)
-  } catch (e) {
-    throw friendlyError(e)
+/** Тихий повторный вход по refresh-токену (перед запуском игры).
+ *  При проблемах соединения повторяет до MS_REFRESH_ATTEMPTS раз, затем отдаёт человекочитаемую
+ *  ошибку. Отказ сервера/авторизации (403, просрочка и т.п.) не ретраит — сразу понятный текст.
+ *  onAttempt — колбэк для показа прогресса попыток. */
+export async function microsoftRefresh(
+  refreshToken: string,
+  onAttempt?: (attempt: number, max: number) => void
+): Promise<MsLoginResult> {
+  for (let attempt = 1; attempt <= MS_REFRESH_ATTEMPTS; attempt++) {
+    onAttempt?.(attempt, MS_REFRESH_ATTEMPTS)
+    try {
+      const auth = makeAuth()
+      const xbox = await auth.refresh(refreshToken)
+      return await finish(xbox)
+    } catch (e) {
+      if (!isConnectionError(e)) throw friendlyError(e) // отказ сервера/авторизации — повтор не поможет
+      if (attempt < MS_REFRESH_ATTEMPTS) await delay(1500) // связь — ждём и пробуем ещё
+    }
   }
+  throw new Error(`Не удалось соединиться с сервером Microsoft спустя ${MS_REFRESH_ATTEMPTS} попыток. Проверьте интернет-соединение или используйте VPN.`)
 }

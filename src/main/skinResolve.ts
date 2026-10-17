@@ -3,7 +3,7 @@ import { store } from './store'
 
 interface Account { id: string; username: string; type: string; uuid?: string }
 
-export interface ResolvedSkin { dataUrl: string; slim: boolean }
+export interface ResolvedSkin { dataUrl: string; slim: boolean; stale?: boolean }
 
 // Скачивает PNG по URL и заворачивает в data-URL. null при любой ошибке/не-картинке.
 async function fetchPng(url: string): Promise<string | null> {
@@ -56,19 +56,33 @@ async function elySkin(name: string): Promise<ResolvedSkin | null> {
   return dataUrl ? { dataUrl, slim: false } : null
 }
 
+// Кэш последнего успешно загруженного скина по аккаунту (в store — переживает перезапуск/оффлайн).
+type SkinCache = Record<string, { dataUrl: string; slim: boolean }>
+
 /** Скин активного аккаунта для 3D-модели в лаунчере.
  *  - microsoft: настоящий лицензионный скин с серверов Mojang по UUID;
  *  - ely / оффлайн: по нику из Ely.by.
- *  null → рендер покажет дефолтного Steve. */
+ *  Если сеть недоступна — отдаём последний закэшированный скин с пометкой stale (рендер повторит
+ *  запрос позже). Нет ни сети, ни кэша → null (дефолтный Steve). */
 export async function getActiveSkin(): Promise<ResolvedSkin | null> {
   const accounts = (store.get('accounts') as Account[] | null) ?? []
   const activeId = store.get('activeAccountId') as string | null
   const acc = accounts.find(a => a.id === activeId) ?? accounts[0]
   if (!acc) return null
 
-  // Лицензия: только Mojang по UUID. При недоступности — дефолт, а НЕ чужой скин с Ely.by по нику.
-  if (acc.type === 'microsoft' && acc.uuid) return mojangSkin(acc.uuid)
-
+  // Лицензия: только Mojang по UUID. Оффлайн/ely: по нику из Ely.by.
   const name = acc.username?.trim()
-  return name ? elySkin(name) : null
+  const live = acc.type === 'microsoft' && acc.uuid
+    ? await mojangSkin(acc.uuid)
+    : (name ? await elySkin(name) : null)
+
+  const cache = (store.get('skinCache') as SkinCache | undefined) ?? {}
+  if (live) {
+    cache[acc.id] = { dataUrl: live.dataUrl, slim: live.slim }
+    store.set('skinCache', cache)
+    return { ...live, stale: false }
+  }
+  // Сеть недоступна — отдаём кэш, если он есть (не ставим Steve при пропавшем соединении).
+  const cached = cache[acc.id]
+  return cached ? { ...cached, stale: true } : null
 }

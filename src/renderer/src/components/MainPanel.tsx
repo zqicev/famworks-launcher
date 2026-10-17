@@ -20,21 +20,23 @@ interface Props {
   selectedId: string | null
   tab: MainTab
   setTab: (t: MainTab) => void
+  showToast: (text: string, kind: 'info' | 'success' | 'error') => void
   onOpenBrowser: (type: string) => void
   onModpackReload?: () => void
 }
 
-async function countDir(dir: string, ext: string): Promise<{ total: number; enabled: number }> {
-  const files = await window.api.mods.installed(dir).catch(() => [] as string[])
-  const total = new Set(
-    files.map(f => f.replace(/\.disabled$/, '')).filter(f => f.toLowerCase().endsWith('.' + ext))
-  ).size
-  // включён = файл оканчивается ровно на .ext (без .disabled)
-  const enabled = files.filter(f => f.toLowerCase().endsWith('.' + ext)).length
+async function countDir(dir: string, ext: string, includeDirs = false): Promise<{ total: number; enabled: number }> {
+  const entries = await window.api.mods.installedEntries(dir).catch(() => [] as { name: string; isDir: boolean }[])
+  // Пак = .ext-файл или (для ресурспаков/шейдеров) папка. Включён = запись без суффикса .disabled.
+  const packs = entries.filter(e =>
+    (includeDirs && e.isDir) || (!e.isDir && e.name.replace(/\.disabled$/, '').toLowerCase().endsWith('.' + ext))
+  )
+  const total = new Set(packs.map(e => e.name.replace(/\.disabled$/, ''))).size
+  const enabled = packs.filter(e => !e.name.endsWith('.disabled')).length
   return { total, enabled }
 }
 
-export default function MainPanel({ modpack, installPath, loading, error, devMode, selectedId, tab, setTab, onOpenBrowser, onModpackReload }: Props) {
+export default function MainPanel({ modpack, installPath, loading, error, devMode, selectedId, tab, setTab, showToast, onOpenBrowser, onModpackReload }: Props) {
   const [counts, setCounts] = useState({ modsTotal: 0, modsActive: 0, rp: 0, sh: 0 })
   const [busyId, setBusyId] = useState<string | null>(null)
   // Реальный вес папки сборки (installPath/<id>). 0 — пока не установлена / ещё считается.
@@ -51,8 +53,8 @@ export default function MainPanel({ modpack, installPath, loading, error, devMod
     const root = `${installPath}/${mpId}`
     const [mods, rp, sh] = await Promise.all([
       countDir(`${root}/mods`, 'jar'),
-      countDir(`${root}/resourcepacks`, 'zip'),
-      countDir(`${root}/shaderpacks`, 'zip')
+      countDir(`${root}/resourcepacks`, 'zip', true),
+      countDir(`${root}/shaderpacks`, 'zip', true)
     ])
     setCounts({ modsTotal: mods.total, modsActive: mods.enabled, rp: rp.total, sh: sh.total })
   }, [mpId, installPath])
@@ -156,7 +158,7 @@ export default function MainPanel({ modpack, installPath, loading, error, devMod
         {tab === 'mods' && <ModsTab modpack={modpack} modsDir={modsDir} onCount={(total, active) => setCounts(c => ({ ...c, modsTotal: total, modsActive: active }))} />}
         {tab === 'resourcepacks' && <PackTab dir={rpDir} items={modpack.resourcepacks ?? []} noun="ресурспаков" type="resourcepack" onCount={n => setCounts(c => ({ ...c, rp: n }))} />}
         {tab === 'shaders' && <PackTab dir={shDir} items={modpack.shaders ?? []} noun="шейдеров" type="shader" onCount={n => setCounts(c => ({ ...c, sh: n }))} />}
-        {tab === 'overview' && <OverviewTab modpack={modpack} packBytes={packBytes} busyId={busyId} onModpackReload={onModpackReload} />}
+        {tab === 'overview' && <OverviewTab modpack={modpack} packBytes={packBytes} busyId={busyId} showToast={showToast} onModpackReload={onModpackReload} />}
         {tab === 'logs' && <LogsTab modpackId={modpack.id} />}
         {tab === 'dev' && devMode && <DevTab modpackId={modpack.id} loader={modpack.loader} mcVersion={modpack.mc_version} />}
       </div>

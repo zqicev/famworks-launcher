@@ -7,6 +7,7 @@ interface Props {
   mod: Mod
   type: 'mod' | 'resourcepack' | 'shader'
   icon?: string | null
+  isDir?: boolean                      // ресурспак/шейдер-папка (а не .zip)
   author?: string | null
   authorAvatar?: string | null         // аватар автора (Modrinth); иначе — кружок с инициалом
   version?: string | null              // версия из архива (фоллбэк к mod.version)
@@ -29,8 +30,13 @@ const TrashIcon = () => (
     <polyline points="3 6 5 6 21 6" /><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
   </svg>
 )
+const FolderIcon = () => (
+  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M4 5h5l2 2h9a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" />
+  </svg>
+)
 
-function ModRow({ mod, type, icon, author, authorAvatar, version, filename, enabled, notInstalled, channel, onChannel, onToggle, onDelete }: Props) {
+function ModRow({ mod, type, icon, isDir, author, authorAvatar, version, filename, enabled, notInstalled, channel, onChannel, onToggle, onDelete }: Props) {
   const locked = mod.required || !!notInstalled
   const [broken, setBroken] = useState(false)
   const [avaBroken, setAvaBroken] = useState(false)
@@ -58,7 +64,7 @@ function ModRow({ mod, type, icon, author, authorAvatar, version, filename, enab
         <div className={styles.avatar} style={{ opacity: enabled ? 1 : 0.4 }}>
           {icon && !broken
             ? <img src={icon} alt="" className={styles.avatarImg} loading="lazy" onError={() => setBroken(true)} />
-            : mod.name[0].toUpperCase()}
+            : isDir ? <FolderIcon /> : mod.name[0].toUpperCase()}
         </div>
         <div className={styles.info}>
           <div className={styles.nameRow}>

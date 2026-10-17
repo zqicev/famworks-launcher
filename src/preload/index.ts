@@ -29,6 +29,7 @@ contextBridge.exposeInMainWorld('api', {
   getPathForFile: (file: File) => webUtils.getPathForFile(file),
   mods: {
     installed: (modsDir: string) => ipcRenderer.invoke('mods:installed', modsDir),
+    installedEntries: (dir: string) => ipcRenderer.invoke('mods:installed-entries', dir),
     localIcons: (dir: string, filenames: string[]) => ipcRenderer.invoke('mods:local-icons', dir, filenames),
     localMeta: (dir: string, filenames: string[]) => ipcRenderer.invoke('mods:local-meta', dir, filenames),
     resolveSources: (dir: string, filenames: string[]) => ipcRenderer.invoke('mods:resolve-sources', dir, filenames),
@@ -56,6 +57,10 @@ contextBridge.exposeInMainWorld('api', {
       ipcRenderer.invoke('cf:files', modId, mcVersion, loader, type),
     download: (url: string, filename: string, modsDir: string, sha1?: string) =>
       ipcRenderer.invoke('cf:download', url, filename, modsDir, sha1)
+  },
+  version: {
+    plan: (packId: string, newMc: string) => ipcRenderer.invoke('version:plan', packId, newMc),
+    apply: (packId: string, plan: unknown, decisions: unknown) => ipcRenderer.invoke('version:apply', packId, plan, decisions)
   },
   install: {
     modpack: (id: string) => ipcRenderer.invoke('install:modpack', id),

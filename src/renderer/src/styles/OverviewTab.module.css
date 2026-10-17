@@ -162,4 +162,19 @@
   font-size: 13px;
   font-weight: 600;
   color: var(--text);
+  display: inline-flex;
+  align-items: center;
 }
+.verEdit {
+  margin-left: 8px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+  color: var(--accent);
+  padding: 2px 6px;
+  border-radius: 5px;
+  border: 1px solid rgb(from var(--accent) r g b / 0.4);
+  transition: background 0.15s, color 0.15s;
+}
+.verEdit:hover { background: var(--accent); color: #0a0a0a; }

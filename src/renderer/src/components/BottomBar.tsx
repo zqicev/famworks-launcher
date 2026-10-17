@@ -48,7 +48,7 @@ export default function BottomBar({ modpack, activeMods = 0, totalMods = 0 }: Pr
   const [busyId, setBusyId] = useState<string | null>(null)
   const [progress, setProgress] = useState<ProgressState | null>(null)
   const [instances, setInstances] = useState<Instance[]>([])
-  const [stopOpen, setStopOpen] = useState(false)
+  const [runOpen, setRunOpen] = useState(false) // список всех запущенных экземпляров (всех сборок)
   const [pickOpen, setPickOpen] = useState(false)
   const [runningMb, setRunningMb] = useState(0)
   const [health, setHealth] = useState<MemoryHealth | null>(null)
@@ -169,13 +169,13 @@ export default function BottomBar({ modpack, activeMods = 0, totalMods = 0 }: Pr
     }
   }, [busyId, modpack.id])
 
-  // Закрытие стоп-меню по клику вне.
+  // Закрытие списка запущенных по клику вне.
   useEffect(() => {
-    if (!stopOpen) return
-    const close = (): void => setStopOpen(false)
+    if (!runOpen) return
+    const close = (): void => setRunOpen(false)
     const t = setTimeout(() => document.addEventListener('click', close), 0)
     return () => { clearTimeout(t); document.removeEventListener('click', close) }
-  }, [stopOpen])
+  }, [runOpen])
 
   // Не даём выбрать больше, чем есть в системе (оставляем запас под ОС).
   const memoryOptions = MEMORY_OPTIONS.filter(mb => mb <= totalRamMb - 1024)
@@ -245,18 +245,25 @@ export default function BottomBar({ modpack, activeMods = 0, totalMods = 0 }: Pr
   }
 
   const stopInstance = async (instanceId: string) => {
-    setStopOpen(false)
     await window.api.killGame(instanceId).catch(() => {})
     refreshInstances()
   }
+  const stopAll = async () => {
+    for (const i of instances) await window.api.killGame(i.instanceId).catch(() => {})
+    setRunOpen(false)
+    refreshInstances()
+  }
+  // Кнопка «стоп» этой сборки: один экземпляр — останавливаем сразу, несколько — открываем список.
   const handleStop = () => {
     if (myInstances.length <= 1) { if (myInstances[0]) stopInstance(myInstances[0].instanceId) }
-    else setStopOpen(o => !o)
+    else setRunOpen(o => !o)
   }
 
   const isBusy = status === 'checking' || status === 'installing' || status === 'launching'
   const canCancel = status === 'installing' || status === 'launching'
   const lockedByOther = !!busyId && busyId !== modpack.id
+  const anyRunning = instances.length > 0            // запущено что-то (любой сборки)
+  const otherRunning = anyRunning && myInstances.length === 0  // запущена другая сборка, эта — нет
 
   const btnLabel = {
     checking: 'ПРОВЕРКА...', not_installed: 'УСТАНОВИТЬ', outdated: 'ОБНОВИТЬ',
@@ -322,8 +329,31 @@ export default function BottomBar({ modpack, activeMods = 0, totalMods = 0 }: Pr
             </>
           ) : lockedByOther ? (
             <div className={styles.statusMsg}>Дождитесь завершения работы с другой сборкой</div>
-          ) : running ? (
-            <div className={styles.statusMsg}>Запущено экземпляров: {myInstances.length}</div>
+          ) : anyRunning ? (
+            <div className={styles.runWrap} onClick={e => e.stopPropagation()}>
+              <button className={styles.runToggle} onClick={() => setRunOpen(o => !o)} title="Показать запущенные сборки">
+                <span className={styles.runDot} />
+                Запущено: {instances.length}
+                <span className={styles.runChevron}>{runOpen ? '∧' : '∨'}</span>
+              </button>
+              {runOpen && (
+                <div className={styles.runMenu}>
+                  <div className={styles.runMenuHead}>Запущенные сборки</div>
+                  {instances.map(inst => (
+                    <div key={inst.instanceId} className={styles.runRow}>
+                      <div className={styles.runInfo}>
+                        <span className={styles.runName}>{inst.modpackName}</span>
+                        <span className={styles.runAcc}>{inst.account}</span>
+                      </div>
+                      <button className={styles.runStop} onClick={() => stopInstance(inst.instanceId)} title="Остановить">✕</button>
+                    </div>
+                  ))}
+                  {instances.length > 1 && (
+                    <button className={styles.runStopAll} onClick={stopAll}>Остановить все</button>
+                  )}
+                </div>
+              )}
+            </div>
           ) : status === 'checking' ? (
             <div className={styles.statusMsg}>Проверка<span className={styles.dots} /></div>
           ) : health?.issue ? (
@@ -377,21 +407,9 @@ export default function BottomBar({ modpack, activeMods = 0, totalMods = 0 }: Pr
           </>
         ) : running ? (
           <>
-            <div className={styles.stopWrap}>
-              <button className={styles.cancelBtn} onClick={handleStop} title="Остановить">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2" /></svg>
-              </button>
-              {stopOpen && myInstances.length > 1 && (
-                <div className={styles.stopMenu} onClick={e => e.stopPropagation()}>
-                  <div className={styles.stopMenuHead}>Остановить экземпляр</div>
-                  {myInstances.map((inst, i) => (
-                    <button key={inst.instanceId} className={styles.stopMenuItem} onClick={() => stopInstance(inst.instanceId)}>
-                      #{i + 1} · {inst.account}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            <button className={styles.cancelBtn} onClick={handleStop} title="Остановить">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="5" y="5" width="14" height="14" rx="2" /></svg>
+            </button>
             <div className={styles.playGroup}>
               <button className={`${styles.playBtn} ${styles.playBtnMuted}`} disabled>
                 <span className={styles.playLabel}>ИГРАТЬ</span>
@@ -405,6 +423,11 @@ export default function BottomBar({ modpack, activeMods = 0, totalMods = 0 }: Pr
               </button>
             </div>
           </>
+        ) : status === 'ready' && otherRunning && !lockedByOther ? (
+          <button className={`${styles.playBtn} ${styles.playBtnAccent}`} onClick={openPick} title="Запущена другая сборка — запустить ещё один экземпляр">
+            <span className={styles.playLabel}><span className={styles.playIcon}>＋ </span>ИГРАТЬ</span>
+            <span className={styles.playSub}>ещё экземпляр · {modpack.name}</span>
+          </button>
         ) : (
           <button
             className={`${styles.playBtn} ${btnAccent && !lockedByOther ? styles.playBtnAccent : styles.playBtnMuted}`}

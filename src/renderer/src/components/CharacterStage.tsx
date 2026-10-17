@@ -92,16 +92,33 @@ export default function CharacterStage({ character }: Props): JSX.Element {
       animPromise = Promise.resolve()
     }
 
-    // Реальный скин активного аккаунта (иначе дефолтный Steve).
-    const skinPromise = window.api.skin.get()
-      .then(res => { if (!disposed && res?.dataUrl) return viewer.loadSkin(res.dataUrl, { model: res.slim ? 'slim' : 'auto-detect' }) })
-      .catch(() => {})
+    // Реальный скин активного аккаунта (иначе дефолтный Steve). Возвращает true, если скин «живой»
+    // (не дефолт и не кэш из-за оффлайна).
+    const applySkin = async (): Promise<boolean> => {
+      try {
+        const res = await window.api.skin.get()
+        if (disposed) return false
+        if (res?.dataUrl) {
+          await viewer.loadSkin(res.dataUrl, { model: res.slim ? 'slim' : 'auto-detect' })
+          return !res.stale
+        }
+      } catch { /* оффлайн — оставляем текущий/дефолтный */ }
+      return false
+    }
+
+    // Пока скин не настоящий (дефолт/кэш) — раз в минуту повторяем, пока не придёт актуальный.
+    let skinRetry: ReturnType<typeof setInterval> | null = null
+    const clearSkinRetry = (): void => { if (skinRetry) { clearInterval(skinRetry); skinRetry = null } }
+    const scheduleSkinRetry = (): void => {
+      if (skinRetry) return
+      skinRetry = setInterval(async () => { if (!disposed && await applySkin()) clearSkinRetry() }, 60000)
+    }
+
+    const skinPromise = applySkin().then(live => { if (!disposed && !live) scheduleSkinRetry() })
 
     // Активный аккаунт сменился (событие из панели) - перезагружаем скин на лету.
     const reloadSkin = (): void => {
-      window.api.skin.get()
-        .then(res => { if (!disposed && res?.dataUrl) return viewer.loadSkin(res.dataUrl, { model: res.slim ? 'slim' : 'auto-detect' }) })
-        .catch(() => {})
+      applySkin().then(live => { if (disposed) return; if (live) clearSkinRetry(); else scheduleSkinRetry() })
     }
     window.addEventListener('fw:account-changed', reloadSkin)
 
@@ -138,6 +155,7 @@ export default function CharacterStage({ character }: Props): JSX.Element {
 
     return () => {
       disposed = true
+      clearSkinRetry()
       window.removeEventListener('fw:account-changed', reloadSkin)
       document.removeEventListener('visibilitychange', onVis)
       ro.disconnect()
