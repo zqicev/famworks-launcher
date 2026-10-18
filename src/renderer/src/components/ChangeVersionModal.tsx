@@ -24,9 +24,11 @@ export default function ChangeVersionModal({ packId, loader, currentMc, onClose,
   const [decisions, setDecisions] = useState<Record<string, Decision>>({})
   const [planning, setPlanning] = useState(false)
   const [confirmDel, setConfirmDel] = useState(false)
+  const [loadingVersions, setLoadingVersions] = useState(true)
 
   useEffect(() => {
     let alive = true
+    setLoadingVersions(true)
     void (async () => {
       let vs = await window.api.mcVersions(loader).catch(() => [] as string[])
       // Мета загрузчика недоступна → показываем полный список релизов (совместимость проверит «Проверить»).
@@ -34,6 +36,7 @@ export default function ChangeVersionModal({ packId, loader, currentMc, onClose,
       if (!alive) return
       setVersions(vs)
       setNewMc(vs.find(v => v !== currentMc) ?? vs[0] ?? '')
+      setLoadingVersions(false)
     })()
     return () => { alive = false }
   }, [loader, currentMc])
@@ -88,7 +91,15 @@ export default function ChangeVersionModal({ packId, loader, currentMc, onClose,
           <div className={styles.pickRow}>
             <span className={styles.mcBadge}>{currentMc}</span>
             <span className={styles.arrow}>→</span>
-            <div className={styles.dd}><Dropdown value={newMc} options={options} onChange={pickMc} /></div>
+            <div className={styles.dd}>
+              <Dropdown
+                value={newMc}
+                options={options}
+                onChange={pickMc}
+                disabled={loadingVersions}
+                placeholder={loadingVersions ? 'Загрузка версий…' : 'Выбрать'}
+              />
+            </div>
             <button className={styles.checkBtn} onClick={runPlan} disabled={planning || !newMc || newMc === currentMc}>
               {planning ? 'Проверка…' : 'Проверить'}
             </button>
