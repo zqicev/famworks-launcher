@@ -139,7 +139,7 @@ interface Window {
     }
     browser: {
       installModpack: (source: string, id: string) => Promise<{ ok?: boolean; modpack?: import('../../types/modpack').Modpack; error?: string; cancelled?: boolean }>
-      install: (source: string, type: string, projectId: string, refId: string, mc: string, loader: string, packRoot: string) =>
+      install: (source: string, type: string, projectId: string, refId: string, mc: string, loader: string, packId: string) =>
         Promise<{ ok: boolean; installed: string[]; error?: string }>
       project: (source: string, id: string, type: string) => Promise<{
         source: 'modrinth' | 'curseforge'

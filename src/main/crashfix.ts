@@ -6,14 +6,14 @@ import { fetchModpack } from './modpacks'
 import { searchModrinth, getModVersions, getModrinthVersionByHash } from './modrinth'
 import { downloadModToDir } from './installer'
 import { matchModFile } from './modFiles'
+import { packDir } from './packpaths'
 
 interface Fix { kind: string; label?: string; query?: string; version?: string; mod?: string; file?: string }
 
 /** Исполняет починку из диагноза краша. */
 export async function applyCrashFix(modpackId: string, fix: Fix): Promise<{ ok: boolean; message?: string; error?: string }> {
   const modpack = await fetchModpack(modpackId)
-  const installPath = store.get('installPath') as string
-  const modsDir = join(installPath, modpackId, 'mods')
+  const modsDir = join(packDir(modpackId), 'mods')
 
   // Установить недостающую/нужную зависимость с Modrinth
   if (fix.kind === 'install-dep') {

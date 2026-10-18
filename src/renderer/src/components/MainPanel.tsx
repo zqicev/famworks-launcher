@@ -48,16 +48,18 @@ export default function MainPanel({ modpack, installPath, loading, error, devMod
   }, [])
 
   const mpId = modpack?.id
+  // Папка сборки (может отличаться от id, в т.ч. кириллицей) — её проставляет main в modpacks.get.
+  const packFolder = modpack?.folder ?? modpack?.id
   const refreshCounts = useCallback(async () => {
-    if (!mpId) return
-    const root = `${installPath}/${mpId}`
+    if (!packFolder) return
+    const root = `${installPath}/${packFolder}`
     const [mods, rp, sh] = await Promise.all([
       countDir(`${root}/mods`, 'jar'),
       countDir(`${root}/resourcepacks`, 'zip', true),
       countDir(`${root}/shaderpacks`, 'zip', true)
     ])
     setCounts({ modsTotal: mods.total, modsActive: mods.enabled, rp: rp.total, sh: sh.total })
-  }, [mpId, installPath])
+  }, [packFolder, installPath])
 
   useEffect(() => {
     setCounts({
@@ -96,9 +98,10 @@ export default function MainPanel({ modpack, installPath, loading, error, devMod
 
   const browseType = tab === 'resourcepacks' ? 'resourcepack' : tab === 'shaders' ? 'shader' : 'mod'
 
-  const modsDir = `${installPath}/${modpack.id}/mods`
-  const rpDir = `${installPath}/${modpack.id}/resourcepacks`
-  const shDir = `${installPath}/${modpack.id}/shaderpacks`
+  const dir = modpack.folder ?? modpack.id
+  const modsDir = `${installPath}/${dir}/mods`
+  const rpDir = `${installPath}/${dir}/resourcepacks`
+  const shDir = `${installPath}/${dir}/shaderpacks`
   const totalSizeMb = modpack.mods.reduce((s, m) => s + m.size_mb, 0)
 
   return (
@@ -132,7 +135,7 @@ export default function MainPanel({ modpack, installPath, loading, error, devMod
             </button>
           )}
 
-          <button className={styles.folderBtn} onClick={() => window.api.shell.openFolder(`${installPath}/${modpack.id}`)} title="Открыть папку сборки">
+          <button className={styles.folderBtn} onClick={() => window.api.shell.openFolder(`${installPath}/${dir}`)} title="Открыть папку сборки">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <path d="M4 5h5l2 2h9a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1z" />
             </svg>

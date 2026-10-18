@@ -82,4 +82,7 @@ export interface Modpack extends ModpackSummary {
   servers?: ServerEntry[]
   configs?: ConfigFile[]
   character?: CharacterAnim  // анимация модельки на «Обзоре»
+  /** Имя папки сборки под installPath (может отличаться от id, в т.ч. кириллицей). Проставляет main
+   *  при modpacks.get; рендер строит пути по нему, а не по id. Не хранится в JSON сборки. */
+  folder?: string
 }

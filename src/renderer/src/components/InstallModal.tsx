@@ -76,8 +76,7 @@ export default function InstallModal({ source, type, projectId, title, packs, in
     setInstalling(true)
     showToast(`Установка «${title}»…`, 'info')
     try {
-      const packRoot = `${installPath}/${current.pack.id}`
-      const res = await window.api.browser.install(source, type, projectId, chosen, current.pack.mc_version, current.pack.loader, packRoot)
+      const res = await window.api.browser.install(source, type, projectId, chosen, current.pack.mc_version, current.pack.loader, current.pack.id)
       if (res.ok) {
         const n = res.installed.length
         showToast(n > 1 ? `«${title}» и зависимости установлены (${n} файлов) в «${current.pack.name}»` : `«${title}» установлен в «${current.pack.name}»`, 'success')

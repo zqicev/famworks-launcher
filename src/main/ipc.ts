@@ -7,6 +7,7 @@ import { checkAndInstallModpack, getModpackStatus, toggleMod, deleteMod, getInst
 import { launchGame, offlineAuthorization, abortLaunch, QuickPlay } from './launcher'
 import { killInstance, listInstances, onInstancesChange, reattachInstances } from './instances'
 import { setupLoader, latestLoaderVersion, LoaderId } from './loaders'
+import { packDir, packFolderOf, ensurePackFolder, forgetPackFolder } from './packpaths'
 import { searchModrinth, getModVersions, getModrinthIcons, getModrinthAuthors } from './modrinth'
 import { microsoftLogin, microsoftRefresh } from './msAuth'
 import { Account } from './store'
@@ -30,7 +31,13 @@ export function setupIpcHandlers() {
   ipcMain.handle('store:set', (_, key, value) => store.set(key, value))
 
   ipcMain.handle('modpacks:index', () => fetchModpackIndex())
-  ipcMain.handle('modpacks:get', (_, id: string) => fetchModpack(id))
+  ipcMain.handle('modpacks:get', async (_, id: string) => {
+    const mp = await fetchModpack(id)
+    // Приводим папку к человекочитаемому имени (безопасно, только когда сборка не запущена) и
+    // отдаём актуальное имя папки рендеру, чтобы он строил пути по нему, а не по id.
+    const folder = ensurePackFolder(mp)
+    return { ...mp, folder }
+  })
 
   ipcMain.handle('modpack:list-dir', async (_, id: string, relPath: string) => {
     const { listPackDir } = await import('./packio')
@@ -155,7 +162,7 @@ export function setupIpcHandlers() {
     if (cached && Date.now() - cached.at < 60000) return cached.bytes
     const { dirSize } = await import('./cleanup')
     const installPath = store.get('installPath') as string
-    const bytes = await dirSize(pathJoin(installPath, modpackId))
+    const bytes = await dirSize(packDir(modpackId))
     sizeCache.set(modpackId, { bytes, at: Date.now() })
     return bytes
   })
@@ -217,7 +224,7 @@ export function setupIpcHandlers() {
     try {
       const modpack = await fetchModpack(modpackId)
       const installPath = store.get('installPath') as string
-      const gameRoot = pathJoin(installPath, modpack.id)
+      const gameRoot = packDir(modpack.id)
       await setupLoader(modpack, gameRoot, win)
       await checkAndInstallModpack(modpack, installPath, win)
       sizeCache.delete(modpackId) // размер вырос — пусть пересчитается
@@ -328,7 +335,7 @@ export function setupIpcHandlers() {
       try {
         const { ensureSkinMod } = await import('./skins')
         const wantSkins = account?.type === 'offline' && !!account.customSkins && modpack.loader !== 'vanilla'
-        await ensureSkinMod(modpack, pathJoin(installPath, modpackId), wantSkins, win)
+        await ensureSkinMod(modpack, packDir(modpackId), wantSkins, win)
       } catch (e) {
         win.webContents.send('launch:log', { id: modpackId, text: `[skins] ${String(e)}` })
       }
@@ -446,12 +453,14 @@ export function setupIpcHandlers() {
   // Кастомные (локальные) сборки
   ipcMain.handle('custom:list', () => store.get('customModpacks'))
   ipcMain.handle('custom:save', (_, mp) => {
-    const list = (store.get('customModpacks') as any[]).filter(m => m.id !== mp.id)
-    list.push(mp)
+    const { folder: _folder, ...clean } = mp ?? {} // folder — служебное (от modpacks.get), в JSON не храним
+    const list = (store.get('customModpacks') as any[]).filter(m => m.id !== clean.id)
+    list.push(clean)
     store.set('customModpacks', list)
-    // Сразу создаём структуру папок, чтобы «Открыть папку» и добавление файлов работали до установки
+    // Сразу создаём структуру папок, чтобы «Открыть папку» и добавление файлов работали до установки.
+    // Через резолвер — иначе у уже переименованной сборки создалась бы лишняя папка по id.
     try {
-      const root = pathJoin(store.get('installPath') as string, mp.id)
+      const root = packDir(mp.id)
       for (const sub of ['mods', 'resourcepacks', 'shaderpacks']) {
         mkdirSync(pathJoin(root, sub), { recursive: true })
       }
@@ -461,16 +470,17 @@ export function setupIpcHandlers() {
   ipcMain.handle('custom:delete', (_, id: string, deleteFiles: boolean) => {
     store.set('customModpacks', (store.get('customModpacks') as any[]).filter(m => m.id !== id))
     if (deleteFiles) {
-      const dir = pathJoin(store.get('installPath') as string, id)
+      const dir = packDir(id) // реальная папка (может быть переименована в человекочитаемую)
       if (existsSync(dir)) { try { rmSync(dir, { recursive: true, force: true }) } catch {} }
     }
+    forgetPackFolder(id)
     return true
   })
 
   // Браузер: установка контента в сборку вместе с обязательными зависимостями (рекурсивно).
-  ipcMain.handle('browser:install', async (_, source: string, type: string, projectId: string, refId: string, mc: string, loader: string, packRoot: string) => {
+  ipcMain.handle('browser:install', async (_, source: string, type: string, projectId: string, refId: string, mc: string, loader: string, packId: string) => {
     const { installFromBrowser } = await import('./browserInstall')
-    return installFromBrowser(source, type, projectId, refId, mc, loader, packRoot, getWindow())
+    return installFromBrowser(source, type, projectId, refId, mc, loader, packDir(packId), getWindow())
   })
 
   // Браузер: страница обзора проекта (описание, галерея, зависимости, авторы, лицензия).

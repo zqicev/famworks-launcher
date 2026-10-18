@@ -12,6 +12,7 @@ import { isCancelError } from './abort'
 import { setPlaying, setIdle } from './discord'
 import { setBusy } from './busy'
 import { addInstance, removeInstance, instancesForPack, anyInstances } from './instances'
+import { packDir } from './packpaths'
 import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'fs'
 import { createHash, randomUUID } from 'crypto'
 
@@ -101,7 +102,7 @@ export async function launchGame(
   }
 
   // 2. Загрузчик (Fabric/Quilt — meta-профиль, Forge/NeoForge — установщик). Все дают version-профиль.
-  const gameRoot = join(installPath, modpack.id)
+  const gameRoot = packDir(modpack.id)
   stage('Подготовка загрузчика')
   const loaderVersionId = await setupLoader(modpack, gameRoot, win)
   // Кириллица в пути + Forge/NeoForge = краш в раннем экране Forge (драйвер GPU при glfwCreateWindow).

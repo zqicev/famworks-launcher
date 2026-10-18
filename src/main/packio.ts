@@ -8,6 +8,7 @@ import { store } from './store'
 import { fetchModpack } from './modpacks'
 import { Modpack, Mod } from '../types/modpack'
 import { slugify, baseCustomId } from '../shared/slug'
+import { packDir } from './packpaths'
 
 export interface ExportResult { ok?: boolean; path?: string; cancelled?: boolean }
 export interface ImportResult { ok?: boolean; modpack?: Modpack; cancelled?: boolean }
@@ -34,7 +35,7 @@ function newCustomId(name: string, installPath: string): string {
 export function listPackDir(id: string, relPath: string): DirEntry[] {
   const installPath = store.get('installPath') as string
   if (!installPath) return []
-  const gameRoot = resolve(join(installPath, id))
+  const gameRoot = resolve(packDir(id))
   const target = resolve(gameRoot, relPath || '.')
   // защита от выхода за пределы папки сборки
   if (target !== gameRoot && !target.startsWith(gameRoot + sep)) return []
@@ -93,7 +94,7 @@ function collectSelected(gameRoot: string, relDir: string, marks: Record<string,
 export async function exportModpackSelected(id: string, marks: Record<string, ExportMark>): Promise<ExportResult> {
   const modpack = await fetchModpack(id)
   const installPath = store.get('installPath') as string
-  const gameRoot = join(installPath, id)
+  const gameRoot = packDir(id)
 
   const res = await dialog.showSaveDialog({
     title: 'Экспорт сборки',
@@ -143,7 +144,7 @@ interface MrFile {
 export async function exportModpackMrpack(id: string, marks: Record<string, ExportMark>): Promise<ExportResult> {
   const modpack = await fetchModpack(id)
   const installPath = store.get('installPath') as string
-  const gameRoot = join(installPath, id)
+  const gameRoot = packDir(id)
 
   const res = await dialog.showSaveDialog({
     title: 'Экспорт сборки (Modrinth)',
@@ -246,7 +247,7 @@ function importFwpack(zip: AdmZip, installPath: string): ImportResult {
   }
 
   const id = newCustomId(meta.name || 'pack', installPath)
-  const gameRoot = join(installPath, id)
+  const gameRoot = packDir(id)
   mkdirSync(gameRoot, { recursive: true })
 
   zip.extractAllTo(gameRoot, true)
@@ -294,7 +295,7 @@ function importMrpack(zip: AdmZip, installPath: string): ImportResult {
 
   const name = idx.name || 'Импортированная сборка'
   const id = newCustomId(name, installPath)
-  const gameRoot = join(installPath, id)
+  const gameRoot = packDir(id)
   mkdirSync(gameRoot, { recursive: true })
 
   const mods: Mod[] = []

@@ -10,6 +10,7 @@ import { loaderInstalled } from './loaders'
 import { store } from './store'
 import { resolveFamworks, FwResolve } from './portalMods'
 import { otherVersions, fileKey } from './modFiles'
+import { packDir } from './packpaths'
 
 interface ResolvedMod {
   url: string
@@ -170,13 +171,13 @@ async function famworksOutdated(modpack: Modpack, gameRoot: string): Promise<boo
 /** Реальные установленные файлы famworks-модов сборки (famworks_id → {filename, sha512}).
  *  Нужно списку модов: имя файла берётся с портала, а не из JSON сборки. */
 export function getFamworksTracking(installPath: string, modpackId: string): Record<string, FwTrack> {
-  return readFwTracking(join(installPath, modpackId))
+  return readFwTracking(packDir(modpackId))
 }
 
 /** Переустановить famworks-моды сборки под свежий канал (после переключения test/release). */
 export async function reinstallFamworks(modpack: Modpack, installPath: string, win: BrowserWindow): Promise<void> {
   for (const k of [...fwResolveCache.keys()]) if (k.startsWith(modpack.id + '|')) fwResolveCache.delete(k)
-  await installFamworks(modpack, join(installPath, modpack.id), win)
+  await installFamworks(modpack, packDir(modpack.id), win)
   emit(win, { phase: 'done', message: '' })
 }
 
@@ -280,7 +281,7 @@ export async function checkAndInstallModpack(
   installPath: string,
   win: BrowserWindow
 ): Promise<void> {
-  const gameRoot = join(installPath, modpack.id)
+  const gameRoot = packDir(modpack.id)
   const modsDir = join(gameRoot, 'mods')
   mkdirSync(modsDir, { recursive: true })
 
@@ -452,7 +453,7 @@ export async function getModpackStatus(
   modpack: Modpack,
   installPath: string
 ): Promise<'not_installed' | 'outdated' | 'ready'> {
-  const gameRoot = join(installPath, modpack.id)
+  const gameRoot = packDir(modpack.id)
 
   // Если загрузчик ещё не подготовлен (профиль Fabric/Quilt или installer Forge/NeoForge) — не установлена
   if (!loaderInstalled(modpack, gameRoot)) return 'not_installed'

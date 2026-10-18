@@ -9,6 +9,7 @@ import { resolveFamworks } from './portalMods'
 import { latestLoaderVersion, LoaderId } from './loaders'
 import { downloadModToDir } from './installer'
 import { beginOperation, endOperation } from './abort'
+import { packDir } from './packpaths'
 
 // ───────── Смена версии Minecraft у пользовательской сборки (миграция ресурсов) ─────────
 
@@ -132,8 +133,7 @@ export async function applyVersionChange(
 ): Promise<{ ok: boolean; error?: string }> {
   const pack = customPack(packId)
   if (!pack) return { ok: false, error: 'Сборка не найдена' }
-  const installPath = store.get('installPath') as string
-  const gameRoot = join(installPath, packId)
+  const gameRoot = packDir(packId)
   const dirFor = (k: ItemKind): string => join(gameRoot, k === 'mod' ? 'mods' : k === 'resourcepack' ? 'resourcepacks' : 'shaderpacks')
   const byId = new Map(plan.items.map(i => [`${i.kind}:${i.id}`, i]))
 
