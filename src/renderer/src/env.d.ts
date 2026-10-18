@@ -8,6 +8,7 @@ interface Window {
     }
     modpacks: {
       index: () => Promise<import('../../types/modpack').ModpackIndex>
+      portalIcons: (items: { id: string; icon: string }[]) => Promise<Record<string, string>>
       get: (id: string) => Promise<import('../../types/modpack').Modpack>
       status: (id: string) => Promise<'not_installed' | 'outdated' | 'ready'>
       dirSize: (id: string) => Promise<number>

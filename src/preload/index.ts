@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld('api', {
   },
   modpacks: {
     index: () => ipcRenderer.invoke('modpacks:index'),
+    portalIcons: (items: { id: string; icon: string }[]) => ipcRenderer.invoke('modpacks:portal-icons', items),
     get: (id: string) => ipcRenderer.invoke('modpacks:get', id),
     status: (id: string) => ipcRenderer.invoke('modpack:status', id),
     dirSize: (id: string) => ipcRenderer.invoke('modpack:dir-size', id),

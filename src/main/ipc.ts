@@ -2,7 +2,7 @@ import { ipcMain, dialog, BrowserWindow, shell, app } from 'electron'
 import { copyFileSync, mkdirSync, rmSync, existsSync, readFileSync, writeFileSync } from 'fs'
 import { basename, join as pathJoin } from 'path'
 import { store, getPackMemory, setPackMemory } from './store'
-import { fetchModpackIndex, fetchModpack } from './modpacks'
+import { fetchModpackIndex, fetchModpack, fetchPackIcons } from './modpacks'
 import { checkAndInstallModpack, getModpackStatus, toggleMod, deleteMod, getInstalledMods, getInstalledEntries, downloadModToDir, getModFileSizeBytes } from './installer'
 import { launchGame, offlineAuthorization, abortLaunch, QuickPlay } from './launcher'
 import { killInstance, listInstances, onInstancesChange, reattachInstances } from './instances'
@@ -31,6 +31,7 @@ export function setupIpcHandlers() {
   ipcMain.handle('store:set', (_, key, value) => store.set(key, value))
 
   ipcMain.handle('modpacks:index', () => fetchModpackIndex())
+  ipcMain.handle('modpacks:portal-icons', (_, items: { id: string; icon: string }[]) => fetchPackIcons(items))
   ipcMain.handle('modpacks:get', async (_, id: string) => {
     const mp = await fetchModpack(id)
     // Приводим папку к человекочитаемому имени (безопасно, только когда сборка не запущена) и

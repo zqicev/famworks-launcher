@@ -8,6 +8,7 @@ export interface HomePack {
   mc_version: string
   for_map?: boolean
   custom?: boolean
+  icon?: string // путь к иконке с портала (famworks-builds), если задана
 }
 
 interface Props {
@@ -33,7 +34,8 @@ export default function HomeView({ packs, onOpen }: Props): JSX.Element {
   const [mode, setMode] = useState<'tiles' | 'list'>('tiles')
   const [categories, setCategories] = useState<string[]>([])
   const [packCat, setPackCat] = useState<Record<string, string>>({})
-  const [icons, setIcons] = useState<Record<string, string>>({})
+  const [icons, setIcons] = useState<Record<string, string>>({})          // локальные id → filename
+  const [portalIcons, setPortalIcons] = useState<Record<string, string>>({}) // с портала id → data-URL
   const [dragId, setDragId] = useState<string | null>(null)
   const [overCat, setOverCat] = useState<string | null>(null)
   const [adding, setAdding] = useState(false)
@@ -45,6 +47,18 @@ export default function HomeView({ packs, onOpen }: Props): JSX.Element {
     window.api.store.get('homeCategories').then(c => { if (Array.isArray(c)) setCategories(c as string[]) }).catch(() => {})
     window.api.store.get('homePackCategory').then(m => { if (m && typeof m === 'object') setPackCat(m as Record<string, string>) }).catch(() => {})
   }, [])
+
+  // Иконки официальных сборок с портала (у кого задана). Зависим от стабильного ключа, а не от
+  // массива packs (он пересоздаётся каждый рендер), иначе дёргали бы IPC без нужды.
+  const iconItems = packs.filter(p => p.icon).map(p => ({ id: p.id, icon: p.icon as string }))
+  const iconKey = iconItems.map(i => `${i.id}:${i.icon}`).join('|')
+  useEffect(() => {
+    if (iconItems.length) window.api.modpacks.portalIcons(iconItems).then(setPortalIcons).catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [iconKey])
+
+  // Источник картинки карточки: локальная > портал > буква.
+  const iconSrc = (id: string): string | undefined => (icons[id] ? `fwbg://icon/${icons[id]}` : portalIcons[id])
 
   const setViewMode = (m: 'tiles' | 'list'): void => { setMode(m); window.api.store.set('homeView', m).catch(() => {}) }
   const persistCats = (c: string[]): void => { setCategories(c); window.api.store.set('homeCategories', c).catch(() => {}) }
@@ -100,8 +114,8 @@ export default function HomeView({ packs, onOpen }: Props): JSX.Element {
       title="Открыть сборку"
     >
       <div className={styles.cardIcon}>
-        {icons[p.id]
-          ? <img src={`fwbg://icon/${icons[p.id]}`} alt="" className={styles.cardImg} />
+        {iconSrc(p.id)
+          ? <img src={iconSrc(p.id)} alt="" className={styles.cardImg} />
           : <span className={styles.cardLetter}>{(p.name[0] ?? '?').toUpperCase()}</span>}
       </div>
       <div className={styles.cardInfo}>

@@ -296,7 +296,7 @@ export default function App() {
           })() : view === 'home' ? (
             <HomeView
               packs={[
-                ...(modpackIndex?.modpacks ?? []).map(p => ({ id: p.id, name: p.name, loader: p.loader, mc_version: p.mc_version, for_map: p.for_map, custom: false })),
+                ...(modpackIndex?.modpacks ?? []).map(p => ({ id: p.id, name: p.name, loader: p.loader, mc_version: p.mc_version, for_map: p.for_map, icon: p.icon, custom: false })),
                 ...customPacks.map(p => ({ id: p.id, name: p.name, loader: p.loader, mc_version: p.mc_version, for_map: p.for_map, custom: true }))
               ]}
               onOpen={(id) => { setSelectedId(id); setView('modpack') }}

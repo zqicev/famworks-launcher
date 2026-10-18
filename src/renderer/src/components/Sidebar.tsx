@@ -57,9 +57,15 @@ const DropdownIcon = () => (
 
 export default function Sidebar({ width, index, customPacks, selectedId, seenUpdates, onSelect, onSettings, onRefresh, onCreate, onDeleteCustom, onImport, onExport, homeActive, onOpenHome, browserActive, onOpenBrowser }: Props) {
   const [version, setVersion] = useState('')
-  const [icons, setIcons] = useState<Record<string, string>>({})
+  const [icons, setIcons] = useState<Record<string, string>>({})          // локальные (пользователь) id → filename
+  const [portalIcons, setPortalIcons] = useState<Record<string, string>>({}) // официальные с портала id → data-URL
   useEffect(() => { window.api.appVersion().then(setVersion).catch(() => {}) }, [])
   useEffect(() => { window.api.packIcon.all().then(setIcons).catch(() => {}) }, [])
+  // Иконки официальных сборок из famworks-builds (у кого задана в index.json).
+  useEffect(() => {
+    const items = (index?.modpacks ?? []).filter(p => p.icon).map(p => ({ id: p.id, icon: p.icon as string }))
+    if (items.length) window.api.modpacks.portalIcons(items).then(setPortalIcons).catch(() => {})
+  }, [index])
 
   const [showMapPacks, setShowMapPacks] = useState<boolean>(false);
 
@@ -67,12 +73,14 @@ export default function Sidebar({ width, index, customPacks, selectedId, seenUpd
     const r = await window.api.packIcon.pick(id).catch(() => null)
     if (r?.filename) setIcons(prev => ({ ...prev, [id]: r.filename! }))
   }
+  // Источник картинки: локальная картинка пользователя > иконка с портала > буква.
+  const iconSrc = (id: string): string | undefined => (icons[id] ? `fwbg://icon/${icons[id]}` : portalIcons[id])
 
-  const Avatar = ({ name, active, icon, onEdit }: { name: string; active: boolean; icon?: string; onEdit: () => void }): JSX.Element => (
+  const Avatar = ({ name, active, src, onEdit }: { name: string; active: boolean; src?: string; onEdit: () => void }): JSX.Element => (
     <div className={styles.avatarWrap} onClick={(e) => { e.stopPropagation(); onEdit() }} title="Сменить картинку сборки">
-      {icon ? (
+      {src ? (
         <div className={styles.avatar}>
-          <img className={styles.avatarImg} src={`fwbg://icon/${icon}`} alt="" />
+          <img className={styles.avatarImg} src={src} alt="" />
         </div>
       ) : (
         <div className={styles.avatar} style={{ background: active ? 'var(--accent)' : 'var(--bg-active)' }}>
@@ -126,7 +134,7 @@ export default function Sidebar({ width, index, customPacks, selectedId, seenUpd
               const active = selectedId === pack.id
               return (
                 <button key={pack.id} className={`${styles.item} ${active ? styles.active : ''}`} onClick={() => onSelect(pack.id)}>
-                  <Avatar name={pack.name} active={active} icon={icons[pack.id]} onEdit={() => setPackIcon(pack.id)} />
+                  <Avatar name={pack.name} active={active} src={iconSrc(pack.id)} onEdit={() => setPackIcon(pack.id)} />
                   <div className={styles.info}>
                     <div className={styles.name}>{pack.name}{hasUpdate && <span className={styles.updateBadge}>ОБНОВЛЕНО</span>}</div>
                     <div className={styles.meta}>{pack.loader.charAt(0).toUpperCase() + pack.loader.slice(1)} · {pack.mc_version}</div>
@@ -161,7 +169,7 @@ export default function Sidebar({ width, index, customPacks, selectedId, seenUpd
                 const active = selectedId === pack.id
                 return (
                   <button key={pack.id} className={`${styles.item} ${active ? styles.active : ''}`} onClick={() => onSelect(pack.id)}>
-                    <Avatar name={pack.name} active={active} icon={icons[pack.id]} onEdit={() => setPackIcon(pack.id)} />
+                    <Avatar name={pack.name} active={active} src={iconSrc(pack.id)} onEdit={() => setPackIcon(pack.id)} />
                     <div className={styles.info}>
                       <div className={styles.name}>{pack.name}{hasUpdate && <span className={styles.updateBadge}>ОБНОВЛЕНО</span>}</div>
                       <div className={styles.meta}>{pack.loader.charAt(0).toUpperCase() + pack.loader.slice(1)} · {pack.mc_version}</div>
@@ -199,7 +207,7 @@ export default function Sidebar({ width, index, customPacks, selectedId, seenUpd
               const active = selectedId === pack.id
               return (
                 <button key={pack.id} className={`${styles.item} ${active ? styles.active : ''}`} onClick={() => onSelect(pack.id)}>
-                  <Avatar name={pack.name} active={active} icon={icons[pack.id]} onEdit={() => setPackIcon(pack.id)} />
+                  <Avatar name={pack.name} active={active} src={iconSrc(pack.id)} onEdit={() => setPackIcon(pack.id)} />
                   <div className={styles.info}>
                     <div className={styles.name}>{pack.name}</div>
                     <div className={styles.meta}>{pack.loader.charAt(0).toUpperCase() + pack.loader.slice(1)} · {pack.mc_version}</div>

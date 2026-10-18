@@ -7,6 +7,9 @@ export interface ModpackSummary {
   loader_version: string
   updated_at: string
   for_map?: boolean
+  /** Путь к иконке сборки в репозитории famworks-builds (относительно modpacks/, напр. "icon/<id>.png").
+   *  Проставляет редактор при загрузке иконки. Лаунчер тянет её с raw+jsDelivr fallback. */
+  icon?: string
 }
 
 export interface ModpackIndex {

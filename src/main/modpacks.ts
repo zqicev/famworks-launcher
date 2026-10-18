@@ -39,6 +39,44 @@ export async function fetchModpackIndex(): Promise<ModpackIndex> {
   return data
 }
 
+// ── Иконки официальных сборок (famworks-builds/modpacks/icon/<id>.png) ──
+// Кэш на сессию по относительному пути: iconPath → data-URL|null (null — не нашли/нет сети).
+const iconCache = new Map<string, string | null>()
+
+async function fetchImage(url: string, timeout: number): Promise<string> {
+  const res = await axios.get<ArrayBuffer>(`${url}?t=${Date.now()}`, {
+    responseType: 'arraybuffer', timeout, validateStatus: s => s === 200
+  })
+  if (!String(res.headers['content-type'] || '').includes('image')) throw new Error('not an image')
+  return `data:image/png;base64,${Buffer.from(res.data).toString('base64')}`
+}
+
+/** Иконка сборки по относительному пути (напр. "icon/<id>.png"): raw → зеркало. data-URL или null. */
+async function fetchPackIcon(iconPath: string): Promise<string | null> {
+  if (iconCache.has(iconPath)) return iconCache.get(iconPath) ?? null
+  const clean = iconPath.replace(/^\/+/, '')
+  for (const [base, t] of [[GITHUB_BASE, 6000], [FALLBACK_BASE, 9000]] as const) {
+    try {
+      const dataUrl = await fetchImage(`${base}/${clean}`, t)
+      iconCache.set(iconPath, dataUrl)
+      return dataUrl
+    } catch { /* пробуем зеркало */ }
+  }
+  iconCache.set(iconPath, null)
+  return null
+}
+
+/** Иконки для набора сборок: id → data-URL. Без иконки/недоступные пропускаются. */
+export async function fetchPackIcons(items: { id: string; icon: string }[]): Promise<Record<string, string>> {
+  const out: Record<string, string> = {}
+  await Promise.all(items.map(async it => {
+    if (!it.icon) return
+    const d = await fetchPackIcon(it.icon)
+    if (d) out[it.id] = d
+  }))
+  return out
+}
+
 // Modrinth project id для Fabric API
 const FABRIC_API_PROJECT = 'P7dR8mSH'
 
