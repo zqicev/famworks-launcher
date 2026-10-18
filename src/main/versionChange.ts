@@ -1,9 +1,10 @@
 import { BrowserWindow } from 'electron'
 import { join } from 'path'
-import { existsSync, unlinkSync, renameSync, statSync } from 'fs'
+import { existsSync, unlinkSync, renameSync, statSync, readdirSync, readFileSync } from 'fs'
+import { createHash } from 'crypto'
 import { Modpack, Mod } from '../types/modpack'
 import { store } from './store'
-import { getModVersions } from './modrinth'
+import { getModVersions, getModrinthVersionByHash } from './modrinth'
 import { getCurseforgeFiles, cfSha1 } from './curseforge'
 import { resolveFamworks } from './portalMods'
 import { latestLoaderVersion, LoaderId } from './loaders'
@@ -22,6 +23,7 @@ export interface VersionItem {
   name: string
   source: 'modrinth' | 'curseforge' | 'famworks' | 'download' | 'local'
   compatible: boolean
+  fromJson: boolean      // true — позиция сборки (JSON); false — отдельный файл в папке
   oldFilename: string
   newFilename?: string
   newVersion?: string
@@ -74,7 +76,7 @@ async function mapLimit<T, R>(items: T[], limit: number, fn: (t: T) => Promise<R
 
 /** Ищет версию ресурса под новую MC. compatible=false — перенести нельзя (нет версии / фикс. ссылка / локальный). */
 async function resolveItem(m: Mod, kind: ItemKind, newMc: string, loader: string): Promise<VersionItem> {
-  const base: VersionItem = { kind, id: m.id, name: m.name, source: sourceOf(m), compatible: false, oldFilename: m.filename }
+  const base: VersionItem = { kind, id: m.id, name: m.name, source: sourceOf(m), compatible: false, fromJson: true, oldFilename: m.filename }
   try {
     if (m.modrinth_id) {
       const v = (await getModVersions(m.modrinth_id, newMc, loader, MR_TYPE[kind]))[0]
@@ -95,18 +97,75 @@ async function resolveItem(m: Mod, kind: ItemKind, newMc: string, loader: string
   return base
 }
 
+/** Отдельный файл в папке (не из JSON): определяем проект по хэшу Modrinth и ищем версию под новую MC. */
+async function resolveLoose(filename: string, kind: ItemKind, dir: string, newMc: string, loader: string): Promise<VersionItem> {
+  const base: VersionItem = {
+    kind, id: filename, name: filename.replace(/\.(jar|zip)$/i, ''),
+    source: 'local', compatible: false, fromJson: false, oldFilename: filename
+  }
+  try {
+    // Файл может лежать как filename или filename.disabled.
+    let buf: Buffer
+    try { buf = readFileSync(join(dir, filename)) } catch { buf = readFileSync(join(dir, filename + '.disabled')) }
+    const sha1 = createHash('sha1').update(buf).digest('hex')
+    const cur = await getModrinthVersionByHash(sha1)
+    if (cur?.project_id) {
+      const v = (await getModVersions(cur.project_id, newMc, loader, MR_TYPE[kind]))[0]
+      const f = v?.files.find(x => x.primary) ?? v?.files?.[0]
+      if (v && f?.url) return { ...base, source: 'modrinth', compatible: true, newFilename: f.filename, newVersion: v.version_number, _url: f.url, _sha512: f.hashes?.sha512, _size: f.size }
+      return { ...base, source: 'modrinth' } // на Modrinth есть, но нет версии под новую MC
+    }
+  } catch { /* не прочитать / не на Modrinth → local, несовместим */ }
+  return base
+}
+
+/** Отдельные файлы в папке, которых НЕТ в JSON (поставлены через Браузер/перетаскиванием). */
+function looseFilesIn(dir: string, jsonNames: Set<string>, ext: string): string[] {
+  let files: string[]
+  try { files = readdirSync(dir) } catch { return [] }
+  const out: string[] = []
+  const seen = new Set<string>()
+  for (const f of files) {
+    const name = f.replace(/\.disabled$/, '')
+    if (!name.toLowerCase().endsWith(ext)) continue // только файлы; папки не хэшируем
+    if (jsonNames.has(name) || seen.has(name)) continue
+    seen.add(name)
+    out.push(name)
+  }
+  return out
+}
+
 /** Собирает план миграции: что переедет, что нет, и какие версии загрузчика/Fabric API под новую MC. */
 export async function planVersionChange(packId: string, newMc: string): Promise<VersionPlan> {
   const pack = customPack(packId)
   if (!pack) throw new Error('Сборка не найдена')
   const loader = pack.loader
-  // Все ресурсы резолвим параллельно (с лимитом), иначе на больших сборках десятки запросов подряд.
+  const gameRoot = packDir(packId)
+
+  // Позиции сборки из JSON.
   const targets: { m: Mod; kind: ItemKind }[] = [
     ...pack.mods.map(m => ({ m, kind: 'mod' as ItemKind })),
     ...(pack.resourcepacks ?? []).map(m => ({ m, kind: 'resourcepack' as ItemKind })),
     ...(pack.shaders ?? []).map(m => ({ m, kind: 'shader' as ItemKind }))
   ]
-  const items = await mapLimit(targets, 6, t => resolveItem(t.m, t.kind, newMc, loader))
+  // Отдельные файлы на диске, которых нет в JSON.
+  const folders: { kind: ItemKind; sub: string; json: Mod[]; ext: string }[] = [
+    { kind: 'mod', sub: 'mods', json: pack.mods, ext: '.jar' },
+    { kind: 'resourcepack', sub: 'resourcepacks', json: pack.resourcepacks ?? [], ext: '.zip' },
+    { kind: 'shader', sub: 'shaderpacks', json: pack.shaders ?? [], ext: '.zip' }
+  ]
+  const looseTargets: { filename: string; kind: ItemKind; dir: string }[] = []
+  for (const { kind, sub, json, ext } of folders) {
+    const dir = join(gameRoot, sub)
+    const jsonNames = new Set(json.map(x => x.filename))
+    for (const filename of looseFilesIn(dir, jsonNames, ext)) looseTargets.push({ filename, kind, dir })
+  }
+
+  const [jsonItems, looseItems] = await Promise.all([
+    mapLimit(targets, 6, t => resolveItem(t.m, t.kind, newMc, loader)),
+    mapLimit(looseTargets, 6, t => resolveLoose(t.filename, t.kind, t.dir, newMc, loader))
+  ])
+  const items = [...jsonItems, ...looseItems]
 
   let loaderVersion: string | null = null
   try { loaderVersion = await latestLoaderVersion(loader as LoaderId, newMc) } catch { /* оставим прежнюю */ }
@@ -181,11 +240,31 @@ export async function applyVersionChange(
     return res.filter((x): x is Mod => x !== null)
   }
 
+  // Отдельные файлы (не из JSON): только файловые операции, в сборку их не записываем.
+  const migrateLoose = async (): Promise<void> => {
+    await mapLimit(plan.items.filter(i => !i.fromJson), 4, async (item) => {
+      const dir = dirFor(item.kind)
+      if (item.compatible && item._url && item.newFilename) {
+        emit(win, { phase: 'download', message: `Перенос ${item.name}`, current: done, total })
+        try {
+          await downloadModToDir(item._url, item.newFilename, dir, win, item._sha512, item._sha1)
+          if (item.newFilename !== item.oldFilename) removeFile(dir, item.oldFilename)
+        } catch { /* не скачалось — оставляем старый файл */ }
+      } else {
+        const d = decisions[`${item.kind}:${item.id}`] ?? 'keep'
+        if (d === 'delete') removeFile(dir, item.oldFilename)
+        else if (d === 'disable') disableFile(dir, item.oldFilename)
+      }
+      done++
+    })
+  }
+
   beginOperation() // свежий сигнал отмены — чтобы загрузки не падали из-за прошлой отменённой операции
   try {
     const mods = await migrate(pack.mods, 'mod')
     const resourcepacks = await migrate(pack.resourcepacks ?? [], 'resourcepack')
     const shaders = await migrate(pack.shaders ?? [], 'shader')
+    await migrateLoose()
 
     const updated: Modpack = {
       ...pack,
