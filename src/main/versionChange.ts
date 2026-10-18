@@ -8,6 +8,7 @@ import { getCurseforgeFiles, cfSha1 } from './curseforge'
 import { resolveFamworks } from './portalMods'
 import { latestLoaderVersion, LoaderId } from './loaders'
 import { downloadModToDir } from './installer'
+import { beginOperation, endOperation } from './abort'
 
 // ───────── Смена версии Minecraft у пользовательской сборки (миграция ресурсов) ─────────
 
@@ -56,6 +57,20 @@ function customPack(packId: string): Modpack | null {
   return list.find(m => m.id === packId) ?? null
 }
 
+/** Параллельная обработка с лимитом (порядок результата сохраняется). */
+async function mapLimit<T, R>(items: T[], limit: number, fn: (t: T) => Promise<R>): Promise<R[]> {
+  const out = new Array<R>(items.length)
+  let next = 0
+  const worker = async (): Promise<void> => {
+    while (next < items.length) {
+      const i = next++
+      out[i] = await fn(items[i])
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker))
+  return out
+}
+
 /** Ищет версию ресурса под новую MC. compatible=false — перенести нельзя (нет версии / фикс. ссылка / локальный). */
 async function resolveItem(m: Mod, kind: ItemKind, newMc: string, loader: string): Promise<VersionItem> {
   const base: VersionItem = { kind, id: m.id, name: m.name, source: sourceOf(m), compatible: false, oldFilename: m.filename }
@@ -84,10 +99,13 @@ export async function planVersionChange(packId: string, newMc: string): Promise<
   const pack = customPack(packId)
   if (!pack) throw new Error('Сборка не найдена')
   const loader = pack.loader
-  const items: VersionItem[] = []
-  for (const m of pack.mods) items.push(await resolveItem(m, 'mod', newMc, loader))
-  for (const p of pack.resourcepacks ?? []) items.push(await resolveItem(p, 'resourcepack', newMc, loader))
-  for (const s of pack.shaders ?? []) items.push(await resolveItem(s, 'shader', newMc, loader))
+  // Все ресурсы резолвим параллельно (с лимитом), иначе на больших сборках десятки запросов подряд.
+  const targets: { m: Mod; kind: ItemKind }[] = [
+    ...pack.mods.map(m => ({ m, kind: 'mod' as ItemKind })),
+    ...(pack.resourcepacks ?? []).map(m => ({ m, kind: 'resourcepack' as ItemKind })),
+    ...(pack.shaders ?? []).map(m => ({ m, kind: 'shader' as ItemKind }))
+  ]
+  const items = await mapLimit(targets, 6, t => resolveItem(t.m, t.kind, newMc, loader))
 
   let loaderVersion: string | null = null
   try { loaderVersion = await latestLoaderVersion(loader as LoaderId, newMc) } catch { /* оставим прежнюю */ }
@@ -130,36 +148,40 @@ export async function applyVersionChange(
 
   const total = plan.items.length
   let done = 0
-  const migrate = async (arr: Mod[], kind: ItemKind): Promise<Mod[]> => {
-    const out: Mod[] = []
-    const dir = dirFor(kind)
-    for (const m of arr) {
-      const item = byId.get(`${kind}:${m.id}`)
-      if (item?.compatible && item._url && item.newFilename) {
-        emit(win, { phase: 'download', message: `Перенос ${m.name}`, current: done, total })
-        try {
-          await downloadModToDir(item._url, item.newFilename, dir, win, item._sha512, item._sha1)
-          if (item.newFilename !== m.filename) removeFile(dir, m.filename)
-          out.push({
-            ...m,
-            filename: item.newFilename,
-            version: item.newVersion ?? m.version,
-            size_mb: item._size ? Math.round(item._size / 1024 / 1024 * 10) / 10 : m.size_mb
-          })
-        } catch {
-          out.push(m) // не скачалось — оставляем, доустановится позже
+  // Перенос одного ресурса. null — ресурс убран из сборки (удалён/отключён).
+  const migrateOne = async (m: Mod, kind: ItemKind, dir: string): Promise<Mod | null> => {
+    const item = byId.get(`${kind}:${m.id}`)
+    if (item?.compatible && item._url && item.newFilename) {
+      emit(win, { phase: 'download', message: `Перенос ${m.name}`, current: done, total })
+      try {
+        await downloadModToDir(item._url, item.newFilename, dir, win, item._sha512, item._sha1)
+        if (item.newFilename !== m.filename) removeFile(dir, m.filename)
+        done++
+        return {
+          ...m,
+          filename: item.newFilename,
+          version: item.newVersion ?? m.version,
+          size_mb: item._size ? Math.round(item._size / 1024 / 1024 * 10) / 10 : m.size_mb
         }
-      } else {
-        const d = decisions[`${kind}:${m.id}`] ?? 'keep'
-        if (d === 'delete') removeFile(dir, m.filename)              // убрать файл и из JSON
-        else if (d === 'disable') disableFile(dir, m.filename)        // файл .disabled, из JSON убрать
-        else out.push(m)                                             // keep — оставить как есть
+      } catch {
+        done++
+        return m // не скачалось — оставляем, доустановится позже
       }
-      done++
     }
-    return out
+    done++
+    const d = decisions[`${kind}:${m.id}`] ?? 'keep'
+    if (d === 'delete') { removeFile(dir, m.filename); return null }  // убрать файл и из JSON
+    if (d === 'disable') { disableFile(dir, m.filename); return null } // файл .disabled, из JSON убрать
+    return m                                                          // keep
+  }
+  // Переносим с лимитом параллельности (порядок в JSON сохраняем).
+  const migrate = async (arr: Mod[], kind: ItemKind): Promise<Mod[]> => {
+    const dir = dirFor(kind)
+    const res = await mapLimit(arr, 4, m => migrateOne(m, kind, dir))
+    return res.filter((x): x is Mod => x !== null)
   }
 
+  beginOperation() // свежий сигнал отмены — чтобы загрузки не падали из-за прошлой отменённой операции
   try {
     const mods = await migrate(pack.mods, 'mod')
     const resourcepacks = await migrate(pack.resourcepacks ?? [], 'resourcepack')
@@ -183,5 +205,7 @@ export async function applyVersionChange(
   } catch (e) {
     emit(win, { phase: 'done', message: '' })
     return { ok: false, error: e instanceof Error ? e.message : String(e) }
+  } finally {
+    endOperation()
   }
 }

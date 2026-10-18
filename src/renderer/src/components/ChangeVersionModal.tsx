@@ -23,7 +23,6 @@ export default function ChangeVersionModal({ packId, loader, currentMc, onClose,
   const [plan, setPlan] = useState<Plan | null>(null)
   const [decisions, setDecisions] = useState<Record<string, Decision>>({})
   const [planning, setPlanning] = useState(false)
-  const [applying, setApplying] = useState(false)
   const [confirmDel, setConfirmDel] = useState(false)
 
   useEffect(() => {
@@ -56,33 +55,33 @@ export default function ChangeVersionModal({ packId, loader, currentMc, onClose,
     } finally { setPlanning(false) }
   }
 
-  const apply = async (): Promise<void> => {
-    if (!plan) return
-    setApplying(true)
-    showToast(`Смена версии на ${plan.newMc}…`, 'info')
-    try {
-      const r = await window.api.version.apply(packId, plan, decisions)
-      if (r.ok) {
-        showToast(`Версия изменена на ${plan.newMc}. Нажмите «Установить», чтобы докачать загрузчик.`, 'success')
-        onApplied(); onClose()
-      } else showToast(r.error || 'Не удалось применить', 'error')
-    } catch (e) {
-      showToast(`Ошибка: ${e instanceof Error ? e.message : String(e)}`, 'error')
-    } finally { setApplying(false) }
+  // Закрываем модалку сразу — ход миграции (может быть долгой) показывает нижняя панель + тосты.
+  const apply = (): void => {
+    if (!plan || !canApply) return
+    const p = plan
+    const d = decisions
+    onClose()
+    showToast(`Смена версии на ${p.newMc}…`, 'info')
+    window.api.version.apply(packId, p, d)
+      .then(r => {
+        if (r.ok) { showToast(`Версия изменена на ${p.newMc}. Нажмите «Установить», чтобы докачать загрузчик.`, 'success'); onApplied() }
+        else showToast(r.error || 'Не удалось применить', 'error')
+      })
+      .catch(e => showToast(`Ошибка: ${e instanceof Error ? e.message : String(e)}`, 'error'))
   }
 
   const incompatible = plan?.items.filter(i => !i.compatible) ?? []
   const compatible = plan?.items.filter(i => i.compatible) ?? []
   const toDelete = Object.values(decisions).filter(d => d === 'delete').length
-  const canApply = !!plan && !applying && (toDelete === 0 || confirmDel)
+  const canApply = !!plan && (toDelete === 0 || confirmDel)
   const options = versions.map(v => ({ value: v, label: v === currentMc ? `${v} (текущая)` : v }))
 
   return (
-    <div className={styles.overlay} onMouseDown={e => { if (e.target === e.currentTarget && !applying) onClose() }}>
+    <div className={styles.overlay} onMouseDown={e => { if (e.target === e.currentTarget) onClose() }}>
       <div className={styles.modal}>
         <div className={styles.header}>
           <h2 className={styles.title}>Сменить версию Minecraft</h2>
-          <button className={styles.close} onClick={onClose} disabled={applying}>✕</button>
+          <button className={styles.close} onClick={onClose}>✕</button>
         </div>
 
         <div className={styles.body}>
@@ -102,8 +101,17 @@ export default function ChangeVersionModal({ packId, loader, currentMc, onClose,
           {plan && (
             <>
               <div className={styles.summary}>
-                <span className={styles.ok}>✓ Переедут: {compatible.length}</span>
+                <span className={styles.ok}>✓ Переедут: {compatible.length} из {plan.items.length}</span>
                 {incompatible.length > 0 && <span className={styles.bad}>✕ Не смогут: {incompatible.length}</span>}
+              </div>
+              <div className={styles.breakdown}>
+                {(['mod', 'resourcepack', 'shader'] as const).map(k => {
+                  const all = plan.items.filter(i => i.kind === k)
+                  if (!all.length) return null
+                  const ok = all.filter(i => i.compatible).length
+                  const label = k === 'mod' ? 'Моды' : k === 'resourcepack' ? 'Ресурспаки' : 'Шейдеры'
+                  return <span key={k}>{label}: {ok}/{all.length}</span>
+                })}
               </div>
 
               {incompatible.length === 0 ? (
@@ -147,9 +155,9 @@ export default function ChangeVersionModal({ packId, loader, currentMc, onClose,
         </div>
 
         <div className={styles.footer}>
-          <button className={styles.ghost} onClick={onClose} disabled={applying}>Отмена</button>
+          <button className={styles.ghost} onClick={onClose}>Отмена</button>
           <button className={styles.accent} onClick={apply} disabled={!canApply}>
-            {applying ? 'Применение…' : toDelete > 0 ? `Применить и удалить (${toDelete})` : 'Применить'}
+            {toDelete > 0 ? `Применить и удалить (${toDelete})` : 'Применить'}
           </button>
         </div>
       </div>

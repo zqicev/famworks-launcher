@@ -28,15 +28,17 @@ export default function Dropdown({ value, options, onChange, placeholder = 'Вы
     const onDoc = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
     const close = () => setOpen(false)
+    // Скролл закрывает меню только если скроллят НЕ само меню (оно со своим overflow-y).
+    const onScroll = (e: Event) => { if (!ref.current || !ref.current.contains(e.target as Node)) setOpen(false) }
     document.addEventListener('mousedown', onDoc)
     document.addEventListener('keydown', onKey)
     window.addEventListener('resize', close)
-    window.addEventListener('scroll', close, true) // capture: закрываем при скролле любого контейнера
+    window.addEventListener('scroll', onScroll, true) // capture: ловим скролл любого контейнера
     return () => {
       document.removeEventListener('mousedown', onDoc)
       document.removeEventListener('keydown', onKey)
       window.removeEventListener('resize', close)
-      window.removeEventListener('scroll', close, true)
+      window.removeEventListener('scroll', onScroll, true)
     }
   }, [open])
 

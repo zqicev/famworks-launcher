@@ -62,6 +62,7 @@
 .summary { display: flex; gap: 16px; font-size: 13px; font-weight: 600; }
 .ok { color: var(--accent); }
 .bad { color: var(--red); }
+.breakdown { display: flex; flex-wrap: wrap; gap: 14px; margin-top: -6px; font-size: 11px; color: var(--text-dim); }
 
 .label { font-size: 12px; color: var(--text-secondary); line-height: 1.5; }
 
