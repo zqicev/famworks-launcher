@@ -13,6 +13,7 @@ import { setPlaying, setIdle } from './discord'
 import { setBusy } from './busy'
 import { addInstance, removeInstance, instancesForPack, anyInstances } from './instances'
 import { packDir } from './packpaths'
+import { trackPackLaunch, trackPackExit } from './analytics'
 import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'fs'
 import { createHash, randomUUID } from 'crypto'
 
@@ -87,6 +88,12 @@ export async function launchGame(
   // Метки этапов в «Логи» — чтобы видеть, докуда дошёл запуск, даже если mclc молчит.
   const stage = (m: string): void => sendTo(win,'launch:log', { id: modpack.id, text: `[launcher] ${m}` })
 
+  // Игрок события — по аккаунту запуска (uuid/ник из authorization; оно здесь уже разрешено).
+  const auth = authorization as { uuid?: string; name?: string } | undefined
+  const eventUser = { uuid: auth?.uuid, name: auth?.name ?? accountName }
+  let javaMajor = 0
+  try { javaMajor = await requiredJavaMajor(modpack.mc_version) } catch { /* не критично для события */ }
+
   // 1. Java: hot-swap использует JBR; иначе гарантируем Java нужной мажорной версии (по версии MC)
   let javaPath: string
   if (dev.javaPath) {
@@ -94,7 +101,7 @@ export async function launchGame(
   } else {
     stage('Проверка Java')
     try {
-      javaPath = await ensureJava(installPath, win, await requiredJavaMajor(modpack.mc_version))
+      javaPath = await ensureJava(installPath, win, javaMajor)
     } catch (e) {
       sendTo(win,'launch:error', `Не удалось установить Java: ${String(e)}`)
       return
@@ -194,12 +201,25 @@ export async function launchGame(
           instanceId, modpackId: modpack.id, modpackName: modpack.name, account: accountName,
           pid: msg.pid, startedAt: Date.now(), worker, userKilled: false
         })
+        trackPackLaunch(modpack.id, {
+          mcVersion: modpack.mc_version, loader: modpack.loader, memoryMb: memoryMB,
+          java: javaMajor ? String(javaMajor) : undefined
+        }, eventUser)
         emit(win, { phase: 'done', message: '' })
         sendTo(win,'launch:spawned', modpack.id)
         setPlaying(modpack.name)
         resolve()
       } else if (msg.t === 'close') {
         const inst = removeInstance(instanceId)
+        // Аналитика выхода из игры: длина сессии, код, причина вылета (без путей).
+        if (spawned) {
+          const crashed = !!msg.code && !inst?.userKilled
+          trackPackExit(modpack.id, {
+            seconds: inst?.startedAt ? Math.round((Date.now() - inst.startedAt) / 1000) : 0,
+            exitCode: msg.code ?? 0,
+            crash: crashed ? pickErrorLine(msg.tail) : undefined
+          }, eventUser)
+        }
         // Диагностика краша — только если игра успела запуститься и её НЕ закрыл пользователь кнопкой.
         if (msg.code && spawned && !inst?.userKilled) {
           diagnoseCrash(modpack, gameRoot, msg.tail ?? '', inst?.startedAt ?? 0).catch(() => null).then(diag => {

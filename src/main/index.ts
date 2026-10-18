@@ -6,6 +6,7 @@ import { setupIpcHandlers } from './ipc'
 import { setupUpdater } from './updater'
 import { initDiscord } from './discord'
 import { registerBackgroundSchemes, registerBackgroundProtocol } from './background'
+import { trackStart } from './analytics'
 
 // Схему пользовательского фона (fwbg://) надо объявить до готовности приложения.
 registerBackgroundSchemes()
@@ -90,6 +91,7 @@ if (!gotLock) {
     const win = createWindow()
     setupUpdater()
     initDiscord()
+    trackStart() // аналитика: «лаунчер открыт» + отправка накопленного (не блокирует)
 
     // Открыт через двойной клик по .fwpack — импортируем после загрузки окна
     const pending = findFwpack(process.argv)

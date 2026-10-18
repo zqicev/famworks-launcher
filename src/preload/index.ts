@@ -13,6 +13,10 @@ contextBridge.exposeInMainWorld('api', {
     get: (key: string) => ipcRenderer.invoke('store:get', key),
     set: (key: string, value: unknown) => ipcRenderer.invoke('store:set', key, value)
   },
+  analytics: {
+    get: () => ipcRenderer.invoke('analytics:get'),
+    set: (enabled: boolean) => ipcRenderer.invoke('analytics:set', enabled)
+  },
   modpacks: {
     index: () => ipcRenderer.invoke('modpacks:index'),
     portalIcons: (items: { id: string; icon: string }[]) => ipcRenderer.invoke('modpacks:portal-icons', items),

@@ -8,6 +8,7 @@ import { launchGame, offlineAuthorization, abortLaunch, QuickPlay } from './laun
 import { killInstance, listInstances, onInstancesChange, reattachInstances } from './instances'
 import { setupLoader, latestLoaderVersion, LoaderId } from './loaders'
 import { packDir, packFolderOf, ensurePackFolder, forgetPackFolder } from './packpaths'
+import { analyticsEnabled, setAnalyticsEnabled, trackInstallError } from './analytics'
 import { searchModrinth, getModVersions, getModrinthIcons, getModrinthAuthors } from './modrinth'
 import { microsoftLogin, microsoftRefresh } from './msAuth'
 import { Account } from './store'
@@ -29,6 +30,9 @@ export function setupIpcHandlers() {
 
   ipcMain.handle('store:get', (_, key) => store.get(key))
   ipcMain.handle('store:set', (_, key, value) => store.set(key, value))
+
+  ipcMain.handle('analytics:get', () => analyticsEnabled())
+  ipcMain.handle('analytics:set', (_, enabled: boolean) => setAnalyticsEnabled(!!enabled))
 
   ipcMain.handle('modpacks:index', () => fetchModpackIndex())
   ipcMain.handle('modpacks:portal-icons', (_, items: { id: string; icon: string }[]) => fetchPackIcons(items))
@@ -235,6 +239,7 @@ export function setupIpcHandlers() {
         win.webContents.send('install:progress', { phase: 'cancelled', message: 'Отменено' })
         return false
       }
+      trackInstallError(modpackId, 'install', e instanceof Error ? e.message : String(e))
       throw e
     } finally {
       endOperation()

@@ -6,6 +6,10 @@ interface Window {
       get: (key: string) => Promise<unknown>
       set: (key: string, value: unknown) => Promise<void>
     }
+    analytics: {
+      get: () => Promise<boolean>
+      set: (enabled: boolean) => Promise<void>
+    }
     modpacks: {
       index: () => Promise<import('../../types/modpack').ModpackIndex>
       portalIcons: (items: { id: string; icon: string }[]) => Promise<Record<string, string>>
