@@ -51,7 +51,7 @@ export default function ChangeVersionModal({ packId, loader, currentMc, onClose,
       const p = await window.api.version.plan(packId, newMc)
       setPlan(p)
       const d: Record<string, Decision> = {}
-      for (const it of p.items) if (!it.compatible) d[`${it.kind}:${it.id}`] = 'keep'
+      for (const it of p.items) if (!it.compatible) d[`${it.kind}:${it.id}`] = 'disable'
       setDecisions(d)
     } catch (e) {
       showToast(`Не удалось проверить совместимость: ${e instanceof Error ? e.message : String(e)}`, 'error')
@@ -133,7 +133,7 @@ export default function ChangeVersionModal({ packId, loader, currentMc, onClose,
                   <div className={styles.list}>
                     {incompatible.map(it => {
                       const key = `${it.kind}:${it.id}`
-                      const d = decisions[key] ?? 'keep'
+                      const d = decisions[key] ?? 'disable'
                       return (
                         <div key={key} className={styles.item}>
                           <div className={styles.itemInfo}>
