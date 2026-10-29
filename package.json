@@ -1,6 +1,6 @@
 {
   "name": "famworks-launcher",
-  "version": "1.7.6",
+  "version": "1.7.8",
   "description": "FamWorks Minecraft Launcher",
   "author": "FamWorks",
   "main": "out/main/index.js",
