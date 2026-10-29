@@ -380,7 +380,8 @@ export function setupIpcHandlers() {
 
   ipcMain.handle('recent:get', async (_, modpackId: string) => {
     const { getRecent } = await import('./recent')
-    return getRecent(pathJoin(store.get('installPath') as string, modpackId), modpackId)
+    // Реальная папка сборки (может быть переименована в человекочитаемую, напр. «Фамрокия»), а не installPath/<id>.
+    return getRecent(packDir(modpackId), modpackId)
   })
 
   ipcMain.handle('server:ping', async (_, ip: string) => {
