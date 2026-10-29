@@ -61,6 +61,24 @@ function activeUser(): User | undefined {
   } catch { return undefined }
 }
 
+/** Minecraft-uuid в формате с дефисами (портал требует 8-4-4-4-12). Невалидный → undefined. */
+function dashUuid(uuid: string | undefined): string | undefined {
+  if (!uuid) return undefined
+  const hex = uuid.replace(/-/g, '').toLowerCase()
+  if (!/^[0-9a-f]{32}$/.test(hex)) return undefined
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
+}
+
+/** Нормализует user для события: uuid приводим к формату с дефисами, иначе портал отклонит пачку (400). */
+function cleanUser(u?: User): User | undefined {
+  if (!u) return undefined
+  const out: User = {}
+  const id = dashUuid(u.uuid)
+  if (id) out.uuid = id
+  if (u.name) out.name = u.name
+  return out.uuid || out.name ? out : undefined
+}
+
 /** Убирает из текста пути (C:\…, /home/…, /Users/…) и обрезает до max. */
 export function sanitize(text: string | undefined, max = 200): string | undefined {
   if (!text) return undefined
@@ -104,11 +122,12 @@ function scheduleFlush(): void {
 export function track(type: string, opts: { ref?: string; data?: Record<string, unknown>; user?: User } = {}): void {
   try {
     if (!analyticsEnabled()) return
+    const user = cleanUser(opts.user)
     const ev: AEvent = {
       type,
       at: new Date().toISOString(),
       installId: getInstallId(),
-      ...(opts.user && (opts.user.uuid || opts.user.name) ? { user: opts.user } : {}),
+      ...(user ? { user } : {}),
       ...(opts.ref ? { ref: opts.ref.slice(0, 80) } : {}),
       ...(opts.data ? { data: opts.data } : {})
     }

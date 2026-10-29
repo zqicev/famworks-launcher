@@ -206,9 +206,9 @@ export default function SettingsModal({ installPath, onPathChange, devMode, onDe
           </div>
           <div className={styles.body}>
             <p className={styles.hint} style={{ margin: 0, fontSize: 13, lineHeight: 1.6, color: 'var(--text-secondary)' }}>
+              МЫ НЕ СОБИРАЕМ IP-АДРЕС, СВЕДЕНИЯ О КОМПЬЮТЕРЕ И ВАШИ ФАЙЛЫ - только события лаунчера.
               Статистика помогает нам улучшать лаунчер, сборки и серверы: мы видим, что ломается и вылетает,
-              какие версии стоят у игроков и как проходят съёмки. Мы не собираем IP-адрес, сведения о компьютере
-              и ваши файлы — только события лаунчера.
+              какие версии стоят у игроков и как проходят съёмки.
             </p>
             <p className={styles.hint} style={{ margin: 0 }}>
               Доступ к данным имеют только Famose и zqicev, третьим лицам ничего не передаём.
