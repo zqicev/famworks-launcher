@@ -13,6 +13,9 @@ export function setupUpdater() {
   autoUpdater.autoDownload = true            // качаем обновление сразу как нашли
   autoUpdater.autoInstallOnAppQuit = true    // ставим при закрытии лаунчера
   autoUpdater.allowPrerelease = false
+  // Разрешаем ПОНИЖЕНИЕ версии: если на famworks-builds опубликовать прошлую (хорошую) версию как latest,
+  // у всех лаунчер сам откатится на неё. Это ручной «откат для всех» на случай плохого релиза.
+  autoUpdater.allowDowngrade = true
 
   autoUpdater.on('checking-for-update', () => send('update:checking'))
 

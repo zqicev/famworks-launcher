@@ -7,6 +7,7 @@ import { setupUpdater } from './updater'
 import { initDiscord } from './discord'
 import { registerBackgroundSchemes, registerBackgroundProtocol } from './background'
 import { trackStart } from './analytics'
+import { loadFlags, gateState } from './flags'
 
 // Схему пользовательского фона (fwbg://) надо объявить до готовности приложения.
 registerBackgroundSchemes()
@@ -85,10 +86,18 @@ if (!gotLock) {
     }
   })
 
-  app.whenReady().then(() => {
+  app.whenReady().then(async () => {
     registerBackgroundProtocol()
     setupIpcHandlers()
     const win = createWindow()
+
+    // Удалённые флаги/«рубильник» — ДО рискованных действий. Если заблокировано (техработы/обяз.
+    // обновление) — показываем экран-заглушку в рендере; апдейтер всё равно запускаем, чтобы доехало
+    // исправление/новая версия.
+    await loadFlags()
+    const sendGate = () => { const g = gateState(); if (g.blocked) win.webContents.send('app:gate', g) }
+    win.webContents.on('did-finish-load', sendGate)
+
     setupUpdater()
     initDiscord()
     trackStart() // аналитика: «лаунчер открыт» + отправка накопленного (не блокирует)

@@ -8,6 +8,8 @@ import { launchGame, offlineAuthorization, abortLaunch, QuickPlay } from './laun
 import { killInstance, listInstances, onInstancesChange, reattachInstances } from './instances'
 import { setupLoader, latestLoaderVersion, LoaderId } from './loaders'
 import { packDir, packFolderOf, ensurePackFolder, forgetPackFolder } from './packpaths'
+import { validateInstallPath, defaultInstallPath } from './installpath'
+import { listAllBackups, listBackups, createBackup, restoreBackup, deleteBackup, defaultBackupDir } from './backup'
 import { analyticsEnabled, setAnalyticsEnabled, trackInstallError } from './analytics'
 import { searchModrinth, getModVersions, getModrinthIcons, getModrinthAuthors } from './modrinth'
 import { microsoftLogin, microsoftRefresh } from './msAuth'
@@ -29,7 +31,49 @@ export function setupIpcHandlers() {
   ipcMain.handle('game:instances', () => listInstances())
 
   ipcMain.handle('store:get', (_, key) => store.get(key))
-  ipcMain.handle('store:set', (_, key, value) => store.set(key, value))
+  ipcMain.handle('store:set', (_, key, value) => {
+    // Бэкстоп: опасный путь установки (в папке лаунчера и т.п.) не сохраняем — его стирает обновление.
+    if (key === 'installPath') {
+      const v = validateInstallPath(String(value ?? ''))
+      if (!v.ok) throw new Error(v.reason)
+    }
+    store.set(key, value)
+  })
+
+  ipcMain.handle('installpath:default', () => defaultInstallPath())
+  ipcMain.handle('installpath:validate', (_, p: string) => validateInstallPath(p))
+
+  ipcMain.handle('backup:list-all', () => listAllBackups())
+  ipcMain.handle('backup:list', (_, packId: string) => listBackups(packId))
+  ipcMain.handle('backup:create', (_, packId: string, categories?: import('./backup').Category[]) => createBackup(packId, 'manual', categories))
+  ipcMain.handle('backup:restore', (_, packId: string, file: string) => restoreBackup(packId, file))
+  ipcMain.handle('backup:delete', (_, packId: string, file: string) => deleteBackup(packId, file))
+
+  ipcMain.handle('backup:settings', () => {
+    const custom = ((store.get('backupDir') as string) || '').trim()
+    const enabled = store.get('backupEnabled') !== false
+    const dismissed = store.get('backupWarnDismissed') === true
+    return {
+      enabled,
+      dir: custom || defaultBackupDir(),
+      defaultDir: defaultBackupDir(),
+      isDefault: !custom,
+      showDisabledWarning: !enabled && !dismissed
+    }
+  })
+  ipcMain.handle('backup:set-enabled', (_, v: boolean) => {
+    store.set('backupEnabled', !!v)
+    // Включили — сбрасываем «скрытие» плашки, чтобы при следующем выключении она показалась снова.
+    if (v) store.set('backupWarnDismissed', false)
+  })
+  ipcMain.handle('backup:dismiss-warning', () => { store.set('backupWarnDismissed', true) })
+  ipcMain.handle('backup:set-dir', (_, p: string) => {
+    const v = validateInstallPath(String(p || '')) // та же защита: не в папке лаунчера / Program Files
+    if (!v.ok) return { ok: false, error: v.reason }
+    store.set('backupDir', String(p))
+    return { ok: true }
+  })
+  ipcMain.handle('backup:reset-dir', () => { store.set('backupDir', '') })
 
   ipcMain.handle('analytics:get', () => analyticsEnabled())
   ipcMain.handle('analytics:set', (_, enabled: boolean) => setAnalyticsEnabled(!!enabled))

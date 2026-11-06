@@ -12,9 +12,12 @@ import { isCancelError } from './abort'
 import { setPlaying, setIdle } from './discord'
 import { setBusy } from './busy'
 import { addInstance, removeInstance, instancesForPack, anyInstances } from './instances'
-import { packDir } from './packpaths'
+import { packDir, ensurePackFolder, systemSupportsCyrillicPaths } from './packpaths'
 import { trackPackLaunch, trackPackExit } from './analytics'
+import { maybeAutoBackup } from './backup'
+import { featureEnabled } from './flags'
 import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'fs'
+import { execFileSync } from 'child_process'
 import { createHash, randomUUID } from 'crypto'
 
 /** Безопасная отправка в окно лаунчера. Если окно уже закрыто (игра пережила лаунчер - это нормально),
@@ -33,6 +36,30 @@ function emit(win: BrowserWindow, event: ProgressEvent) {
 /** true, если в пути есть не-ASCII символы (кириллица и т.п.). */
 function hasNonAscii(p: string): boolean {
   return /[^\x00-\x7f]/.test(p)
+}
+
+/** Короткое имя Windows (8.3, ASCII) для существующего пути. НИЧЕГО не создаёт и не двигает — только
+ *  читает. Нужно, чтобы запускать Java из кириллического пути без переименования папки. Если короткие
+ *  имена на томе отключены — вернётся исходный путь. */
+function shortPath(p: string): string {
+  if (process.platform !== 'win32') return p
+  try {
+    const out = execFileSync('cmd', ['/d', '/c', `for %I in ("${p}") do @echo %~sI`], {
+      encoding: 'utf8', windowsHide: true, timeout: 5000
+    }).trim()
+    return out || p
+  } catch {
+    return p
+  }
+}
+
+/** Путь для ЗАПУСКА (classpath/JVM): если в пути кириллица, а система её в путях не тянет — короткое имя
+ *  (ASCII). Папку не трогаем, данные остаются на месте; короткое имя указывает на ту же папку.
+ *  За флагом cyrillicShortPath — можно отключить удалённо, если вдруг начнёт мешать. */
+function asciiLaunchPath(p: string): string {
+  if (!hasNonAscii(p) || systemSupportsCyrillicPaths() || !featureEnabled('cyrillicShortPath')) return p
+  const sp = shortPath(p)
+  return hasNonAscii(sp) ? p : sp
 }
 
 /** На путях с кириллицей ранний loading-экран Forge (fmlearlydisplay) падает в драйвере GPU при
@@ -109,7 +136,10 @@ export async function launchGame(
   }
 
   // 2. Загрузчик (Fabric/Quilt — meta-профиль, Forge/NeoForge — установщик). Все дают version-профиль.
-  const gameRoot = packDir(modpack.id)
+  // Фиксируем реальную папку сборки (её НЕ двигаем — данные остаются на месте).
+  ensurePackFolder(modpack)
+  const gameRoot = packDir(modpack.id) // реальная папка (чтение/запись профилей, серверов и т.п.)
+  mkdirSync(gameRoot, { recursive: true }) // чтобы короткое имя (8.3) резолвилось по существующей папке
   stage('Подготовка загрузчика')
   const loaderVersionId = await setupLoader(modpack, gameRoot, win)
   // Кириллица в пути + Forge/NeoForge = краш в раннем экране Forge (драйвер GPU при glfwCreateWindow).
@@ -117,9 +147,18 @@ export async function launchGame(
   if ((modpack.loader === 'forge' || modpack.loader === 'neoforge') && hasNonAscii(gameRoot)) {
     ensureForgeEarlyWindowOff(gameRoot, win, modpack.id)
   }
+  // Путь для запуска: если в gameRoot кириллица, а система её в путях не тянет — короткое ASCII-имя той
+  // же папки (папку НЕ переименовываем), иначе Java падает с ClassNotFoundException. Считаем после того,
+  // как папка точно создана — короткие имена резолвятся только для существующих путей.
+  const launchRoot = asciiLaunchPath(gameRoot)
+  if (launchRoot !== gameRoot) {
+    sendTo(win, 'launch:log', { id: modpack.id, text: `[launcher] путь с кириллицей: запуск через короткое имя ${launchRoot}` })
+  } else if (hasNonAscii(gameRoot) && !systemSupportsCyrillicPaths()) {
+    sendTo(win, 'launch:log', { id: modpack.id, text: '[launcher] путь с кириллицей, короткие имена (8.3) на томе отключены - возможен краш; перенесите сборку в папку с латинским путём' })
+  }
   // Forge/NeoForge держат module-path и прочие JVM-аргументы в профиле, а mclc их не читает —
-  // передаём вручную через customArgs. Плюс dev-аргументы (отладка/hot-swap).
-  const extraJvmArgs = [...loaderJvmArgs(modpack, gameRoot), ...dev.jvmArgs, ...authlibArgs]
+  // передаём вручную через customArgs (пути — через launchRoot, ASCII). Плюс dev-аргументы.
+  const extraJvmArgs = [...loaderJvmArgs(modpack, launchRoot), ...dev.jvmArgs, ...authlibArgs]
   for (const n of dev.notes) sendTo(win,'launch:log', { id: modpack.id, text: n })
 
   // 3. Серверы сборки → servers.dat. Сеем один раз: если набор серверов не менялся,
@@ -167,13 +206,13 @@ export async function launchGame(
 
   const options: ILauncherOptions = {
     authorization,
-    root: gameRoot,
+    root: launchRoot, // ASCII-путь к той же папке (кириллица ломает classpath Java)
     // Vanilla: setupLoader вернул '' → custom не задаём, mclc запускает чистый клиент.
     version: { number: modpack.mc_version, type: 'release', ...(loaderVersionId ? { custom: loaderVersionId } : {}) },
     memory: { max: `${memoryMB}M`, min: '512M' },
     javaPath,
     // Общий кэш ванильных ассетов на все сборки — чтобы не перекачивать их для каждой сборки.
-    overrides: { detached: true, assetRoot: join(installPath, 'assets') },
+    overrides: { detached: true, assetRoot: join(asciiLaunchPath(installPath), 'assets') },
     ...(extraJvmArgs.length ? { customArgs: extraJvmArgs } : {}),
     ...(quickPlay ? { quickPlay: { type: quickPlay.type, identifier: quickPlay.identifier } } : {})
   } as ILauncherOptions
@@ -219,6 +258,8 @@ export async function launchGame(
             exitCode: msg.code ?? 0,
             crash: crashed ? pickErrorLine(msg.tail) : undefined
           }, eventUser)
+          // Лёгкая авто-копия миров/настроек после игры (не чаще ~20ч). Не блокируем закрытие.
+          setImmediate(() => { maybeAutoBackup(modpack.id).catch(() => {}) })
         }
         // Диагностика краша — только если игра успела запуститься и её НЕ закрыл пользователь кнопкой.
         if (msg.code && spawned && !inst?.userKilled) {

@@ -199,3 +199,16 @@ export async function getProjectIdsByHashes(sha1s: string[]): Promise<Record<str
   } catch { /* нет сети - вернётся пусто */ }
   return out
 }
+
+/** Версии Modrinth по sha1 файлов одним запросом. sha1(hex) -> версия|null (нет на Modrinth). */
+export async function getVersionsByHashes(sha1s: string[]): Promise<Record<string, ModrinthVersion | null>> {
+  const out: Record<string, ModrinthVersion | null> = {}
+  const uniq = [...new Set(sha1s.filter(Boolean))]
+  if (!uniq.length) return out
+  try {
+    const res = await axios.post(`${BASE}/version_files`, { hashes: uniq, algorithm: 'sha1' }, { headers: HEADERS })
+    const data = (res.data ?? {}) as Record<string, ModrinthVersion>
+    for (const h of uniq) out[h] = data[h] ?? null
+  } catch { /* нет сети - вернётся пусто */ }
+  return out
+}

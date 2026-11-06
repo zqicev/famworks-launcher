@@ -33,6 +33,17 @@ interface StoreSchema {
   ideaPath: string // путь к idea64.exe для «Открыть в IntelliJ»
   jbrPath: string // путь к java.exe из JetBrains Runtime (для hot-swap); авто из IntelliJ, если пусто
   devSettings: Record<string, { debug?: boolean; port?: number; projectPath?: string; lastJar?: string; hotswap?: boolean }>
+  // Резервные копии сборок. backupEnabled по умолчанию включено (undefined = вкл). backupDir — своя
+  // папка для копий (пусто = дефолт в userData).
+  backupEnabled?: boolean
+  backupDir?: string
+  // Плашку «бэкапы выключены» пользователь скрыл. Сбрасывается при включении бэкапов — чтобы при
+  // следующем выключении плашка показалась снова.
+  backupWarnDismissed?: boolean
+  // Последние известные удалённые флаги (кэш на случай «нет сети» при запуске).
+  flagsCache?: Record<string, unknown>
+  // Кэш резолва модов для бэкапов (имя|размер|mtime → источник), чтобы не перехешивать каждый раз.
+  modResolveCache?: Record<string, unknown>
 }
 
 export const store = new Store<StoreSchema>({

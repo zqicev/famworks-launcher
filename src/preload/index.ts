@@ -13,6 +13,24 @@ contextBridge.exposeInMainWorld('api', {
     get: (key: string) => ipcRenderer.invoke('store:get', key),
     set: (key: string, value: unknown) => ipcRenderer.invoke('store:set', key, value)
   },
+  installPath: {
+    default: () => ipcRenderer.invoke('installpath:default'),
+    validate: (p: string) => ipcRenderer.invoke('installpath:validate', p)
+  },
+  backup: {
+    listAll: () => ipcRenderer.invoke('backup:list-all'),
+    list: (packId: string) => ipcRenderer.invoke('backup:list', packId),
+    create: (packId: string, categories?: string[]) => ipcRenderer.invoke('backup:create', packId, categories),
+    restore: (packId: string, file: string) => ipcRenderer.invoke('backup:restore', packId, file),
+    delete: (packId: string, file: string) => ipcRenderer.invoke('backup:delete', packId, file),
+    settings: () => ipcRenderer.invoke('backup:settings'),
+    setEnabled: (v: boolean) => ipcRenderer.invoke('backup:set-enabled', v),
+    setDir: (p: string) => ipcRenderer.invoke('backup:set-dir', p),
+    resetDir: () => ipcRenderer.invoke('backup:reset-dir'),
+    dismissWarning: () => ipcRenderer.invoke('backup:dismiss-warning')
+  },
+  onAppGate: (cb: (g: { blocked: boolean; mode: 'maintenance' | 'update' | null; message: string }) => void) =>
+    subscribe('app:gate', cb),
   analytics: {
     get: () => ipcRenderer.invoke('analytics:get'),
     set: (enabled: boolean) => ipcRenderer.invoke('analytics:set', enabled)

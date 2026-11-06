@@ -10,6 +10,23 @@ interface Window {
       get: () => Promise<boolean>
       set: (enabled: boolean) => Promise<void>
     }
+    installPath: {
+      default: () => Promise<string>
+      validate: (p: string) => Promise<{ ok: boolean; reason?: string }>
+    }
+    backup: {
+      listAll: () => Promise<Record<string, { file: string; at: number; sizeBytes: number; reason: string; categories: string[] }[]>>
+      list: (packId: string) => Promise<{ file: string; at: number; sizeBytes: number; reason: string; categories: string[] }[]>
+      create: (packId: string, categories?: string[]) => Promise<string | null>
+      restore: (packId: string, file: string) => Promise<{ ok: boolean; error?: string }>
+      delete: (packId: string, file: string) => Promise<{ ok: boolean }>
+      settings: () => Promise<{ enabled: boolean; dir: string; defaultDir: string; isDefault: boolean; showDisabledWarning: boolean }>
+      setEnabled: (v: boolean) => Promise<void>
+      setDir: (p: string) => Promise<{ ok: boolean; error?: string }>
+      resetDir: () => Promise<void>
+      dismissWarning: () => Promise<void>
+    }
+    onAppGate: (cb: (g: { blocked: boolean; mode: 'maintenance' | 'update' | null; message: string }) => void) => () => void
     modpacks: {
       index: () => Promise<import('../../types/modpack').ModpackIndex>
       portalIcons: (items: { id: string; icon: string }[]) => Promise<Record<string, string>>

@@ -5,6 +5,7 @@ import { existsSync, mkdirSync, writeFileSync, readFileSync, readdirSync, statSy
 import axios from 'axios'
 import AdmZip from 'adm-zip'
 import { store } from './store'
+import { packDir } from './packpaths'
 
 interface DevSetting { debug?: boolean; port?: number; projectPath?: string; lastJar?: string; hotswap?: boolean }
 export interface DevConfig {
@@ -87,7 +88,8 @@ export function devLaunchOverrides(id: string): { javaPath: string | null; jvmAr
 }
 
 function modsDir(id: string): string {
-  return join(store.get('installPath') as string, id, 'mods')
+  // Через packDir — иначе у переименованной сборки путь уедет мимо реальной папки.
+  return join(packDir(id), 'mods')
 }
 
 function setLastJar(id: string, filename: string): void {

@@ -2,8 +2,8 @@ import { join } from 'path'
 import { Dirent } from 'fs'
 import { readdir, stat, rm } from 'fs/promises'
 
-// Папки уровня installPath, которые НЕ являются сборками — не трогаем.
-const RESERVED = new Set(['assets', 'runtime'])
+// Папки уровня installPath, которые НЕ являются сборками — не трогаем (в т.ч. резервные копии).
+const RESERVED = new Set(['assets', 'runtime', 'backups'])
 // Мусор внутри папки сборки: пересоздаётся при необходимости, удалять безопасно.
 //  - assets  — теперь общий кэш на уровне installPath, per-pack копия лишняя
 //  - .loader — installer-jar'ы Forge/NeoForge, нужны только в момент установки
