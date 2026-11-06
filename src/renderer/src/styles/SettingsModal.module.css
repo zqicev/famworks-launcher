@@ -5,12 +5,15 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  padding: 24px;
   z-index: 300;
   animation: fadeIn 0.15s ease;
 }
 
 .modal {
   width: 480px;
+  max-width: 100%;
+  max-height: 100%;          /* не вылезаем за окно — на маленьком окне модалка сжимается */
   background: var(--bg-surface);
   border: 1px solid var(--border);
   border-radius: 14px;
@@ -20,12 +23,31 @@
   animation: scaleIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+/* Настройки как отдельная страница (в области контента, рядом с сайдбаром). */
+.page {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+/* Ограничиваем ширину содержимого, чтобы на широком окне поля не растягивались на весь экран. */
+.pageInner {
+  width: 100%;
+  max-width: 680px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
 .header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   padding: 18px 20px;
   border-bottom: 1px solid var(--border);
+  flex-shrink: 0;            /* шапка не сжимается, когда тело скроллится */
 }
 
 .title {
@@ -49,6 +71,9 @@
   display: flex;
   flex-direction: column;
   gap: 16px;
+  overflow-y: auto;          /* контент прокручивается внутри модалки на маленьком окне */
+  min-height: 0;
+  flex: 1;
 }
 
 .cinput {
@@ -128,6 +153,7 @@
   gap: 8px;
   padding: 14px 20px;
   border-top: 1px solid var(--border);
+  flex-shrink: 0;            /* кнопки всегда видны снизу, тело скроллится между шапкой и ними */
 }
 
 .cancelBtn {
@@ -259,3 +285,79 @@
   transition: background 0.12s, color 0.12s;
 }
 .suggestItem:hover { background: var(--bg-hover); color: var(--text); }
+
+/* ───────── Вкладки разделов настроек ───────── */
+.tabs {
+  display: flex;
+  gap: 6px;
+  padding: 10px 20px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.tab {
+  padding: 7px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dim);
+  transition: background 0.15s, color 0.15s;
+}
+.tab:hover { color: var(--text-secondary); background: var(--bg-active); }
+.tabOn, .tabOn:hover { color: #0a0a0a; background: var(--accent); }
+
+/* Заголовок строки-переключателя (крупнее label и не капсом) */
+.rowTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 4px;
+}
+
+/* ───────── Список резервных копий ───────── */
+.bkList { display: flex; flex-direction: column; gap: 10px; }
+.bkPack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: transparent;
+}
+.bkPackHead { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.bkName {
+  font-size: 13px; font-weight: 600; color: var(--text);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.bkRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: var(--bg-active);
+}
+.bkMeta { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.bkWhen {
+  font-size: 12px; color: var(--text-secondary);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.chips { display: flex; flex-wrap: wrap; gap: 4px; }
+.chip {
+  font-size: 10px; line-height: 1;
+  padding: 3px 7px; border-radius: 6px;
+  background: var(--bg-hover); color: var(--text-dim);
+}
+.smallBtn {
+  padding: 6px 12px;
+  font-size: 12px;
+  white-space: nowrap;
+  background: var(--bg-active);
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  border-radius: 7px;
+  transition: border-color 0.15s, color 0.15s;
+}
+.smallBtn:hover:not(:disabled) { border-color: #555; color: var(--text); }
+.smallBtn:disabled { opacity: 0.5; cursor: default; }
+.dangerBtn:hover:not(:disabled) { border-color: var(--red); color: var(--red); }

@@ -14,6 +14,7 @@ export interface HomePack {
 interface Props {
   packs: HomePack[]
   onOpen: (id: string) => void
+  onCreate: () => void
 }
 
 const UNCAT = '' // ключ раздела «Без категории» (общий список)
@@ -30,7 +31,7 @@ const ListIcon = (): JSX.Element => (
   </svg>
 )
 
-export default function HomeView({ packs, onOpen }: Props): JSX.Element {
+export default function HomeView({ packs, onOpen, onCreate }: Props): JSX.Element {
   const [mode, setMode] = useState<'tiles' | 'list'>('tiles')
   const [categories, setCategories] = useState<string[]>([])
   const [packCat, setPackCat] = useState<Record<string, string>>({})
@@ -157,6 +158,7 @@ export default function HomeView({ packs, onOpen }: Props): JSX.Element {
         <h1 className={styles.title}>Главная</h1>
         <p className={styles.desc}>Ваши сборки, официальные и для карт. Перетащите карточку в категорию.</p>
         <div className={styles.controls}>
+          <button className={styles.createPack} onClick={onCreate}>+ Создать сборку</button>
           {adding ? (
             <input
               autoFocus className={styles.catInput} placeholder="Название категории" value={newCat} maxLength={24}

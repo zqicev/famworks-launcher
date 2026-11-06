@@ -11,6 +11,66 @@
   overflow: hidden;
 }
 
+/* Экран-заглушка (техработы / обязательное обновление): перекрывает всё, кроме титлбара. */
+.gate {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  position: relative;
+  z-index: 1;
+}
+.gateBox {
+  max-width: 460px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.gateLogo { font-family: var(--font-display); font-size: 26px; font-weight: 800; letter-spacing: 1px; }
+.gateAccent { color: var(--accent); }
+.gateTitle { font-family: var(--font-display); font-size: 20px; font-weight: 700; color: var(--text); }
+.gateMsg { font-size: 14px; line-height: 1.6; color: var(--text-secondary); }
+
+/* Ненавязчивая плашка «бэкапы выключены»: тонкая полоса, не перекрывает контент. */
+.backupWarn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  padding: 6px 14px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--text-secondary);
+  z-index: 5;
+}
+.backupDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--red);
+  flex-shrink: 0;
+}
+.backupText { flex: 1; min-width: 0; }
+.backupLink {
+  color: var(--accent);
+  font-size: 12px;
+  padding: 2px 4px;
+  white-space: nowrap;
+}
+.backupLink:hover { text-decoration: underline; }
+.backupClose {
+  color: var(--text-dim);
+  font-size: 12px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+.backupClose:hover { color: var(--text); }
+
 /* Перетаскиваемая граница сайдбара. Узкая полоса поверх правого края,
    с увеличенной зоной захвата (margin отрицательный). */
 .resizer {

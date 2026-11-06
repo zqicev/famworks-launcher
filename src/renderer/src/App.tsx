@@ -32,7 +32,6 @@ export default function App() {
   const [needsSetup, setNeedsSetup] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [settingsOpen, setSettingsOpen] = useState(false)
   const [seenUpdates, setSeenUpdates] = useState<Record<string, string>>({})
   const [customPacks, setCustomPacks] = useState<Modpack[]>([])
   const [createOpen, setCreateOpen] = useState(false)
@@ -43,11 +42,37 @@ export default function App() {
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [devMode, setDevMode] = useState(false)
   const [crash, setCrash] = useState<CrashData | null>(null)
-  const [view, setView] = useState<'home' | 'modpack' | 'browser'>('home')
+  const [view, setView] = useState<'home' | 'modpack' | 'browser' | 'settings'>('home')
+  const [settingsReturn, setSettingsReturn] = useState<'home' | 'modpack' | 'browser'>('home')
+  const openSettings = useCallback(() => {
+    setView((v) => { if (v !== 'settings') setSettingsReturn(v); return 'settings' })
+  }, [])
   const [browserKey, setBrowserKey] = useState(0) // remount браузера при каждом открытии — свежее состояние/контекст
   const [browserInit, setBrowserInit] = useState<{ type: string; packId: string | null; detail: BrowserDetail | null }>({ type: 'modpack', packId: null, detail: null })
   const [mainTab, setMainTab] = useState<MainTab>('overview')
   const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT)
+  const [backupWarn, setBackupWarn] = useState(false)
+  const refreshBackupWarn = useCallback(() => {
+    window.api.backup.settings().then((s) => setBackupWarn(s.showDisabledWarning)).catch(() => {})
+  }, [])
+  useEffect(() => { refreshBackupWarn() }, [view, refreshBackupWarn])
+  const dismissBackupWarn = () => { window.api.backup.dismissWarning().catch(() => {}); setBackupWarn(false) }
+
+  // Удалённый «рубильник»/обязательное обновление: главный процесс присылает экран-заглушку.
+  const [gate, setGate] = useState<{ mode: 'maintenance' | 'update' | null; message: string } | null>(null)
+  useEffect(() => window.api.onAppGate((g) => setGate(g.blocked ? g : null)), [])
+
+  // Настройки — форма с «Сохранить». Если уходишь с несохранёнными изменениями — спрашиваем.
+  const [settingsDirty, setSettingsDirty] = useState(false)
+  const settingsDiscardRef = useRef<(() => void) | null>(null)
+  const [pendingLeave, setPendingLeave] = useState<(() => void) | null>(null)
+  const leaveSettings = useCallback((go: () => void) => {
+    if (view === 'settings' && settingsDirty) setPendingLeave(() => go)
+    else go()
+  }, [view, settingsDirty])
+  const closeSettings = useCallback(() => {
+    leaveSettings(() => { setView(settingsReturn); refreshBackupWarn() })
+  }, [leaveSettings, settingsReturn, refreshBackupWarn])
 
   // Перетаскивание правого края сайдбара: ширина в пределах [MIN, MAX], запоминается в store.
   const startSidebarResize = useCallback((e: React.MouseEvent) => {
@@ -253,7 +278,28 @@ export default function App() {
         <div className={styles.bgScrim} />
       </>}
       <TitleBar />
+      {gate ? (
+        <div className={styles.gate}>
+          <div className={styles.gateBox}>
+            <div className={styles.gateLogo}><span>FAM</span><span className={styles.gateAccent}>WORKS</span></div>
+            <h2 className={styles.gateTitle}>{gate.mode === 'update' ? 'Нужно обновление' : 'Технические работы'}</h2>
+            <p className={styles.gateMsg}>{gate.message}</p>
+            {gate.mode === 'update' && <p className={styles.gateMsg}>Лаунчер скачивает новую версию - она установится автоматически.</p>}
+          </div>
+        </div>
+      ) : (
+        <>
       <UpdateBanner />
+      {backupWarn && (
+        <div className={styles.backupWarn}>
+          <span className={styles.backupDot} />
+          <span className={styles.backupText}>
+            Автосохранение сборок выключено - копии не создаются автоматически.
+          </span>
+          <button className={styles.backupLink} onClick={openSettings}>Настройки</button>
+          <button className={styles.backupClose} onClick={dismissBackupWarn} title="Скрыть">✕</button>
+        </div>
+      )}
       {needsSetup ? (
         <SetupModal onComplete={handleSetupComplete} />
       ) : (
@@ -264,17 +310,17 @@ export default function App() {
             customPacks={customPacks}
             selectedId={view === 'modpack' ? selectedId : null}
             seenUpdates={seenUpdates}
-            onSelect={(id) => { setSelectedId(id); setView('modpack') }}
-            onSettings={() => setSettingsOpen(true)}
+            onSelect={(id) => leaveSettings(() => { setSelectedId(id); setView('modpack') })}
+            onSettings={openSettings}
             onRefresh={handleRefresh}
             onCreate={() => setCreateOpen(true)}
             onDeleteCustom={handleDeleteCustom}
             onImport={handleImport}
             onExport={handleExportCustom}
             homeActive={view === 'home'}
-            onOpenHome={() => setView('home')}
+            onOpenHome={() => leaveSettings(() => setView('home'))}
             browserActive={view === 'browser'}
-            onOpenBrowser={() => openBrowser('modpack', null)}
+            onOpenBrowser={() => leaveSettings(() => openBrowser('modpack', null))}
           />
           <div className={styles.resizer} onMouseDown={startSidebarResize} title="Потяните, чтобы изменить ширину" />
           {view === 'browser' ? (() => {
@@ -300,6 +346,24 @@ export default function App() {
                 ...customPacks.map(p => ({ id: p.id, name: p.name, loader: p.loader, mc_version: p.mc_version, for_map: p.for_map, custom: true }))
               ]}
               onOpen={(id) => { setSelectedId(id); setView('modpack') }}
+              onCreate={() => setCreateOpen(true)}
+            />
+          ) : view === 'settings' ? (
+            <SettingsModal
+              installPath={installPath}
+              onPathChange={setInstallPath}
+              devMode={devMode}
+              onDevModeChange={setDevMode}
+              bgImage={bgImage}
+              onBgChange={setBgImage}
+              onClose={closeSettings}
+              onBackupChange={refreshBackupWarn}
+              onDirtyChange={setSettingsDirty}
+              discardRef={settingsDiscardRef}
+              packs={[
+                ...(modpackIndex?.modpacks ?? []).map((p) => ({ id: p.id, name: p.name })),
+                ...customPacks.map((p) => ({ id: p.id, name: p.name }))
+              ]}
             />
           ) : (
             <MainPanel
@@ -316,19 +380,17 @@ export default function App() {
               onModpackReload={() => { if (selectedId) window.api.modpacks.get(selectedId).then(setModpack).catch(() => {}) }}
             />
           )}
-          {settingsOpen && (
-            <SettingsModal
-              installPath={installPath}
-              onPathChange={setInstallPath}
-              devMode={devMode}
-              onDevModeChange={setDevMode}
-              bgImage={bgImage}
-              onBgChange={setBgImage}
-              onClose={() => setSettingsOpen(false)}
-            />
-          )}
           {createOpen && (
             <CreateModpackModal onCreate={handleCreated} onClose={() => setCreateOpen(false)} />
+          )}
+          {pendingLeave && (
+            <ConfirmModal
+              title="Несохранённые изменения"
+              message="В настройках есть несохранённые изменения. Выйти без сохранения?"
+              confirmLabel="Выйти без сохранения"
+              onConfirm={() => { settingsDiscardRef.current?.(); setSettingsDirty(false); pendingLeave() }}
+              onClose={() => setPendingLeave(null)}
+            />
           )}
           {deleteTarget && (
             <ConfirmModal
@@ -348,6 +410,8 @@ export default function App() {
             />
           )}
         </div>
+      )}
+        </>
       )}
       {toast && (
         <div className={`${styles.toast} ${styles['toast_' + toast.kind]}`}>
