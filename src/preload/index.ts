@@ -24,10 +24,10 @@ contextBridge.exposeInMainWorld('api', {
     restore: (packId: string, file: string) => ipcRenderer.invoke('backup:restore', packId, file),
     delete: (packId: string, file: string) => ipcRenderer.invoke('backup:delete', packId, file),
     settings: () => ipcRenderer.invoke('backup:settings'),
-    setEnabled: (v: boolean) => ipcRenderer.invoke('backup:set-enabled', v),
+    autoMap: () => ipcRenderer.invoke('backup:auto-map'),
+    setAuto: (packId: string, v: boolean) => ipcRenderer.invoke('backup:set-auto', packId, v),
     setDir: (p: string) => ipcRenderer.invoke('backup:set-dir', p),
-    resetDir: () => ipcRenderer.invoke('backup:reset-dir'),
-    dismissWarning: () => ipcRenderer.invoke('backup:dismiss-warning')
+    resetDir: () => ipcRenderer.invoke('backup:reset-dir')
   },
   onAppGate: (cb: (g: { blocked: boolean; mode: 'maintenance' | 'update' | null; message: string }) => void) =>
     subscribe('app:gate', cb),

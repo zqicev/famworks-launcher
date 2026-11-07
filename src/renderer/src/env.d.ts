@@ -20,11 +20,11 @@ interface Window {
       create: (packId: string, categories?: string[]) => Promise<string | null>
       restore: (packId: string, file: string) => Promise<{ ok: boolean; error?: string }>
       delete: (packId: string, file: string) => Promise<{ ok: boolean }>
-      settings: () => Promise<{ enabled: boolean; dir: string; defaultDir: string; isDefault: boolean; showDisabledWarning: boolean }>
-      setEnabled: (v: boolean) => Promise<void>
+      settings: () => Promise<{ dir: string; defaultDir: string; isDefault: boolean }>
+      autoMap: () => Promise<Record<string, boolean>>
+      setAuto: (packId: string, v: boolean) => Promise<void>
       setDir: (p: string) => Promise<{ ok: boolean; error?: string }>
       resetDir: () => Promise<void>
-      dismissWarning: () => Promise<void>
     }
     onAppGate: (cb: (g: { blocked: boolean; mode: 'maintenance' | 'update' | null; message: string }) => void) => () => void
     modpacks: {

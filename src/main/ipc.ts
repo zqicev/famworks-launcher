@@ -9,7 +9,7 @@ import { killInstance, listInstances, onInstancesChange, reattachInstances } fro
 import { setupLoader, latestLoaderVersion, LoaderId } from './loaders'
 import { packDir, packFolderOf, ensurePackFolder, forgetPackFolder } from './packpaths'
 import { validateInstallPath, defaultInstallPath } from './installpath'
-import { listAllBackups, listBackups, createBackup, restoreBackup, deleteBackup, defaultBackupDir } from './backup'
+import { listAllBackups, listBackups, createBackup, restoreBackup, deleteBackup, defaultBackupDir, autoBackupMap, setAutoBackup } from './backup'
 import { analyticsEnabled, setAnalyticsEnabled, trackInstallError } from './analytics'
 import { searchModrinth, getModVersions, getModrinthIcons, getModrinthAuthors } from './modrinth'
 import { microsoftLogin, microsoftRefresh } from './msAuth'
@@ -51,22 +51,10 @@ export function setupIpcHandlers() {
 
   ipcMain.handle('backup:settings', () => {
     const custom = ((store.get('backupDir') as string) || '').trim()
-    const enabled = store.get('backupEnabled') !== false
-    const dismissed = store.get('backupWarnDismissed') === true
-    return {
-      enabled,
-      dir: custom || defaultBackupDir(),
-      defaultDir: defaultBackupDir(),
-      isDefault: !custom,
-      showDisabledWarning: !enabled && !dismissed
-    }
+    return { dir: custom || defaultBackupDir(), defaultDir: defaultBackupDir(), isDefault: !custom }
   })
-  ipcMain.handle('backup:set-enabled', (_, v: boolean) => {
-    store.set('backupEnabled', !!v)
-    // Включили — сбрасываем «скрытие» плашки, чтобы при следующем выключении она показалась снова.
-    if (v) store.set('backupWarnDismissed', false)
-  })
-  ipcMain.handle('backup:dismiss-warning', () => { store.set('backupWarnDismissed', true) })
+  ipcMain.handle('backup:auto-map', () => autoBackupMap())
+  ipcMain.handle('backup:set-auto', (_, packId: string, v: boolean) => setAutoBackup(packId, !!v))
   ipcMain.handle('backup:set-dir', (_, p: string) => {
     const v = validateInstallPath(String(p || '')) // та же защита: не в папке лаунчера / Program Files
     if (!v.ok) return { ok: false, error: v.reason }

@@ -18,19 +18,49 @@ export const ALL_CATEGORIES: Category[] = ['worlds', 'settings', 'screenshots', 
 const CODE: Record<Category, string> = { worlds: 'w', settings: 's', screenshots: 'c', mods: 'm', resourcepacks: 'r', shaders: 'h' }
 const BY_CODE: Record<string, Category> = Object.fromEntries(Object.entries(CODE).map(([k, v]) => [v, k as Category]))
 
-// Файлы/папки каждой «простой» категории (кладём целиком).
-const PLAIN: Partial<Record<Category, string[]>> = {
-  worlds: ['saves'],
-  settings: ['options.txt', 'optionsof.txt', 'servers.dat', 'hotbar.nbt', 'config'],
-  screenshots: ['screenshots']
-}
 // «Умные» категории: папка игры, где Modrinth-файлы запоминаем списком.
 const SMART: Partial<Record<Category, string>> = { mods: 'mods', resourcepacks: 'resourcepacks', shaders: 'shaderpacks' }
 
-const AUTO_KEEP = 3                        // авто-копий на сборку
-const MANUAL_KEEP = 20                     // ручных копий на сборку (живут, пока не удалишь)
-const AUTO_INTERVAL = 20 * 3600 * 1000     // авто-копия не чаще раза в ~20ч
+// В «Настройки» кладём ВСЁ из папки игры, кроме перекачиваемого/регенерируемого и других категорий.
+// Так попадают не только config/ и options.txt, но и папки, которые моды создают сами (journeymap,
+// xaero-вейпоинты, schematics и т.п.).
+const SETTINGS_EXCLUDE = new Set([
+  'saves', 'screenshots', 'mods', 'resourcepacks', 'shaderpacks',
+  'versions', 'libraries', 'assets', 'natives', 'logs', 'crash-reports', 'crash_reports',
+  '.loader', '.fabric', '.mixin.out', 'runtime'
+])
+
+function settingsItems(gameRoot: string): string[] {
+  try { return readdirSync(gameRoot).filter((n) => !SETTINGS_EXCLUDE.has(n)) } catch { return [] }
+}
+
+/** Файлы/папки «простой» категории (кладём целиком). «Настройки» — всё, кроме исключённого. */
+function plainItems(cat: Category, gameRoot: string): string[] | null {
+  if (cat === 'worlds') return ['saves']
+  if (cat === 'screenshots') return ['screenshots']
+  if (cat === 'settings') return settingsItems(gameRoot)
+  return null
+}
+
+const AUTO_KEEP = 2                         // авто-копий на сборку (последние N сессий, по кругу)
+const MANUAL_KEEP = 20                      // ручных копий на сборку (живут, пока не удалишь)
+const NO_WORLD_THROTTLE = 2 * 3600 * 1000   // серверная сборка без миров — не чаще раза в ~2ч
 const AUTO_SIZE_CAP = 2 * 1024 * 1024 * 1024 // авто пропускаем, если миров/скринов/конфигов > 2 ГБ
+
+/** Самое свежее изменение миров (mtime level.dat/session.lock). 0 — миров нет. */
+function savesNewestMtime(gameRoot: string): number {
+  const dir = join(gameRoot, 'saves')
+  if (!existsSync(dir)) return 0
+  let newest = 0
+  try {
+    for (const w of readdirSync(dir)) {
+      for (const f of ['level.dat', 'session.lock']) {
+        try { const m = statSync(join(dir, w, f)).mtimeMs; if (m > newest) newest = m } catch { /* нет файла */ }
+      }
+    }
+  } catch { /* нет папки */ }
+  return newest
+}
 
 export interface BackupInfo { file: string; at: number; sizeBytes: number; reason: string; categories: Category[] }
 
@@ -38,8 +68,19 @@ interface AssetEntry { folder: string; filename: string; enabled: boolean; url: 
 type ModCacheVal = { sha1: string; source: 'modrinth' | 'local'; url?: string; sha512?: string }
 type ModCache = Record<string, ModCacheVal>
 
-export function backupsEnabled(): boolean {
-  return store.get('backupEnabled') !== false
+/** Автосохранение включено для конкретной сборки (по умолчанию да). */
+export function autoBackupEnabled(packId: string): boolean {
+  const map = (store.get('backupAuto') as Record<string, boolean>) || {}
+  return map[packId] !== false
+}
+export function setAutoBackup(packId: string, v: boolean): void {
+  const map = { ...((store.get('backupAuto') as Record<string, boolean>) || {}) }
+  map[packId] = v
+  store.set('backupAuto', map)
+}
+/** Карта «сборка → автосохранение» (только явно заданные; отсутствие = включено). */
+export function autoBackupMap(): Record<string, boolean> {
+  return (store.get('backupAuto') as Record<string, boolean>) || {}
 }
 
 /** Папка копий по умолчанию — рядом со сборками (installPath/backups). installPath защищён от выбора
@@ -163,7 +204,7 @@ export async function createBackup(packId: string, reason = 'manual', categories
   const included: Category[] = []
 
   for (const cat of categories) {
-    const plain = PLAIN[cat]
+    const plain = plainItems(cat, gameRoot)
     if (!plain) continue
     let any = false
     for (const item of plain) {
@@ -209,18 +250,32 @@ export async function createBackup(packId: string, reason = 'manual', categories
   return join(dir, file)
 }
 
-/** Лёгкая страховка после игры: авто-копия не чаще раза в ~20ч (все категории). */
-export async function maybeAutoBackup(packId: string): Promise<void> {
+/** Авто-копия после игры: по копии на каждую сессию с изменившимся миром. Возвращает статус (для логов). */
+export async function maybeAutoBackup(packId: string): Promise<string> {
   try {
-    if (!backupsEnabled() || !featureEnabled('autoBackup')) return
-    const last = listBackups(packId)[0]
-    if (last && Date.now() - last.at < AUTO_INTERVAL) return
+    if (!autoBackupEnabled(packId)) return 'автосохранение выключено для сборки'
+    if (!featureEnabled('autoBackup')) return 'отключено удалённым флагом'
     const gameRoot = packDir(packId)
+    // Копия на КАЖДУЮ сессию, где мир менялся. Защита от «пустых» копий: если с прошлой авто-копии мир
+    // не изменился (а для серверных сборок без миров — прошло мало времени), пропускаем. Ручные/версионные
+    // копии троттлинг не учитывает.
+    const lastAuto = listBackups(packId).find((b) => b.reason === 'auto')
+    if (lastAuto) {
+      const newest = savesNewestMtime(gameRoot)
+      if (newest > 0) {
+        if (newest <= lastAuto.at) return 'мир не менялся с прошлой авто-копии'
+      } else if (Date.now() - lastAuto.at < NO_WORLD_THROTTLE) {
+        return 'без миров: конфиги недавно уже сохранены'
+      }
+    }
     // Грубый предохранитель по весу: миры/скрины/конфиги (умные категории почти не весят — список).
     const heavy = ['saves', 'screenshots', 'config'].map((d) => join(gameRoot, d)).filter((p) => existsSync(p))
-    if (heavy.length && sizeUnder(heavy, AUTO_SIZE_CAP) > AUTO_SIZE_CAP) return
-    await createBackup(packId, 'auto')
-  } catch { /* бэкап не должен мешать работе */ }
+    if (heavy.length && sizeUnder(heavy, AUTO_SIZE_CAP) > AUTO_SIZE_CAP) return 'слишком большой объём миров/скриншотов'
+    const r = await createBackup(packId, 'auto')
+    return r ? 'авто-копия создана' : 'нечего сохранять (нет данных)'
+  } catch (e) {
+    return 'ошибка: ' + String(e)
+  }
 }
 
 function insideRoot(target: string, root: string): boolean {

@@ -51,12 +51,6 @@ export default function App() {
   const [browserInit, setBrowserInit] = useState<{ type: string; packId: string | null; detail: BrowserDetail | null }>({ type: 'modpack', packId: null, detail: null })
   const [mainTab, setMainTab] = useState<MainTab>('overview')
   const [sidebarWidth, setSidebarWidth] = useState(SIDEBAR_DEFAULT)
-  const [backupWarn, setBackupWarn] = useState(false)
-  const refreshBackupWarn = useCallback(() => {
-    window.api.backup.settings().then((s) => setBackupWarn(s.showDisabledWarning)).catch(() => {})
-  }, [])
-  useEffect(() => { refreshBackupWarn() }, [view, refreshBackupWarn])
-  const dismissBackupWarn = () => { window.api.backup.dismissWarning().catch(() => {}); setBackupWarn(false) }
 
   // Удалённый «рубильник»/обязательное обновление: главный процесс присылает экран-заглушку.
   const [gate, setGate] = useState<{ mode: 'maintenance' | 'update' | null; message: string } | null>(null)
@@ -71,8 +65,8 @@ export default function App() {
     else go()
   }, [view, settingsDirty])
   const closeSettings = useCallback(() => {
-    leaveSettings(() => { setView(settingsReturn); refreshBackupWarn() })
-  }, [leaveSettings, settingsReturn, refreshBackupWarn])
+    leaveSettings(() => setView(settingsReturn))
+  }, [leaveSettings, settingsReturn])
 
   // Перетаскивание правого края сайдбара: ширина в пределах [MIN, MAX], запоминается в store.
   const startSidebarResize = useCallback((e: React.MouseEvent) => {
@@ -290,16 +284,6 @@ export default function App() {
       ) : (
         <>
       <UpdateBanner />
-      {backupWarn && (
-        <div className={styles.backupWarn}>
-          <span className={styles.backupDot} />
-          <span className={styles.backupText}>
-            Автосохранение сборок выключено - копии не создаются автоматически.
-          </span>
-          <button className={styles.backupLink} onClick={openSettings}>Настройки</button>
-          <button className={styles.backupClose} onClick={dismissBackupWarn} title="Скрыть">✕</button>
-        </div>
-      )}
       {needsSetup ? (
         <SetupModal onComplete={handleSetupComplete} />
       ) : (
@@ -357,7 +341,6 @@ export default function App() {
               bgImage={bgImage}
               onBgChange={setBgImage}
               onClose={closeSettings}
-              onBackupChange={refreshBackupWarn}
               onDirtyChange={setSettingsDirty}
               discardRef={settingsDiscardRef}
               packs={[

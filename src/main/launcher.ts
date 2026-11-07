@@ -258,8 +258,12 @@ export async function launchGame(
             exitCode: msg.code ?? 0,
             crash: crashed ? pickErrorLine(msg.tail) : undefined
           }, eventUser)
-          // Лёгкая авто-копия миров/настроек после игры (не чаще ~20ч). Не блокируем закрытие.
-          setImmediate(() => { maybeAutoBackup(modpack.id).catch(() => {}) })
+          // Авто-копия после игры (на каждую сессию с изменившимся миром). Не блокируем закрытие; статус — в Логи.
+          setImmediate(() => {
+            maybeAutoBackup(modpack.id)
+              .then((s) => sendTo(win, 'launch:log', { id: modpack.id, text: `[backup] ${s}` }))
+              .catch(() => {})
+          })
         }
         // Диагностика краша — только если игра успела запуститься и её НЕ закрыл пользователь кнопкой.
         if (msg.code && spawned && !inst?.userKilled) {

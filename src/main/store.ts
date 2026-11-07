@@ -35,11 +35,9 @@ interface StoreSchema {
   devSettings: Record<string, { debug?: boolean; port?: number; projectPath?: string; lastJar?: string; hotswap?: boolean }>
   // Резервные копии сборок. backupEnabled по умолчанию включено (undefined = вкл). backupDir — своя
   // папка для копий (пусто = дефолт в userData).
-  backupEnabled?: boolean
   backupDir?: string
-  // Плашку «бэкапы выключены» пользователь скрыл. Сбрасывается при включении бэкапов — чтобы при
-  // следующем выключении плашка показалась снова.
-  backupWarnDismissed?: boolean
+  // Автосохранение на сборку: { packId: вкл/выкл }. Отсутствие = включено.
+  backupAuto?: Record<string, boolean>
   // Последние известные удалённые флаги (кэш на случай «нет сети» при запуске).
   flagsCache?: Record<string, unknown>
   // Кэш резолва модов для бэкапов (имя|размер|mtime → источник), чтобы не перехешивать каждый раз.

@@ -11,7 +11,6 @@ interface Props {
   bgImage: string | null
   onBgChange: (filename: string | null) => void
   onClose: () => void
-  onBackupChange?: () => void
   onDirtyChange?: (dirty: boolean) => void
   discardRef?: MutableRefObject<(() => void) | null>
   packs: { id: string; name: string }[]
@@ -30,7 +29,7 @@ const CAT_SHORT: Record<string, string> = {
 // применяются только по кнопке «Сохранить». Акцент показываем вживую как превью и откатываем, если не
 // сохранили. Фон, очистка и восстановление — это действия (работают сразу), не часть черновика.
 export default function SettingsModal({
-  installPath, onPathChange, devMode, onDevModeChange, bgImage, onBgChange, onClose, onBackupChange, onDirtyChange, discardRef, packs
+  installPath, onPathChange, devMode, onDevModeChange, bgImage, onBgChange, onClose, onDirtyChange, discardRef, packs
 }: Props) {
   const initialAccent = useState(() => {
     const v = getComputedStyle(document.documentElement).getPropertyValue('--accent')
@@ -42,13 +41,11 @@ export default function SettingsModal({
   const [dDev, setDDev] = useState(devMode)
   const [accent, setAccent] = useState(initialAccent)
   const [dAnalytics, setDAnalytics] = useState(true)
-  const [dBkEnabled, setDBkEnabled] = useState(true)
   const [bkDirCustom, setBkDirCustom] = useState('') // '' = папка по умолчанию
 
   // Сохранённые значения (базовая линия для «изменено?» и отката)
   const [savedAccent, setSavedAccent] = useState(initialAccent)
   const [savedAnalytics, setSavedAnalytics] = useState(true)
-  const [savedBkEnabled, setSavedBkEnabled] = useState(true)
   const [savedBkDirCustom, setSavedBkDirCustom] = useState('')
   const [defaultBkDir, setDefaultBkDir] = useState('')
 
@@ -66,16 +63,17 @@ export default function SettingsModal({
   const [deleting, setDeleting] = useState<string | null>(null)   // ключ = file
   const [restoreMsg, setRestoreMsg] = useState('')
   const [tab, setTab] = useState<'general' | 'design' | 'storage'>('general')
+  const [auto, setAutoState] = useState<Record<string, boolean>>({}) // автосохранение на сборку (per-pack)
   const reloadBackups = () => window.api.backup.listAll().then(setBackups).catch(() => {})
 
   useEffect(() => {
     window.api.analytics.get().then((v) => { setDAnalytics(v); setSavedAnalytics(v) }).catch(() => {})
     window.api.backup.settings().then((s) => {
-      setDBkEnabled(s.enabled); setSavedBkEnabled(s.enabled)
       const custom = s.isDefault ? '' : s.dir
       setBkDirCustom(custom); setSavedBkDirCustom(custom)
       setDefaultBkDir(s.defaultDir)
     }).catch(() => {})
+    window.api.backup.autoMap().then(setAutoState).catch(() => {})
     window.api.backup.listAll().then(setBackups).catch(() => {})
     window.api.installPath.validate(installPath).then((v) => setPathWarn(v.ok ? '' : v.reason || '')).catch(() => {})
   }, [installPath])
@@ -85,7 +83,6 @@ export default function SettingsModal({
     dDev !== devMode ||
     accent !== savedAccent ||
     dAnalytics !== savedAnalytics ||
-    dBkEnabled !== savedBkEnabled ||
     bkDirCustom !== savedBkDirCustom
   useEffect(() => { onDirtyChange?.(dirty) }, [dirty, onDirtyChange])
 
@@ -103,10 +100,10 @@ export default function SettingsModal({
   // Откат всех черновиков к сохранённому (вызывает и App при уходе с несохранёнными изменениями).
   const discard = useCallback(() => {
     setPath(installPath); setDDev(devMode)
-    setDAnalytics(savedAnalytics); setDBkEnabled(savedBkEnabled); setBkDirCustom(savedBkDirCustom)
+    setDAnalytics(savedAnalytics); setBkDirCustom(savedBkDirCustom)
     setAccent(savedAccent); applyAccent(savedAccent)
     setPathErr(''); setBkErr(''); setSavedMsg('')
-  }, [installPath, devMode, savedAnalytics, savedBkEnabled, savedBkDirCustom, savedAccent])
+  }, [installPath, devMode, savedAnalytics, savedBkDirCustom, savedAccent])
   useEffect(() => {
     if (!discardRef) return
     discardRef.current = discard
@@ -131,16 +128,19 @@ export default function SettingsModal({
     if (path !== installPath) { await window.api.store.set('installPath', path); onPathChange(path) }
     if (dDev !== devMode) { await window.api.store.set('devMode', dDev); onDevModeChange(dDev) }
     if (dAnalytics !== savedAnalytics) { await window.api.analytics.set(dAnalytics) }
-    if (dBkEnabled !== savedBkEnabled) { await window.api.backup.setEnabled(dBkEnabled) }
     if (accent !== savedAccent) { await window.api.store.set('accentColor', accent) }
 
-    setSavedAccent(accent); setSavedAnalytics(dAnalytics); setSavedBkEnabled(dBkEnabled); setSavedBkDirCustom(bkDirCustom)
+    setSavedAccent(accent); setSavedAnalytics(dAnalytics); setSavedBkDirCustom(bkDirCustom)
     setPathErr(''); setBkErr(''); setPathWarn(''); setSavedMsg('Настройки сохранены')
-    onBackupChange?.()
   }
 
   const toggleDev = () => { setDDev((v) => !v); setSavedMsg('') }
-  const toggleBackups = () => { setDBkEnabled((v) => !v); setSavedMsg('') }
+  // Автосохранение сборки — применяется сразу (это не черновик формы).
+  const toggleAuto = async (packId: string) => {
+    const next = !(auto[packId] !== false)
+    setAutoState((a) => ({ ...a, [packId]: next }))
+    try { await window.api.backup.setAuto(packId, next) } catch { /* ignore */ }
+  }
   const toggleAnalytics = () => {
     if (dAnalytics) setConfirmOff(true)          // выключение — через подтверждение
     else { setDAnalytics(true); setSavedMsg('') } // включение — сразу (в черновик)
@@ -347,16 +347,6 @@ export default function SettingsModal({
                 </p>
               </div>
 
-              <button className={styles.toggleRow} onClick={toggleBackups}>
-                <div>
-                  <div className={styles.rowTitle}>Автоматически сохранять сборки</div>
-                  <p className={styles.hint} style={{ margin: 0 }}>
-                    Копии миров, настроек, модов, ресурспаков, шейдеров и скриншотов - после игры (раз в день) и перед сменой версии. Храним 3 авто-копии; ручные живут, пока не удалишь.
-                  </p>
-                </div>
-                <span className={`${styles.switch} ${dBkEnabled ? styles.switchOn : ''}`}><span className={styles.knob} /></span>
-              </button>
-
               <div className={styles.field}>
                 <label className={styles.label}>ПАПКА ДЛЯ КОПИЙ</label>
                 <div className={styles.pathRow}>
@@ -370,6 +360,9 @@ export default function SettingsModal({
 
               <div className={styles.field}>
                 <label className={styles.label}>РЕЗЕРВНЫЕ КОПИИ ПО СБОРКАМ</label>
+                <p className={styles.hint} style={{ margin: 0 }}>
+                  Автосохранение (на каждую сборку своё) делает копию после каждой сессии, где менялся мир, и перед сменой версии - храним 2 последние авто-копии. Ручные живут, пока не удалишь.
+                </p>
                 <div className={styles.bkList}>
                   {packs.length === 0 && <p className={styles.hint} style={{ margin: 0 }}>Сборок пока нет.</p>}
                   {packs.map((p) => {
@@ -378,6 +371,10 @@ export default function SettingsModal({
                       <div key={p.id} className={styles.bkPack}>
                         <div className={styles.bkPackHead}>
                           <span className={styles.bkName}>{p.name}</span>
+                          <button className={styles.autoRow} onClick={() => toggleAuto(p.id)} title="Автосохранять эту сборку после игры">
+                            <span className={styles.autoLabel}>Автосохранение</span>
+                            <span className={`${styles.switch} ${auto[p.id] !== false ? styles.switchOn : ''}`}><span className={styles.knob} /></span>
+                          </button>
                           <button className={styles.smallBtn} onClick={() => openCreate(p.id)}>+ Копия</button>
                         </div>
                         {list.length === 0
@@ -456,7 +453,7 @@ export default function SettingsModal({
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
               {CAT_ALL.map((c) => (
-                <button key={c} className={styles.toggleRow} style={{ padding: '8px 2px' }} onClick={() => toggleCat(c)}>
+                <button key={c} className={styles.toggleRow} style={{ padding: '10px 14px' }} onClick={() => toggleCat(c)}>
                   <span style={{ fontSize: 13, color: 'var(--text)' }}>{CAT_LABEL[c]}</span>
                   <span className={`${styles.switch} ${createCats.has(c) ? styles.switchOn : ''}`}><span className={styles.knob} /></span>
                 </button>
