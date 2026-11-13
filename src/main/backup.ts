@@ -251,15 +251,25 @@ export async function backupOnLoad(packId: string, displayName?: string): Promis
   } catch (e) { return 'ошибка: ' + String(e) }
 }
 
-/** После ВЫХОДА из игры — только миры, в которые играли, в копию дня. */
-export async function backupOnExit(packId: string, displayName: string | undefined, since: number): Promise<string> {
+/** После ВЫХОДА из игры — сыгранные миры; а если не крашнулось, то и моды/конфиги (jar-ники к этому
+ *  моменту уже освобождены, поэтому копируются надёжно — на случай, если при старте были заняты). */
+export async function backupOnExit(packId: string, displayName: string | undefined, since: number, crashed: boolean): Promise<string> {
   try {
     if (!autoBackupEnabled(packId)) return 'автосохранение выключено'
     if (!featureEnabled('autoBackup')) return 'отключено удалённым флагом'
-    const worlds = changedWorlds(packDir(packId), since)
-    if (!worlds.length) return 'выход: мир не менялся'
-    const ok = await updateDailyAuto(packId, worlds, ['worlds'], displayName)
-    return ok ? `выход: сохранено миров: ${worlds.length}` : 'выход: нечего сохранять'
+    const gameRoot = packDir(packId)
+    const worlds = changedWorlds(gameRoot, since)
+    const rels: string[] = [...worlds]
+    const cats: Category[] = worlds.length ? ['worlds'] : []
+    if (!crashed) {
+      for (const c of ['mods', 'resourcepacks', 'shaders', 'settings', 'screenshots'] as Category[]) {
+        const items = catItems(c, gameRoot)
+        if (items.length) { rels.push(...items); cats.push(c) }
+      }
+    }
+    if (!rels.length) return 'выход: нечего сохранять'
+    const ok = await updateDailyAuto(packId, rels, cats, displayName)
+    return ok ? `выход: сохранено (${[...new Set(cats)].join(', ')})` : 'выход: нечего сохранять'
   } catch (e) { return 'ошибка: ' + String(e) }
 }
 

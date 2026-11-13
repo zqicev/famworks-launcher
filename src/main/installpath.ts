@@ -1,5 +1,5 @@
 import { app } from 'electron'
-import { dirname, resolve, relative, isAbsolute } from 'path'
+import { dirname, resolve, relative, isAbsolute, parse } from 'path'
 
 // Путь установки сборок НЕ должен быть внутри папки самого лаунчера: обновление (electron-updater/NSIS)
 // переписывает папку программы и стирает всё, что в ней лежит, включая миры и моды. Здесь — безопасный
@@ -32,6 +32,12 @@ function isInside(child: string, parent: string): boolean {
 export function validateInstallPath(p: string): { ok: boolean; reason?: string } {
   const path = (p || '').trim()
   if (!path) return { ok: false, reason: 'Папка не выбрана' }
+
+  // Корень диска (C:\, D:\, /) — права/мусор в корне ломают установку и игру.
+  const abs = resolve(path)
+  if (abs === parse(abs).root) {
+    return { ok: false, reason: 'Нельзя выбирать корень диска (C:\\, D:\\). Выберите вложенную папку, например D:\\Games\\FamWorks.' }
+  }
 
   const appDir = appInstallDir()
   // Папка лаунчера (или вложенная/родительская к ней) — обновление её переписывает и стирает данные.

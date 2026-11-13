@@ -264,10 +264,10 @@ export async function launchGame(
             exitCode: msg.code ?? 0,
             crash: crashed ? pickErrorLine(msg.tail) : undefined
           }, eventUser)
-          // После выхода — только сыгранные миры в сегодняшнюю авто-копию. Не блокируем закрытие; статус — в Логи.
+          // После выхода — сыгранные миры (+ моды/конфиги, если не крашнулось) в сегодняшнюю авто-копию.
           const startedAt = inst?.startedAt ?? 0
           setImmediate(() => {
-            backupOnExit(modpack.id, modpack.name, startedAt)
+            backupOnExit(modpack.id, modpack.name, startedAt, crashed)
               .then((s) => sendTo(win, 'launch:log', { id: modpack.id, text: `[backup] ${s}` }))
               .catch(() => {})
           })
