@@ -20,12 +20,16 @@ contextBridge.exposeInMainWorld('api', {
   backup: {
     listAll: () => ipcRenderer.invoke('backup:list-all'),
     list: (packId: string) => ipcRenderer.invoke('backup:list', packId),
-    create: (packId: string, categories?: string[]) => ipcRenderer.invoke('backup:create', packId, categories),
+    create: (packId: string, categories?: string[], displayName?: string) => ipcRenderer.invoke('backup:create', packId, categories, displayName),
     restore: (packId: string, file: string) => ipcRenderer.invoke('backup:restore', packId, file),
     delete: (packId: string, file: string) => ipcRenderer.invoke('backup:delete', packId, file),
+    open: (packId: string, file: string) => ipcRenderer.invoke('backup:open', packId, file),
     settings: () => ipcRenderer.invoke('backup:settings'),
     autoMap: () => ipcRenderer.invoke('backup:auto-map'),
     setAuto: (packId: string, v: boolean) => ipcRenderer.invoke('backup:set-auto', packId, v),
+    setGlobal: (v: boolean) => ipcRenderer.invoke('backup:set-global', v),
+    answerAsk: (enable: boolean) => ipcRenderer.invoke('backup:answer-ask', enable),
+    dismissWarning: () => ipcRenderer.invoke('backup:dismiss-warning'),
     setDir: (p: string) => ipcRenderer.invoke('backup:set-dir', p),
     resetDir: () => ipcRenderer.invoke('backup:reset-dir')
   },

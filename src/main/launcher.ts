@@ -14,7 +14,7 @@ import { setBusy } from './busy'
 import { addInstance, removeInstance, instancesForPack, anyInstances } from './instances'
 import { packDir, ensurePackFolder, systemSupportsCyrillicPaths } from './packpaths'
 import { trackPackLaunch, trackPackExit } from './analytics'
-import { maybeAutoBackup } from './backup'
+import { backupOnLoad, backupOnExit } from './backup'
 import { featureEnabled } from './flags'
 import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'fs'
 import { execFileSync } from 'child_process'
@@ -247,6 +247,12 @@ export async function launchGame(
         emit(win, { phase: 'done', message: '' })
         sendTo(win,'launch:spawned', modpack.id)
         setPlaying(modpack.name)
+        // Загрузилась без вылета — сохраняем моды/конфиги в сегодняшнюю авто-копию (не блокируем).
+        setImmediate(() => {
+          backupOnLoad(modpack.id, modpack.name)
+            .then((s) => sendTo(win, 'launch:log', { id: modpack.id, text: `[backup] ${s}` }))
+            .catch(() => {})
+        })
         resolve()
       } else if (msg.t === 'close') {
         const inst = removeInstance(instanceId)
@@ -258,9 +264,10 @@ export async function launchGame(
             exitCode: msg.code ?? 0,
             crash: crashed ? pickErrorLine(msg.tail) : undefined
           }, eventUser)
-          // Авто-копия после игры (на каждую сессию с изменившимся миром). Не блокируем закрытие; статус — в Логи.
+          // После выхода — только сыгранные миры в сегодняшнюю авто-копию. Не блокируем закрытие; статус — в Логи.
+          const startedAt = inst?.startedAt ?? 0
           setImmediate(() => {
-            maybeAutoBackup(modpack.id)
+            backupOnExit(modpack.id, modpack.name, startedAt)
               .then((s) => sendTo(win, 'launch:log', { id: modpack.id, text: `[backup] ${s}` }))
               .catch(() => {})
           })

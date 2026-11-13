@@ -12,6 +12,7 @@ interface Props {
   onBgChange: (filename: string | null) => void
   onClose: () => void
   onDirtyChange?: (dirty: boolean) => void
+  onBackupChange?: () => void
   discardRef?: MutableRefObject<(() => void) | null>
   packs: { id: string; name: string }[]
 }
@@ -29,7 +30,7 @@ const CAT_SHORT: Record<string, string> = {
 // применяются только по кнопке «Сохранить». Акцент показываем вживую как превью и откатываем, если не
 // сохранили. Фон, очистка и восстановление — это действия (работают сразу), не часть черновика.
 export default function SettingsModal({
-  installPath, onPathChange, devMode, onDevModeChange, bgImage, onBgChange, onClose, onDirtyChange, discardRef, packs
+  installPath, onPathChange, devMode, onDevModeChange, bgImage, onBgChange, onClose, onDirtyChange, onBackupChange, discardRef, packs
 }: Props) {
   const initialAccent = useState(() => {
     const v = getComputedStyle(document.documentElement).getPropertyValue('--accent')
@@ -63,7 +64,10 @@ export default function SettingsModal({
   const [deleting, setDeleting] = useState<string | null>(null)   // ключ = file
   const [restoreMsg, setRestoreMsg] = useState('')
   const [tab, setTab] = useState<'general' | 'design' | 'storage'>('general')
-  const [auto, setAutoState] = useState<Record<string, boolean>>({}) // автосохранение на сборку (per-pack)
+  const [auto, setAutoState] = useState<Record<string, boolean>>({})       // черновик: автосохранение на сборку
+  const [autoSaved, setAutoSaved] = useState<Record<string, boolean>>({})  // базовая линия
+  const [globalAuto, setGlobalAuto] = useState(true)                       // черновик: мастер автосохранения
+  const [globalSaved, setGlobalSaved] = useState(true)                     // базовая линия
   const reloadBackups = () => window.api.backup.listAll().then(setBackups).catch(() => {})
 
   useEffect(() => {
@@ -72,18 +76,21 @@ export default function SettingsModal({
       const custom = s.isDefault ? '' : s.dir
       setBkDirCustom(custom); setSavedBkDirCustom(custom)
       setDefaultBkDir(s.defaultDir)
+      setGlobalAuto(s.global); setGlobalSaved(s.global)
     }).catch(() => {})
-    window.api.backup.autoMap().then(setAutoState).catch(() => {})
+    window.api.backup.autoMap().then((m) => { setAutoState(m); setAutoSaved(m) }).catch(() => {})
     window.api.backup.listAll().then(setBackups).catch(() => {})
     window.api.installPath.validate(installPath).then((v) => setPathWarn(v.ok ? '' : v.reason || '')).catch(() => {})
   }, [installPath])
 
+  const autoChanged = globalAuto !== globalSaved || packs.some((p) => (auto[p.id] !== false) !== (autoSaved[p.id] !== false))
   const dirty =
     path !== installPath ||
     dDev !== devMode ||
     accent !== savedAccent ||
     dAnalytics !== savedAnalytics ||
-    bkDirCustom !== savedBkDirCustom
+    bkDirCustom !== savedBkDirCustom ||
+    autoChanged
   useEffect(() => { onDirtyChange?.(dirty) }, [dirty, onDirtyChange])
 
   // Акцент меняем вживую (превью). Для отката держим актуальный «сохранённый» в ref.
@@ -101,9 +108,10 @@ export default function SettingsModal({
   const discard = useCallback(() => {
     setPath(installPath); setDDev(devMode)
     setDAnalytics(savedAnalytics); setBkDirCustom(savedBkDirCustom)
+    setGlobalAuto(globalSaved); setAutoState(autoSaved)
     setAccent(savedAccent); applyAccent(savedAccent)
     setPathErr(''); setBkErr(''); setSavedMsg('')
-  }, [installPath, devMode, savedAnalytics, savedBkDirCustom, savedAccent])
+  }, [installPath, devMode, savedAnalytics, savedBkDirCustom, savedAccent, globalSaved, autoSaved])
   useEffect(() => {
     if (!discardRef) return
     discardRef.current = discard
@@ -129,17 +137,25 @@ export default function SettingsModal({
     if (dDev !== devMode) { await window.api.store.set('devMode', dDev); onDevModeChange(dDev) }
     if (dAnalytics !== savedAnalytics) { await window.api.analytics.set(dAnalytics) }
     if (accent !== savedAccent) { await window.api.store.set('accentColor', accent) }
+    // Автосохранение: мастер и per-pack
+    if (globalAuto !== globalSaved) { await window.api.backup.setGlobal(globalAuto) }
+    for (const p of packs) {
+      const now = auto[p.id] !== false
+      if (now !== (autoSaved[p.id] !== false)) { await window.api.backup.setAuto(p.id, now) }
+    }
 
     setSavedAccent(accent); setSavedAnalytics(dAnalytics); setSavedBkDirCustom(bkDirCustom)
+    setGlobalSaved(globalAuto); setAutoSaved({ ...auto })
     setPathErr(''); setBkErr(''); setPathWarn(''); setSavedMsg('Настройки сохранены')
+    onBackupChange?.()
   }
 
   const toggleDev = () => { setDDev((v) => !v); setSavedMsg('') }
-  // Автосохранение сборки — применяется сразу (это не черновик формы).
-  const toggleAuto = async (packId: string) => {
-    const next = !(auto[packId] !== false)
-    setAutoState((a) => ({ ...a, [packId]: next }))
-    try { await window.api.backup.setAuto(packId, next) } catch { /* ignore */ }
+  // Автосохранение (мастер и per-pack) — черновик, применяется по «Сохранить».
+  const toggleGlobalAuto = () => { setGlobalAuto((v) => !v); setSavedMsg('') }
+  const toggleAuto = (packId: string) => {
+    setAutoState((a) => ({ ...a, [packId]: a[packId] === false }))
+    setSavedMsg('')
   }
   const toggleAnalytics = () => {
     if (dAnalytics) setConfirmOff(true)          // выключение — через подтверждение
@@ -182,7 +198,7 @@ export default function SettingsModal({
     }
   }
 
-  // Восстановление из копии — действие (докачивает Modrinth-моды, кладёт локальные)
+  // Восстановление из копии — действие (возвращает файлы из копии)
   const restore = async (packId: string, file: string) => {
     setRestoring(file); setRestoreMsg('')
     try {
@@ -216,7 +232,7 @@ export default function SettingsModal({
   const doCreate = async () => {
     if (!createFor || !createCats.size) return
     setCreating(true)
-    try { await window.api.backup.create(createFor, [...createCats]); await reloadBackups() }
+    try { await window.api.backup.create(createFor, [...createCats], packName(createFor)); await reloadBackups() }
     catch { /* ignore */ }
     finally { setCreating(false); setCreateFor(null) }
   }
@@ -347,6 +363,16 @@ export default function SettingsModal({
                 </p>
               </div>
 
+              <button className={styles.toggleRow} onClick={toggleGlobalAuto}>
+                <div>
+                  <div className={styles.rowTitle}>Автосохранение сборок</div>
+                  <p className={styles.hint} style={{ margin: 0 }}>
+                    Общий переключатель для всех сборок. Внизу можно включать/выключать автосохранение для каждой сборки отдельно.
+                  </p>
+                </div>
+                <span className={`${styles.switch} ${globalAuto ? styles.switchOn : ''}`}><span className={styles.knob} /></span>
+              </button>
+
               <div className={styles.field}>
                 <label className={styles.label}>ПАПКА ДЛЯ КОПИЙ</label>
                 <div className={styles.pathRow}>
@@ -361,7 +387,7 @@ export default function SettingsModal({
               <div className={styles.field}>
                 <label className={styles.label}>РЕЗЕРВНЫЕ КОПИИ ПО СБОРКАМ</label>
                 <p className={styles.hint} style={{ margin: 0 }}>
-                  Автосохранение (на каждую сборку своё) делает копию после каждой сессии, где менялся мир, и перед сменой версии - храним 2 последние авто-копии. Ручные живут, пока не удалишь.
+                  Автосохранение - одна копия на день: моды и конфиги пишутся после удачной загрузки сборки, миры - при выходе из игры (только те, в которые играл). Храним копии за 2 последних дня. Ручные живут, пока не удалишь.
                 </p>
                 <div className={styles.bkList}>
                   {packs.length === 0 && <p className={styles.hint} style={{ margin: 0 }}>Сборок пока нет.</p>}
@@ -371,9 +397,10 @@ export default function SettingsModal({
                       <div key={p.id} className={styles.bkPack}>
                         <div className={styles.bkPackHead}>
                           <span className={styles.bkName}>{p.name}</span>
-                          <button className={styles.autoRow} onClick={() => toggleAuto(p.id)} title="Автосохранять эту сборку после игры">
+                          <button className={styles.autoRow} onClick={() => toggleAuto(p.id)} disabled={!globalAuto}
+                            style={{ opacity: globalAuto ? 1 : 0.4 }} title={globalAuto ? 'Автосохранять эту сборку после игры' : 'Включите общее автосохранение выше'}>
                             <span className={styles.autoLabel}>Автосохранение</span>
-                            <span className={`${styles.switch} ${auto[p.id] !== false ? styles.switchOn : ''}`}><span className={styles.knob} /></span>
+                            <span className={`${styles.switch} ${globalAuto && auto[p.id] !== false ? styles.switchOn : ''}`}><span className={styles.knob} /></span>
                           </button>
                           <button className={styles.smallBtn} onClick={() => openCreate(p.id)}>+ Копия</button>
                         </div>
@@ -385,6 +412,7 @@ export default function SettingsModal({
                                 <span className={styles.bkWhen}>{new Date(b.at).toLocaleString('ru-RU')} · {BK_REASON[b.reason] || b.reason} · {formatBytes(b.sizeBytes)}</span>
                                 <div className={styles.chips}>{b.categories.map((c) => <span key={c} className={styles.chip}>{CAT_SHORT[c] || c}</span>)}</div>
                               </div>
+                              <button className={styles.smallBtn} onClick={() => window.api.backup.open(p.id, b.file)} title="Открыть папку копии">Папка</button>
                               <button className={styles.smallBtn} disabled={restoring === b.file || deleting === b.file} onClick={() => restore(p.id, b.file)}>
                                 {restoring === b.file ? '…' : 'Восстановить'}
                               </button>
@@ -399,7 +427,7 @@ export default function SettingsModal({
                 </div>
                 {restoreMsg && <p className={styles.hint} style={{ margin: 0 }}>{restoreMsg}</p>}
                 <p className={styles.hint}>
-                  При восстановлении заменяются только сохранённые в копии категории. Modrinth докачивается, локальные - из копии. Перед заменой делается копия текущего состояния.
+                  При восстановлении заменяются только сохранённые в копии категории (моды тоже из копии). Перед заменой делается копия текущего состояния.
                 </p>
               </div>
             </>

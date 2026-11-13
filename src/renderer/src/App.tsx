@@ -10,6 +10,7 @@ import SettingsModal from './components/SettingsModal'
 import UpdateBanner from './components/UpdateBanner'
 import CreateModpackModal from './components/CreateModpackModal'
 import ConfirmModal from './components/ConfirmModal'
+import FirstRunBackupModal from './components/FirstRunBackupModal'
 import ExportModal from './components/ExportModal'
 import CrashModal, { CrashData } from './components/CrashModal'
 import { ensureLogCapture } from './gameLog'
@@ -55,6 +56,22 @@ export default function App() {
   // Удалённый «рубильник»/обязательное обновление: главный процесс присылает экран-заглушку.
   const [gate, setGate] = useState<{ mode: 'maintenance' | 'update' | null; message: string } | null>(null)
   useEffect(() => window.api.onAppGate((g) => setGate(g.blocked ? g : null)), [])
+
+  // Плашка «автосохранение выключено» (по сохранённому состоянию мастера).
+  const [backupWarn, setBackupWarn] = useState(false)
+  const refreshBackupWarn = useCallback(() => {
+    window.api.backup.settings().then((s) => setBackupWarn(s.showDisabledWarning)).catch(() => {})
+  }, [])
+  const dismissBackupWarn = (): void => { window.api.backup.dismissWarning().catch(() => {}); setBackupWarn(false) }
+  useEffect(() => { refreshBackupWarn() }, [view, refreshBackupWarn])
+
+  // Первый запуск: один раз спрашиваем про автосохранение сборок.
+  const [askBackup, setAskBackup] = useState(false)
+  useEffect(() => { window.api.backup.settings().then((s) => { if (!s.asked) setAskBackup(true) }).catch(() => {}) }, [])
+  const handleBackupChoice = (enable: boolean): void => {
+    window.api.backup.answerAsk(enable).then(() => refreshBackupWarn()).catch(() => {})
+    setAskBackup(false)
+  }
 
   // Настройки — форма с «Сохранить». Если уходишь с несохранёнными изменениями — спрашиваем.
   const [settingsDirty, setSettingsDirty] = useState(false)
@@ -284,6 +301,14 @@ export default function App() {
       ) : (
         <>
       <UpdateBanner />
+      {backupWarn && (
+        <div className={styles.backupWarn}>
+          <span className={styles.backupDot} />
+          <span className={styles.backupText}>Автосохранение сборок выключено - копии не создаются автоматически.</span>
+          <button className={styles.backupLink} onClick={openSettings}>Настройки</button>
+          <button className={styles.backupClose} onClick={dismissBackupWarn} title="Скрыть">✕</button>
+        </div>
+      )}
       {needsSetup ? (
         <SetupModal onComplete={handleSetupComplete} />
       ) : (
@@ -342,6 +367,7 @@ export default function App() {
               onBgChange={setBgImage}
               onClose={closeSettings}
               onDirtyChange={setSettingsDirty}
+              onBackupChange={refreshBackupWarn}
               discardRef={settingsDiscardRef}
               packs={[
                 ...(modpackIndex?.modpacks ?? []).map((p) => ({ id: p.id, name: p.name })),
@@ -403,6 +429,7 @@ export default function App() {
         </div>
       )}
       {crash && <CrashModal data={crash} onClose={() => setCrash(null)} />}
+      {!gate && !needsSetup && askBackup && <FirstRunBackupModal onChoose={handleBackupChoice} />}
     </div>
   )
 }
