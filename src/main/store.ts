@@ -40,7 +40,8 @@ interface StoreSchema {
   backupAuto?: Record<string, boolean>
   // Последние известные удалённые флаги (кэш на случай «нет сети» при запуске).
   flagsCache?: Record<string, unknown>
-  // Кэш резолва модов для бэкапов (имя|размер|mtime → источник), чтобы не перехешивать каждый раз.
+  // УСТАРЕЛО: кэш резолва модов для бэкапов теперь в отдельном mod-resolve-cache.json (см. backup.ts).
+  // Ключ остаётся в схеме только чтобы удалить его у старых установок.
   modResolveCache?: Record<string, unknown>
 }
 

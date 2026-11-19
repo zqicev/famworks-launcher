@@ -4,7 +4,7 @@ import styles from '../styles/SettingsModal.module.css'
 
 interface Props {
   onClose: () => void
-  /** Локальная сборка: применяем выбранную сцену (data-URL .glb/.gltf) как character.scene. */
+  /** Локальная сборка: применяем выбранную сцену (fwbg://scene/… — копия .glb/.gltf) как character.scene. */
   onApply?: (sceneUrl: string) => void
   /** Убрать свою сцену (вернуться к дефолтному персонажу). Показывается, если сцена задана. */
   onClear?: () => void
@@ -21,8 +21,8 @@ export default function SceneGuideModal({ onClose, onApply, onClear }: Props): J
     try {
       const r = await window.api.scene.pick()
       if (r.cancelled) return
-      if (r.error || !r.dataUrl) { setErr('Не удалось прочитать файл'); return }
-      onApply(r.dataUrl)
+      if (r.error || !r.url) { setErr('Не удалось прочитать файл'); return }
+      onApply(r.url)
       onClose()
     } finally {
       setBusy(false)
