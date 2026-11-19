@@ -68,6 +68,10 @@ export default function SettingsModal({
   const [autoSaved, setAutoSaved] = useState<Record<string, boolean>>({})  // базовая линия
   const [globalAuto, setGlobalAuto] = useState(true)                       // черновик: мастер автосохранения
   const [globalSaved, setGlobalSaved] = useState(true)                     // базовая линия
+  const [autoCats, setAutoCats] = useState<Record<string, Cat[]>>({})      // черновик: категории автосейва на сборку
+  const [autoCatsSaved, setAutoCatsSaved] = useState<Record<string, Cat[]>>({})
+  const [catsOpenFor, setCatsOpenFor] = useState<string | null>(null)
+  const catsFor = (id: string): Cat[] => autoCats[id] ?? CAT_ALL
   const reloadBackups = () => window.api.backup.listAll().then(setBackups).catch(() => {})
 
   useEffect(() => {
@@ -79,11 +83,16 @@ export default function SettingsModal({
       setGlobalAuto(s.global); setGlobalSaved(s.global)
     }).catch(() => {})
     window.api.backup.autoMap().then((m) => { setAutoState(m); setAutoSaved(m) }).catch(() => {})
+    window.api.backup.autoCatsMap().then((m) => { setAutoCats(m as Record<string, Cat[]>); setAutoCatsSaved(m as Record<string, Cat[]>) }).catch(() => {})
     window.api.backup.listAll().then(setBackups).catch(() => {})
     window.api.installPath.validate(installPath).then((v) => setPathWarn(v.ok ? '' : v.reason || '')).catch(() => {})
   }, [installPath])
 
-  const autoChanged = globalAuto !== globalSaved || packs.some((p) => (auto[p.id] !== false) !== (autoSaved[p.id] !== false))
+  const catsEq = (a: Cat[], b: Cat[]): boolean => a.length === b.length && a.every((c) => b.includes(c))
+  const autoChanged =
+    globalAuto !== globalSaved ||
+    packs.some((p) => (auto[p.id] !== false) !== (autoSaved[p.id] !== false)) ||
+    packs.some((p) => !catsEq(autoCats[p.id] ?? CAT_ALL, autoCatsSaved[p.id] ?? CAT_ALL))
   const dirty =
     path !== installPath ||
     dDev !== devMode ||
@@ -108,10 +117,10 @@ export default function SettingsModal({
   const discard = useCallback(() => {
     setPath(installPath); setDDev(devMode)
     setDAnalytics(savedAnalytics); setBkDirCustom(savedBkDirCustom)
-    setGlobalAuto(globalSaved); setAutoState(autoSaved)
+    setGlobalAuto(globalSaved); setAutoState(autoSaved); setAutoCats(autoCatsSaved)
     setAccent(savedAccent); applyAccent(savedAccent)
     setPathErr(''); setBkErr(''); setSavedMsg('')
-  }, [installPath, devMode, savedAnalytics, savedBkDirCustom, savedAccent, globalSaved, autoSaved])
+  }, [installPath, devMode, savedAnalytics, savedBkDirCustom, savedAccent, globalSaved, autoSaved, autoCatsSaved])
   useEffect(() => {
     if (!discardRef) return
     discardRef.current = discard
@@ -142,10 +151,12 @@ export default function SettingsModal({
     for (const p of packs) {
       const now = auto[p.id] !== false
       if (now !== (autoSaved[p.id] !== false)) { await window.api.backup.setAuto(p.id, now) }
+      const a = autoCats[p.id] ?? CAT_ALL
+      if (!catsEq(a, autoCatsSaved[p.id] ?? CAT_ALL)) { await window.api.backup.setAutoCats(p.id, a) }
     }
 
     setSavedAccent(accent); setSavedAnalytics(dAnalytics); setSavedBkDirCustom(bkDirCustom)
-    setGlobalSaved(globalAuto); setAutoSaved({ ...auto })
+    setGlobalSaved(globalAuto); setAutoSaved({ ...auto }); setAutoCatsSaved({ ...autoCats })
     setPathErr(''); setBkErr(''); setPathWarn(''); setSavedMsg('Настройки сохранены')
     onBackupChange?.()
   }
@@ -155,6 +166,13 @@ export default function SettingsModal({
   const toggleGlobalAuto = () => { setGlobalAuto((v) => !v); setSavedMsg('') }
   const toggleAuto = (packId: string) => {
     setAutoState((a) => ({ ...a, [packId]: a[packId] === false }))
+    setSavedMsg('')
+  }
+  const toggleAutoCat = (packId: string, c: Cat) => {
+    setAutoCats((m) => {
+      const cur = m[packId] ?? CAT_ALL
+      return { ...m, [packId]: cur.includes(c) ? cur.filter((x) => x !== c) : [...cur, c] }
+    })
     setSavedMsg('')
   }
   const toggleAnalytics = () => {
@@ -288,20 +306,24 @@ export default function SettingsModal({
                 )}
               </div>
 
-              <button className={styles.toggleRow} onClick={toggleDev}>
-                <div>
-                  <div className={styles.rowTitle}>Режим разработчика</div>
-                  <p className={styles.hint} style={{ margin: 0 }}>Вкладка «Разработка»: запуск с отладкой (JDWP) и интеграция с IntelliJ IDEA.</p>
+              <button className={styles.switchCard} onClick={toggleDev}>
+                <div className={styles.switchHead}>
+                  <span className={styles.switchTitle}>Режим разработчика</span>
+                  <span className={`${styles.switch} ${dDev ? styles.switchOn : ''}`}><span className={styles.knob} /></span>
                 </div>
-                <span className={`${styles.switch} ${dDev ? styles.switchOn : ''}`}><span className={styles.knob} /></span>
+                <div className={styles.switchBody}>
+                  <p className={styles.switchDesc}>Вкладка «Разработка»: запуск с отладкой (JDWP) и интеграция с IntelliJ IDEA.</p>
+                </div>
               </button>
 
-              <button className={styles.toggleRow} onClick={toggleAnalytics}>
-                <div>
-                  <div className={styles.rowTitle}>Отправлять статистику</div>
-                  <p className={styles.hint} style={{ margin: 0 }}>Анонимные события лаунчера (запуски, вылеты, версии) помогают улучшать лаунчер и сборки. IP, железо и файлы не собираются.</p>
+              <button className={styles.switchCard} onClick={toggleAnalytics}>
+                <div className={styles.switchHead}>
+                  <span className={styles.switchTitle}>Отправлять статистику</span>
+                  <span className={`${styles.switch} ${dAnalytics ? styles.switchOn : ''}`}><span className={styles.knob} /></span>
                 </div>
-                <span className={`${styles.switch} ${dAnalytics ? styles.switchOn : ''}`}><span className={styles.knob} /></span>
+                <div className={styles.switchBody}>
+                  <p className={styles.switchDesc}>Анонимные события лаунчера (запуски, вылеты, версии) помогают улучшать лаунчер и сборки. IP, железо и файлы не собираются.</p>
+                </div>
               </button>
             </>
           )}
@@ -363,14 +385,16 @@ export default function SettingsModal({
                 </p>
               </div>
 
-              <button className={styles.toggleRow} onClick={toggleGlobalAuto}>
-                <div>
-                  <div className={styles.rowTitle}>Автосохранение сборок</div>
-                  <p className={styles.hint} style={{ margin: 0 }}>
-                    Общий переключатель для всех сборок. Внизу можно включать/выключать автосохранение для каждой сборки отдельно.
+              <button className={styles.switchCard} onClick={toggleGlobalAuto}>
+                <div className={styles.switchHead}>
+                  <span className={styles.switchTitle}>Автосохранение сборок</span>
+                  <span className={`${styles.switch} ${globalAuto ? styles.switchOn : ''}`}><span className={styles.knob} /></span>
+                </div>
+                <div className={styles.switchBody}>
+                  <p className={styles.switchDesc}>
+                    Общий переключатель для всех сборок. Ниже можно включать/выключать автосохранение для каждой сборки отдельно.
                   </p>
                 </div>
-                <span className={`${styles.switch} ${globalAuto ? styles.switchOn : ''}`}><span className={styles.knob} /></span>
               </button>
 
               <div className={styles.field}>
@@ -393,34 +417,67 @@ export default function SettingsModal({
                   {packs.length === 0 && <p className={styles.hint} style={{ margin: 0 }}>Сборок пока нет.</p>}
                   {packs.map((p) => {
                     const list = backups[p.id] || []
+                    const packAuto = globalAuto && auto[p.id] !== false
+                    const catsOpen = catsOpenFor === p.id
                     return (
                       <div key={p.id} className={styles.bkPack}>
                         <div className={styles.bkPackHead}>
                           <span className={styles.bkName}>{p.name}</span>
                           <button className={styles.autoRow} onClick={() => toggleAuto(p.id)} disabled={!globalAuto}
-                            style={{ opacity: globalAuto ? 1 : 0.4 }} title={globalAuto ? 'Автосохранять эту сборку после игры' : 'Включите общее автосохранение выше'}>
-                            <span className={styles.autoLabel}>Автосохранение</span>
-                            <span className={`${styles.switch} ${globalAuto && auto[p.id] !== false ? styles.switchOn : ''}`}><span className={styles.knob} /></span>
+                            title={globalAuto ? 'Автосохранять эту сборку после игры' : 'Включите общее автосохранение выше'}>
+                            <span className={styles.autoLabel}>Автосейв</span>
+                            <span className={`${styles.switch} ${packAuto ? styles.switchOn : ''}`}><span className={styles.knob} /></span>
                           </button>
-                          <button className={styles.smallBtn} onClick={() => openCreate(p.id)}>+ Копия</button>
                         </div>
-                        {list.length === 0
-                          ? <p className={styles.hint} style={{ margin: 0 }}>копий пока нет</p>
-                          : list.map((b) => (
-                            <div key={b.file} className={styles.bkRow}>
-                              <div className={styles.bkMeta}>
-                                <span className={styles.bkWhen}>{new Date(b.at).toLocaleString('ru-RU')} · {BK_REASON[b.reason] || b.reason} · {formatBytes(b.sizeBytes)}</span>
-                                <div className={styles.chips}>{b.categories.map((c) => <span key={c} className={styles.chip}>{CAT_SHORT[c] || c}</span>)}</div>
-                              </div>
-                              <button className={styles.smallBtn} onClick={() => window.api.backup.open(p.id, b.file)} title="Открыть папку копии">Папка</button>
-                              <button className={styles.smallBtn} disabled={restoring === b.file || deleting === b.file} onClick={() => restore(p.id, b.file)}>
-                                {restoring === b.file ? '…' : 'Восстановить'}
-                              </button>
-                              <button className={`${styles.smallBtn} ${styles.dangerBtn}`} disabled={restoring === b.file || deleting === b.file} onClick={() => del(p.id, b.file)} title="Удалить копию">
-                                {deleting === b.file ? '…' : 'Удалить'}
-                              </button>
+
+                        <div className={styles.bkBody}>
+                          <div className={styles.bkActions}>
+                            <button className={`${styles.actBtn} ${catsOpen ? styles.actBtnOn : ''}`} disabled={!packAuto}
+                              onClick={() => setCatsOpenFor((o) => (o === p.id ? null : p.id))} title="Что автоматически сохранять">
+                              Что сохранять {catsOpen ? '▴' : '▾'}
+                            </button>
+                            <button className={styles.actBtn} onClick={() => openCreate(p.id)} title="Сделать копию прямо сейчас">
+                              + Копия сейчас
+                            </button>
+                          </div>
+
+                          {catsOpen && packAuto && (
+                            <div className={styles.catsRow}>
+                              <span className={styles.catsHint}>Сохранять:</span>
+                              {CAT_ALL.map((c) => (
+                                <button key={c} className={`${styles.catChip} ${catsFor(p.id).includes(c) ? styles.catChipOn : ''}`} onClick={() => toggleAutoCat(p.id, c)}>
+                                  {CAT_LABEL[c]}
+                                </button>
+                              ))}
                             </div>
-                          ))}
+                          )}
+
+                          {list.length === 0
+                            ? <p className={styles.bkEmpty}>Копий пока нет</p>
+                            : (
+                              <div className={styles.bkRows}>
+                                {list.map((b) => (
+                                  <div key={b.file} className={styles.bkRow}>
+                                    <div className={styles.bkMeta}>
+                                      <span className={styles.bkWhen}>{new Date(b.at).toLocaleString('ru-RU')} · {BK_REASON[b.reason] || b.reason} · {formatBytes(b.sizeBytes)}</span>
+                                      <div className={styles.chips}>{b.categories.map((c) => <span key={c} className={styles.chip}>{CAT_SHORT[c] || c}</span>)}</div>
+                                    </div>
+                                    <button className={styles.iconGhost} onClick={() => window.api.backup.open(p.id, b.file)} title="Открыть папку копии">
+                                      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+                                    </button>
+                                    <button className={styles.restoreBtn} disabled={restoring === b.file || deleting === b.file} onClick={() => restore(p.id, b.file)}>
+                                      {restoring === b.file ? '…' : 'Восстановить'}
+                                    </button>
+                                    <button className={`${styles.iconGhost} ${styles.iconDanger}`} disabled={restoring === b.file || deleting === b.file} onClick={() => del(p.id, b.file)} title="Удалить копию">
+                                      {deleting === b.file
+                                        ? '…'
+                                        : <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13M9 7V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v3"/></svg>}
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                        </div>
                       </div>
                     )
                   })}

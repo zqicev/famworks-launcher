@@ -14,7 +14,7 @@ import { setBusy } from './busy'
 import { addInstance, removeInstance, instancesForPack, anyInstances } from './instances'
 import { packDir, ensurePackFolder, systemSupportsCyrillicPaths } from './packpaths'
 import { trackPackLaunch, trackPackExit } from './analytics'
-import { backupOnLoad, backupOnExit } from './backup'
+import { backupOnLoad, backupOnExit, isBackingUp, waitForBackup } from './backup'
 import { featureEnabled } from './flags'
 import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'fs'
 import { execFileSync } from 'child_process'
@@ -109,6 +109,12 @@ export async function launchGame(
   // Вкладку «Логи» чистим только для ПЕРВОГО экземпляра сборки — иначе 2-й запуск стёр бы логи 1-го
   // (у дублей одной сборки общий поток логов).
   if (instancesForPack(modpack.id).length === 0) sendTo(win,'launch:starting', modpack.id)
+
+  // Нельзя запускать, пока идёт авто-копия этой сборки (копируем её же файлы) — ждём завершения.
+  if (isBackingUp(modpack.id)) {
+    sendTo(win,'install:progress', { phase: 'check', message: 'Завершается резервное копирование…' })
+    await waitForBackup(modpack.id)
+  }
 
   // Dev-режим: отладка (JDWP) и hot-swap (JVM от JetBrains Runtime + enhanced redefinition)
   const dev = devLaunchOverrides(modpack.id)
@@ -249,7 +255,7 @@ export async function launchGame(
         setPlaying(modpack.name)
         // Загрузилась без вылета — сохраняем моды/конфиги в сегодняшнюю авто-копию (не блокируем).
         setImmediate(() => {
-          backupOnLoad(modpack.id, modpack.name)
+          backupOnLoad(modpack.id, modpack.name, win)
             .then((s) => sendTo(win, 'launch:log', { id: modpack.id, text: `[backup] ${s}` }))
             .catch(() => {})
         })
@@ -267,7 +273,7 @@ export async function launchGame(
           // После выхода — сыгранные миры (+ моды/конфиги, если не крашнулось) в сегодняшнюю авто-копию.
           const startedAt = inst?.startedAt ?? 0
           setImmediate(() => {
-            backupOnExit(modpack.id, modpack.name, startedAt, crashed)
+            backupOnExit(modpack.id, modpack.name, startedAt, crashed, win)
               .then((s) => sendTo(win, 'launch:log', { id: modpack.id, text: `[backup] ${s}` }))
               .catch(() => {})
           })

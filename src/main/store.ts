@@ -44,6 +44,8 @@ interface StoreSchema {
   backupWarnDismissed?: boolean
   // Автосохранение на сборку: { packId: вкл/выкл }. Отсутствие = включено. Работает поверх мастера.
   backupAuto?: Record<string, boolean>
+  // Какие категории авто-сохранять для сборки: { packId: ['worlds','mods',…] }. Отсутствие = всё.
+  backupAutoCats?: Record<string, string[]>
   // Имя папки копий для сборки: { packId: имя }. Папку называем по названию сборки, а не по id.
   backupFolders?: Record<string, string>
   // Последние известные удалённые флаги (кэш на случай «нет сети» при запуске).

@@ -52,7 +52,14 @@ export default function BottomBar({ modpack, activeMods = 0, totalMods = 0 }: Pr
   const [pickOpen, setPickOpen] = useState(false)
   const [runningMb, setRunningMb] = useState(0)
   const [health, setHealth] = useState<MemoryHealth | null>(null)
+  const [backupLabel, setBackupLabel] = useState<string | null>(null) // идёт авто-копия: подпись категории
   const clearTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Прогресс авто-копии этой сборки + блокировка «Играть» на время копирования.
+  useEffect(() => {
+    window.api.backup.isBusy(modpack.id).then((b) => setBackupLabel((l) => (b ? l ?? '' : null))).catch(() => {})
+    return window.api.backup.onProgress((d) => { if (d.packId === modpack.id) setBackupLabel(d.label) })
+  }, [modpack.id])
 
   const myInstances = instances.filter(i => i.modpackId === modpack.id)
   const running = myInstances.length > 0
@@ -259,6 +266,7 @@ export default function BottomBar({ modpack, activeMods = 0, totalMods = 0 }: Pr
     else setRunOpen(o => !o)
   }
 
+  const backingUp = backupLabel !== null
   const isBusy = status === 'checking' || status === 'installing' || status === 'launching'
   const canCancel = status === 'installing' || status === 'launching'
   const lockedByOther = !!busyId && busyId !== modpack.id
@@ -317,7 +325,9 @@ export default function BottomBar({ modpack, activeMods = 0, totalMods = 0 }: Pr
         </div>
 
         <div className={styles.statusArea}>
-          {progress ? (
+          {backingUp ? (
+            <div className={styles.statusMsg}>Сохранение{backupLabel ? `: ${backupLabel}` : ''}<span className={styles.dots} /></div>
+          ) : progress ? (
             <>
               <div className={styles.statusMsg}>{progress.message}{isBusy && <span className={styles.dots} />}</div>
               <div className={styles.statusSub}>
@@ -423,6 +433,11 @@ export default function BottomBar({ modpack, activeMods = 0, totalMods = 0 }: Pr
               </button>
             </div>
           </>
+        ) : backingUp ? (
+          <button className={`${styles.playBtn} ${styles.playBtnMuted}`} disabled>
+            <span className={styles.playLabel}>СОХРАНЕНИЕ…</span>
+            <span className={styles.playSub}>{modpack.name} · {modpack.mc_version}</span>
+          </button>
         ) : status === 'ready' && otherRunning && !lockedByOther ? (
           <button className={`${styles.playBtn} ${styles.playBtnAccent}`} onClick={openPick} title="Запущена другая сборка — запустить ещё один экземпляр">
             <span className={styles.playLabel}><span className={styles.playIcon}>＋ </span>ИГРАТЬ</span>

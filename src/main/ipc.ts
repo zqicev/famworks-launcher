@@ -9,7 +9,7 @@ import { killInstance, listInstances, onInstancesChange, reattachInstances } fro
 import { setupLoader, latestLoaderVersion, LoaderId } from './loaders'
 import { packDir, packFolderOf, ensurePackFolder, forgetPackFolder } from './packpaths'
 import { validateInstallPath, defaultInstallPath } from './installpath'
-import { listAllBackups, listBackups, createBackup, restoreBackup, deleteBackup, defaultBackupDir, autoBackupMap, setAutoBackup, autoBackupGlobal, setAutoBackupGlobal, backupAsked, answerBackupAsk, backupPath } from './backup'
+import { listAllBackups, listBackups, createBackup, restoreBackup, deleteBackup, defaultBackupDir, autoBackupMap, setAutoBackup, autoBackupGlobal, setAutoBackupGlobal, backupAsked, answerBackupAsk, backupPath, isBackingUp, autoBackupCatsMap, setAutoBackupCats } from './backup'
 import { analyticsEnabled, setAnalyticsEnabled, trackInstallError } from './analytics'
 import { searchModrinth, getModVersions, getModrinthIcons, getModrinthAuthors } from './modrinth'
 import { microsoftLogin, microsoftRefresh } from './msAuth'
@@ -64,6 +64,8 @@ export function setupIpcHandlers() {
   })
   ipcMain.handle('backup:auto-map', () => autoBackupMap())
   ipcMain.handle('backup:set-auto', (_, packId: string, v: boolean) => setAutoBackup(packId, !!v))
+  ipcMain.handle('backup:auto-cats-map', () => autoBackupCatsMap())
+  ipcMain.handle('backup:set-auto-cats', (_, packId: string, cats: import('./backup').Category[]) => setAutoBackupCats(packId, cats))
   ipcMain.handle('backup:set-global', (_, v: boolean) => {
     setAutoBackupGlobal(!!v)
     if (v) store.set('backupWarnDismissed', false) // включили — плашку снова можно показать при след. выключении
@@ -71,6 +73,7 @@ export function setupIpcHandlers() {
   ipcMain.handle('backup:dismiss-warning', () => { store.set('backupWarnDismissed', true) })
   ipcMain.handle('backup:answer-ask', (_, enable: boolean) => answerBackupAsk(!!enable))
   ipcMain.handle('backup:open', (_, packId: string, file: string) => { shell.openPath(backupPath(packId, file)) })
+  ipcMain.handle('backup:is-busy', (_, packId: string) => isBackingUp(packId))
   ipcMain.handle('backup:set-dir', (_, p: string) => {
     const v = validateInstallPath(String(p || '')) // та же защита: не в папке лаунчера / Program Files
     if (!v.ok) return { ok: false, error: v.reason }

@@ -108,6 +108,19 @@ export function setAutoBackup(packId: string, v: boolean): void {
 }
 export function autoBackupMap(): Record<string, boolean> { return (store.get('backupAuto') as Record<string, boolean>) || {} }
 
+/** Какие категории авто-сохранять для сборки (по умолчанию — все). */
+export function autoBackupCats(packId: string): Category[] {
+  const m = (store.get('backupAutoCats') as Record<string, Category[]>) || {}
+  const v = m[packId]
+  return Array.isArray(v) ? (v.filter((c) => ALL_CATEGORIES.includes(c)) as Category[]) : ALL_CATEGORIES
+}
+export function setAutoBackupCats(packId: string, cats: Category[]): void {
+  const m = { ...((store.get('backupAutoCats') as Record<string, Category[]>) || {}) }
+  m[packId] = cats.filter((c) => ALL_CATEGORIES.includes(c))
+  store.set('backupAutoCats', m)
+}
+export function autoBackupCatsMap(): Record<string, Category[]> { return (store.get('backupAutoCats') as Record<string, Category[]>) || {} }
+
 // ───────── Расположение копий ─────────
 export function defaultBackupDir(): string {
   const installPath = ((store.get('installPath') as string | undefined) || '').trim()
@@ -221,55 +234,67 @@ export async function createBackup(packId: string, reason = 'manual', categories
   return backupDir
 }
 
-/** Докопировать элементы в СЕГОДНЯШНЮЮ авто-копию (одна на день), объединить категории. */
-async function updateDailyAuto(packId: string, rels: string[], cats: Category[], displayName?: string): Promise<boolean> {
-  if (!autoBackupEnabled(packId) || !featureEnabled('autoBackup')) return false
+const CAT_RU: Record<Category, string> = {
+  worlds: 'миры', settings: 'настройки', screenshots: 'скриншоты', mods: 'моды', resourcepacks: 'ресурспаки', shaders: 'шейдеры'
+}
+
+// Сейчас идёт авто-копия (чтобы запрещать запуск сборки, пока оно не закончится).
+const running = new Map<string, Promise<void>>()
+export function isBackingUp(packId: string): boolean { return running.has(packId) }
+export async function waitForBackup(packId: string): Promise<void> {
+  const p = running.get(packId)
+  if (p) await p.catch(() => {})
+}
+
+/** Докопировать категории в СЕГОДНЯШНЮЮ авто-копию с прогрессом (подпись категории) в окно. */
+async function runDailyBackup(packId: string, groups: { cat: Category; rels: string[] }[], displayName: string | undefined, win?: import('electron').BrowserWindow): Promise<string> {
+  if (!autoBackupEnabled(packId)) return 'автосохранение выключено'
+  if (!featureEnabled('autoBackup')) return 'отключено удалённым флагом'
   const gameRoot = packDir(packId)
-  const present = rels.filter((rel) => existsSync(join(gameRoot, rel)))
-  if (!present.length) return false
+  const allowed = new Set(autoBackupCats(packId)) // выбор категорий пользователя для этой сборки
+  const real = groups
+    .map((g) => ({ cat: g.cat, rels: g.rels.filter((r) => existsSync(join(gameRoot, r))) }))
+    .filter((g) => g.rels.length && allowed.has(g.cat))
+  if (!real.length) return 'нечего сохранять (нет выбранных категорий)'
+
   const dir = join(backupsRoot(), resolveBackupFolder(packId, displayName), `${dayKey()}__auto`)
-  mkdirSync(dir, { recursive: true })
-  for (const rel of present) await copyTree(join(gameRoot, rel), join(dir, rel))
-  const prev = readMeta(dir)
-  const categories = [...new Set([...(prev?.categories || []), ...cats])] as Category[]
-  const sizeBytes = await sizeDir(dir)
-  try { writeFileSync(join(dir, 'meta.json'), JSON.stringify({ categories, at: Date.now(), reason: 'auto', sizeBytes } as Meta)) } catch { /* ignore */ }
-  rotate(packId)
-  return true
+  const sendProg = (label: string | null): void => { try { win?.webContents.send('backup:progress', { packId, label }) } catch { /* окно закрыто */ } }
+  const task = (async () => {
+    mkdirSync(dir, { recursive: true })
+    for (const g of real) {
+      sendProg(CAT_RU[g.cat])
+      for (const rel of g.rels) await copyTree(join(gameRoot, rel), join(dir, rel))
+    }
+    const prev = readMeta(dir)
+    const categories = [...new Set([...(prev?.categories || []), ...real.map((g) => g.cat)])] as Category[]
+    const sizeBytes = await sizeDir(dir)
+    try { writeFileSync(join(dir, 'meta.json'), JSON.stringify({ categories, at: Date.now(), reason: 'auto', sizeBytes } as Meta)) } catch { /* ignore */ }
+    rotate(packId)
+  })()
+  running.set(packId, task.then(() => {}, () => {}))
+  try { await task } finally { running.delete(packId); sendProg(null) }
+  return `сохранено (${real.map((g) => CAT_RU[g.cat]).join(', ')})`
 }
 
 /** После УДАЧНОЙ загрузки сборки (игра стартовала, не вылетела) — моды/ресурспаки/шейдеры/настройки/скрины. */
-export async function backupOnLoad(packId: string, displayName?: string): Promise<string> {
+export async function backupOnLoad(packId: string, displayName: string | undefined, win?: import('electron').BrowserWindow): Promise<string> {
   try {
-    if (!autoBackupEnabled(packId)) return 'автосохранение выключено'
-    if (!featureEnabled('autoBackup')) return 'отключено удалённым флагом'
     const gameRoot = packDir(packId)
-    const cats: Category[] = ['mods', 'resourcepacks', 'shaders', 'settings', 'screenshots']
-    const rels = cats.flatMap((c) => catItems(c, gameRoot))
-    const ok = await updateDailyAuto(packId, rels, cats, displayName)
-    return ok ? 'загрузка: моды и конфиги сохранены' : 'загрузка: нечего сохранять'
+    const groups = (['mods', 'resourcepacks', 'shaders', 'settings', 'screenshots'] as Category[]).map((c) => ({ cat: c, rels: catItems(c, gameRoot) }))
+    return 'загрузка: ' + await runDailyBackup(packId, groups, displayName, win)
   } catch (e) { return 'ошибка: ' + String(e) }
 }
 
-/** После ВЫХОДА из игры — сыгранные миры; а если не крашнулось, то и моды/конфиги (jar-ники к этому
- *  моменту уже освобождены, поэтому копируются надёжно — на случай, если при старте были заняты). */
-export async function backupOnExit(packId: string, displayName: string | undefined, since: number, crashed: boolean): Promise<string> {
+/** После ВЫХОДА из игры — сыгранные миры; если не крашнулось — ещё моды/конфиги (jar-ники уже свободны). */
+export async function backupOnExit(packId: string, displayName: string | undefined, since: number, crashed: boolean, win?: import('electron').BrowserWindow): Promise<string> {
   try {
-    if (!autoBackupEnabled(packId)) return 'автосохранение выключено'
-    if (!featureEnabled('autoBackup')) return 'отключено удалённым флагом'
     const gameRoot = packDir(packId)
+    const groups: { cat: Category; rels: string[] }[] = []
     const worlds = changedWorlds(gameRoot, since)
-    const rels: string[] = [...worlds]
-    const cats: Category[] = worlds.length ? ['worlds'] : []
-    if (!crashed) {
-      for (const c of ['mods', 'resourcepacks', 'shaders', 'settings', 'screenshots'] as Category[]) {
-        const items = catItems(c, gameRoot)
-        if (items.length) { rels.push(...items); cats.push(c) }
-      }
-    }
-    if (!rels.length) return 'выход: нечего сохранять'
-    const ok = await updateDailyAuto(packId, rels, cats, displayName)
-    return ok ? `выход: сохранено (${[...new Set(cats)].join(', ')})` : 'выход: нечего сохранять'
+    if (worlds.length) groups.push({ cat: 'worlds', rels: worlds })
+    if (!crashed) for (const c of ['mods', 'resourcepacks', 'shaders', 'settings', 'screenshots'] as Category[]) groups.push({ cat: c, rels: catItems(c, gameRoot) })
+    if (!groups.length) return 'выход: мир не менялся'
+    return 'выход: ' + await runDailyBackup(packId, groups, displayName, win)
   } catch (e) { return 'ошибка: ' + String(e) }
 }
 
