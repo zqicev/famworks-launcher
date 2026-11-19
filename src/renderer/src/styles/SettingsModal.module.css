@@ -204,6 +204,34 @@
 }
 .switchOn .knob { transform: translateX(16px); background: #0a0a0a; }
 
+/* ───────── Карточка-переключатель (в стиле карточки сборки) ───────── */
+.switchCard {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--bg-surface);
+  overflow: hidden;
+  transition: border-color 0.15s;
+}
+.switchCard:hover { border-color: #383838; }
+.switchHead {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 14px;
+  border-bottom: 1px solid var(--border);
+}
+.switchTitle {
+  flex: 1; min-width: 0;
+  font-family: var(--font-display);
+  font-size: 15px; font-weight: 600; letter-spacing: 0.2px;
+  color: var(--text);
+}
+.switchBody { padding: 11px 14px; }
+.switchDesc { font-size: 12px; color: var(--text-secondary); line-height: 1.5; margin: 0; }
+
 .cinputBad { border-color: var(--red) !important; }
 
 /* Выбор акцентного цвета */
@@ -314,32 +342,91 @@
 }
 
 /* ───────── Список резервных копий ───────── */
-.bkList { display: flex; flex-direction: column; gap: 10px; }
+/* Глубина ступенями: страница #0a0a0a → карточка surface → контролы active → чипы hover. */
+.bkList { display: flex; flex-direction: column; gap: 12px; }
+
 .bkPack {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 12px;
   border: 1px solid var(--border);
-  border-radius: 10px;
-  background: transparent;
+  border-radius: 12px;
+  background: var(--bg-surface);
+  overflow: hidden;
 }
-.bkPackHead { display: flex; align-items: center; gap: 10px; }
+
+/* Шапка карточки с именем и тумблером, отделена линией от тела */
+.bkPackHead {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 14px;
+  border-bottom: 1px solid var(--border);
+}
 .bkName {
   flex: 1; min-width: 0;
-  font-size: 13px; font-weight: 600; color: var(--text);
+  font-family: var(--font-display);
+  font-size: 15px; font-weight: 600; letter-spacing: 0.2px; color: var(--text);
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.autoRow { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
-.autoLabel { font-size: 12px; color: var(--text-secondary); white-space: nowrap; }
+.autoRow { display: flex; align-items: center; gap: 9px; flex-shrink: 0; transition: opacity 0.15s; }
+.autoRow:disabled { opacity: 0.4; cursor: default; }
+.autoLabel {
+  font-size: 10px; font-weight: 600; letter-spacing: 1px; text-transform: uppercase;
+  color: var(--text-dim); white-space: nowrap;
+}
+
+.bkBody { display: flex; flex-direction: column; gap: 12px; padding: 12px 14px; }
+
+/* Действия сборки — обычные читаемые кнопки */
+.bkActions { display: flex; gap: 8px; }
+.actBtn {
+  height: 30px; padding: 0 14px;
+  font-size: 12px; font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--bg-active);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  white-space: nowrap;
+  transition: color 0.15s, background 0.15s, border-color 0.15s;
+}
+.actBtn:hover:not(:disabled) { color: var(--text); background: var(--bg-hover); border-color: #383838; }
+.actBtn:disabled { opacity: 0.45; cursor: default; }
+.actBtnOn, .actBtnOn:hover { color: var(--text); border-color: #444; }
+
+/* Выбор категорий автосохранения на сборку */
+.catsRow { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.catsHint {
+  font-size: 10px; font-weight: 600; letter-spacing: 0.6px; text-transform: uppercase;
+  color: var(--text-dim); margin-right: 4px;
+}
+.catChip {
+  font-size: 11px;
+  padding: 4px 11px;
+  border-radius: 999px;
+  color: var(--text-secondary);
+  background: var(--bg-active);
+  border: 1px solid var(--border);
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+.catChip:hover { color: var(--text); border-color: #444; }
+.catChipOn, .catChipOn:hover { background: var(--accent); color: #0a0a0a; border-color: var(--accent); }
+
+.bkEmpty { font-size: 12px; color: var(--text-dim); margin: 0; }
+
+/* Список копий — собственная панель, строки разделены линиями */
+.bkRows {
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-active);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  overflow: hidden;
+}
 .bkRow {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 8px 10px;
-  border-radius: 8px;
-  background: var(--bg-active);
+  gap: 10px;
+  padding: 9px 11px;
 }
+.bkRow + .bkRow { border-top: 1px solid var(--border); }
 .bkMeta { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
 .bkWhen {
   font-size: 12px; color: var(--text-secondary);
@@ -349,18 +436,35 @@
 .chip {
   font-size: 10px; line-height: 1;
   padding: 3px 7px; border-radius: 6px;
-  background: var(--bg-hover); color: var(--text-dim);
+  background: var(--bg-hover); color: var(--text-secondary);
 }
-.smallBtn {
-  padding: 6px 12px;
-  font-size: 12px;
+
+/* Основная кнопка строки */
+.restoreBtn {
+  padding: 6px 13px;
+  font-size: 12px; font-weight: 600;
   white-space: nowrap;
-  background: var(--bg-active);
+  flex-shrink: 0;
+  background: var(--bg-hover);
   border: 1px solid var(--border);
   color: var(--text-secondary);
   border-radius: 7px;
   transition: border-color 0.15s, color 0.15s;
 }
-.smallBtn:hover:not(:disabled) { border-color: #555; color: var(--text); }
-.smallBtn:disabled { opacity: 0.5; cursor: default; }
-.dangerBtn:hover:not(:disabled) { border-color: var(--red); color: var(--red); }
+.restoreBtn:hover:not(:disabled) { border-color: var(--accent); color: var(--text); }
+.restoreBtn:disabled { opacity: 0.5; cursor: default; }
+
+/* Иконочные действия строки (папка, удалить) */
+.iconGhost {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px; height: 30px;
+  flex-shrink: 0;
+  color: var(--text-dim);
+  border-radius: 7px;
+  transition: color 0.15s, background 0.15s;
+}
+.iconGhost:hover:not(:disabled) { color: var(--text); background: var(--bg-hover); }
+.iconGhost:disabled { opacity: 0.4; cursor: default; }
+.iconDanger:hover:not(:disabled) { color: var(--red); background: var(--bg-hover); }

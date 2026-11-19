@@ -17,12 +17,20 @@ interface Window {
     backup: {
       listAll: () => Promise<Record<string, { file: string; at: number; sizeBytes: number; reason: string; categories: string[] }[]>>
       list: (packId: string) => Promise<{ file: string; at: number; sizeBytes: number; reason: string; categories: string[] }[]>
-      create: (packId: string, categories?: string[]) => Promise<string | null>
+      create: (packId: string, categories?: string[], displayName?: string) => Promise<string | null>
       restore: (packId: string, file: string) => Promise<{ ok: boolean; error?: string }>
       delete: (packId: string, file: string) => Promise<{ ok: boolean }>
-      settings: () => Promise<{ dir: string; defaultDir: string; isDefault: boolean }>
+      open: (packId: string, file: string) => Promise<void>
+      isBusy: (packId: string) => Promise<boolean>
+      onProgress: (cb: (d: { packId: string; label: string | null }) => void) => () => void
+      settings: () => Promise<{ dir: string; defaultDir: string; isDefault: boolean; global: boolean; asked: boolean; showDisabledWarning: boolean }>
       autoMap: () => Promise<Record<string, boolean>>
       setAuto: (packId: string, v: boolean) => Promise<void>
+      autoCatsMap: () => Promise<Record<string, string[]>>
+      setAutoCats: (packId: string, cats: string[]) => Promise<void>
+      setGlobal: (v: boolean) => Promise<void>
+      answerAsk: (enable: boolean) => Promise<void>
+      dismissWarning: () => Promise<void>
       setDir: (p: string) => Promise<{ ok: boolean; error?: string }>
       resetDir: () => Promise<void>
     }

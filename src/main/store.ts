@@ -36,12 +36,22 @@ interface StoreSchema {
   // Резервные копии сборок. backupEnabled по умолчанию включено (undefined = вкл). backupDir — своя
   // папка для копий (пусто = дефолт в userData).
   backupDir?: string
-  // Автосохранение на сборку: { packId: вкл/выкл }. Отсутствие = включено.
+  // Общий (мастер) переключатель автосохранения для всех сборок. Отсутствие = включено.
+  backupAutoGlobal?: boolean
+  // Пользователя уже спрашивали при первом запуске про автосохранение (модалка показывается один раз).
+  backupAskDone?: boolean
+  // Плашку «автосохранение выключено» пользователь скрыл. Сбрасывается при включении мастера.
+  backupWarnDismissed?: boolean
+  // Автосохранение на сборку: { packId: вкл/выкл }. Отсутствие = включено. Работает поверх мастера.
   backupAuto?: Record<string, boolean>
+  // Какие категории авто-сохранять для сборки: { packId: ['worlds','mods',…] }. Отсутствие = всё.
+  backupAutoCats?: Record<string, string[]>
+  // Имя папки копий для сборки: { packId: имя }. Папку называем по названию сборки, а не по id.
+  backupFolders?: Record<string, string>
   // Последние известные удалённые флаги (кэш на случай «нет сети» при запуске).
   flagsCache?: Record<string, unknown>
-  // УСТАРЕЛО: кэш резолва модов для бэкапов теперь в отдельном mod-resolve-cache.json (см. backup.ts).
-  // Ключ остаётся в схеме только чтобы удалить его у старых установок.
+  // УСТАРЕЛО: кэш резолва модов старых zip-бэкапов (до 5000 записей). Бэкапы теперь — копии папок,
+  // кэш не нужен. Ключ остаётся в схеме только чтобы удалить его у старых установок (см. ниже).
   modResolveCache?: Record<string, unknown>
 }
 
@@ -61,6 +71,9 @@ export const store = new Store<StoreSchema>({
     devSettings: {}
   }
 })
+
+// electron-store перечитывает и парсит весь config.json на каждый get — мёртвый кэш раздувал каждое чтение.
+if (store.has('modResolveCache')) store.delete('modResolveCache')
 
 /** ОЗУ (МБ) для конкретной сборки: своё значение, иначе общий дефолт allocatedMemory. */
 export function getPackMemory(id: string): number {

@@ -9,7 +9,7 @@ import { killInstance, listInstances, onInstancesChange, reattachInstances } fro
 import { setupLoader, latestLoaderVersion, LoaderId } from './loaders'
 import { packDir, packFolderOf, ensurePackFolder, forgetPackFolder } from './packpaths'
 import { validateInstallPath, defaultInstallPath } from './installpath'
-import { listAllBackups, listBackups, createBackup, restoreBackup, deleteBackup, defaultBackupDir, autoBackupMap, setAutoBackup, backupBusy, waitBackupIdle } from './backup'
+import { listAllBackups, listBackups, createBackup, restoreBackup, deleteBackup, defaultBackupDir, autoBackupMap, setAutoBackup, autoBackupGlobal, setAutoBackupGlobal, backupAsked, answerBackupAsk, backupPath, isBackingUp, waitForBackup, autoBackupCatsMap, setAutoBackupCats } from './backup'
 import { analyticsEnabled, setAnalyticsEnabled, trackInstallError } from './analytics'
 import { searchModrinth, getModVersions, getModrinthIcons, getModrinthAuthors } from './modrinth'
 import { microsoftLogin, microsoftRefresh } from './msAuth'
@@ -21,11 +21,12 @@ function getWindow(): BrowserWindow {
   return BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
 }
 
-/** Копия сборки пишется асинхронно — игра/установка не должны менять её файлы, пока они читаются в архив. */
+/** Авто-копия сборки идёт асинхронно — установка не должна менять её файлы, пока они копируются.
+ *  (Запуск игры ждёт копию сам — см. launchGame в launcher.ts.) */
 async function waitPackBackup(win: BrowserWindow, packId: string): Promise<void> {
-  if (!backupBusy(packId)) return
-  win.webContents.send('install:progress', { phase: 'check', message: 'Сохранение резервной копии...' })
-  await waitBackupIdle(packId)
+  if (!isBackingUp(packId)) return
+  win.webContents.send('install:progress', { phase: 'check', message: 'Завершается резервное копирование…' })
+  await waitForBackup(packId)
 }
 
 export function setupIpcHandlers() {
@@ -54,16 +55,35 @@ export function setupIpcHandlers() {
 
   ipcMain.handle('backup:list-all', () => listAllBackups())
   ipcMain.handle('backup:list', (_, packId: string) => listBackups(packId))
-  ipcMain.handle('backup:create', (_, packId: string, categories?: import('./backup').Category[]) => createBackup(packId, 'manual', categories))
+  ipcMain.handle('backup:create', (_, packId: string, categories?: import('./backup').Category[], displayName?: string) => createBackup(packId, 'manual', categories, displayName))
   ipcMain.handle('backup:restore', (_, packId: string, file: string) => restoreBackup(packId, file))
   ipcMain.handle('backup:delete', (_, packId: string, file: string) => deleteBackup(packId, file))
 
   ipcMain.handle('backup:settings', () => {
     const custom = ((store.get('backupDir') as string) || '').trim()
-    return { dir: custom || defaultBackupDir(), defaultDir: defaultBackupDir(), isDefault: !custom }
+    const global = autoBackupGlobal()
+    const dismissed = store.get('backupWarnDismissed') === true
+    return {
+      dir: custom || defaultBackupDir(),
+      defaultDir: defaultBackupDir(),
+      isDefault: !custom,
+      global,
+      asked: backupAsked(),
+      showDisabledWarning: !global && !dismissed
+    }
   })
   ipcMain.handle('backup:auto-map', () => autoBackupMap())
   ipcMain.handle('backup:set-auto', (_, packId: string, v: boolean) => setAutoBackup(packId, !!v))
+  ipcMain.handle('backup:auto-cats-map', () => autoBackupCatsMap())
+  ipcMain.handle('backup:set-auto-cats', (_, packId: string, cats: import('./backup').Category[]) => setAutoBackupCats(packId, cats))
+  ipcMain.handle('backup:set-global', (_, v: boolean) => {
+    setAutoBackupGlobal(!!v)
+    if (v) store.set('backupWarnDismissed', false) // включили — плашку снова можно показать при след. выключении
+  })
+  ipcMain.handle('backup:dismiss-warning', () => { store.set('backupWarnDismissed', true) })
+  ipcMain.handle('backup:answer-ask', (_, enable: boolean) => answerBackupAsk(!!enable))
+  ipcMain.handle('backup:open', (_, packId: string, file: string) => { shell.openPath(backupPath(packId, file)) })
+  ipcMain.handle('backup:is-busy', (_, packId: string) => isBackingUp(packId))
   ipcMain.handle('backup:set-dir', (_, p: string) => {
     const v = validateInstallPath(String(p || '')) // та же защита: не в папке лаунчера / Program Files
     if (!v.ok) return { ok: false, error: v.reason }
@@ -333,8 +353,6 @@ export function setupIpcHandlers() {
         setBusy(null)
         return false
       }
-
-      await waitPackBackup(win, modpackId)
 
       const accounts = store.get('accounts') as Account[]
       const activeId = store.get('activeAccountId') as string | null
