@@ -2,7 +2,7 @@ import { join, dirname, resolve, sep } from 'path'
 import { createWriteStream, createReadStream, existsSync, mkdirSync, renameSync, unlinkSync, rmSync, readdirSync, statSync, writeFileSync, readFileSync } from 'fs'
 import { createHash } from 'crypto'
 import axios from 'axios'
-import AdmZip from 'adm-zip'
+import { openZipReader } from './zipReader'
 import { BrowserWindow } from 'electron'
 import { Modpack, Mod, ConfigFile } from '../types/modpack'
 import { opSignal, isCancelled } from './abort'
@@ -392,14 +392,18 @@ async function extractConfig(cfg: ConfigFile, gameRoot: string, done: number, to
       emit(win, { phase: 'download', message: `Распаковка ${cfg.path || 'архива'}`, current: done, total, bytesDownloaded: bytes, bytesTotal: bTotal, speedBps: speed })
     }, cfg.sha512)
 
-    const zip = new AdmZip(tmpZip)
-    for (const e of zip.getEntries()) {
-      if (e.isDirectory) continue
-      const outPath = safeJoin(gameRoot, e.entryName) // entryName хранит путь внутри архива → структура сохраняется
-      if (!outPath) continue // выход за пределы (zip-slip) — пропускаем
-      if (existsSync(outPath) && !cfg.overwrite) continue // не перетираем пользовательские файлы без overwrite
-      mkdirSync(dirname(outPath), { recursive: true })
-      writeFileSync(outPath, e.getData())
+    // Потоково: в память только оглавление, записи распаковываются прямо в файлы.
+    const zip = await openZipReader(tmpZip)
+    try {
+      for (const it of zip.items) {
+        if (it.isDir) continue
+        const outPath = safeJoin(gameRoot, it.name) // имя хранит путь внутри архива → структура сохраняется
+        if (!outPath) continue // выход за пределы (zip-slip) — пропускаем
+        if (existsSync(outPath) && !cfg.overwrite) continue // не перетираем пользовательские файлы без overwrite
+        await zip.extractTo(it, outPath)
+      }
+    } finally {
+      zip.close() // до unlinkSync ниже: открытый архив на Windows не удалить
     }
     mkdirSync(dirname(marker), { recursive: true })
     writeFileSync(marker, new Date().toISOString())

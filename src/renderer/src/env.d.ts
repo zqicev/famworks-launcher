@@ -164,7 +164,7 @@ interface Window {
       head: (uuid: string) => Promise<string | null>
     }
     scene: {
-      pick: () => Promise<{ dataUrl?: string; cancelled?: boolean; error?: string }>
+      pick: () => Promise<{ url?: string; cancelled?: boolean; error?: string }>
       saveExample: (text: string) => Promise<{ ok?: boolean; cancelled?: boolean; error?: string }>
     }
     browser: {

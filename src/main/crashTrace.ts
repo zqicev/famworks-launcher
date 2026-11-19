@@ -1,6 +1,6 @@
 import { join } from 'path'
 import { readdirSync } from 'fs'
-import AdmZip from 'adm-zip'
+import { openZipReader, ZipReader } from './zipReader'
 import { matchModFile } from './modFiles'
 
 // Разбор краш-трейса и сопоставление его с jar-файлами модов сборки:
@@ -105,30 +105,32 @@ export function missingClass(type: string, message: string): string | null {
 }
 
 /** id / имя / версия мода из fabric.mod.json или quilt.mod.json. */
-function readMeta(zip: AdmZip): { id?: string; name?: string; version?: string } {
+async function readMeta(zip: ZipReader): Promise<{ id?: string; name?: string; version?: string }> {
   try {
-    const fabric = zip.getEntry('fabric.mod.json')
+    const fabric = await zip.readText('fabric.mod.json')
     if (fabric) {
-      const j = JSON.parse(fabric.getData().toString('utf8'))
+      const j = JSON.parse(fabric)
       return { id: j.id, name: j.name, version: j.version }
     }
-    const quilt = zip.getEntry('quilt.mod.json')
+    const quilt = await zip.readText('quilt.mod.json')
     if (quilt) {
-      const q = JSON.parse(quilt.getData().toString('utf8')).quilt_loader
+      const q = JSON.parse(quilt).quilt_loader
       return { id: q?.id, name: q?.metadata?.name, version: q?.version }
     }
   } catch { /* кривой json - остаётся имя файла */ }
   return {}
 }
 
-function readModJar(modsDir: string, file: string): ModJar | null {
+/** Оглавление jar. Читаем только центральный каталог (yauzl), а не весь jar в память (как adm-zip). */
+async function readModJar(modsDir: string, file: string): Promise<ModJar | null> {
+  let zip: ZipReader
+  try { zip = await openZipReader(join(modsDir, file)) } catch { return null }
   try {
-    const zip = new AdmZip(join(modsDir, file))
     const classes = new Set<string>()
     const dirs = new Set<string>()
     const configs = new Set<string>()
-    for (const e of zip.getEntries()) {
-      const n = e.entryName
+    for (const it of zip.items) {
+      const n = it.name
       if (n.endsWith('.class')) {
         classes.add(n)
         for (let d = n.slice(0, Math.max(0, n.lastIndexOf('/'))); d && !dirs.has(d); d = d.slice(0, Math.max(0, d.lastIndexOf('/')))) dirs.add(d)
@@ -136,10 +138,12 @@ function readModJar(modsDir: string, file: string): ModJar | null {
         configs.add(n)
       }
     }
-    const meta = readMeta(zip)
+    const meta = await readMeta(zip)
     return { file, id: meta.id, name: meta.name || file.replace(/\.jar$/i, ''), version: meta.version, classes, dirs, configs }
   } catch {
     return null
+  } finally {
+    zip.close()
   }
 }
 
@@ -149,7 +153,7 @@ export async function scanMods(modsDir: string): Promise<ModJar[]> {
   try { files = readdirSync(modsDir).filter(f => f.toLowerCase().endsWith('.jar')) } catch { return [] }
   const out: ModJar[] = []
   for (const f of files) {
-    const jar = readModJar(modsDir, f)
+    const jar = await readModJar(modsDir, f)
     if (jar) out.push(jar)
     await new Promise(r => setImmediate(r))
   }

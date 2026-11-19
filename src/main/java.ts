@@ -1,7 +1,7 @@
 import { join } from 'path'
 import { existsSync, mkdirSync, createWriteStream, readdirSync, statSync, rmSync, writeFileSync, renameSync } from 'fs'
 import axios from 'axios'
-import AdmZip from 'adm-zip'
+import { extractAll } from './zipReader'
 import { execSync } from 'child_process'
 import { BrowserWindow } from 'electron'
 import { ProgressEvent } from './installer'
@@ -162,8 +162,8 @@ export async function ensureJava(installPath: string, win: BrowserWindow, major 
   emit(win, { phase: 'download', message: 'Распаковка Java...' })
 
   if (isWin) {
-    const zip = new AdmZip(archivePath)
-    zip.extractAllTo(javaDir, true)
+    // Потоково: дистрибутив JDK весит ~200 МБ — не читаем его в память целиком (adm-zip читал).
+    await extractAll(archivePath, javaDir)
   } else {
     // tar доступен на macOS, Linux и Windows 10+; здесь — для unix
     execSync(`tar -xzf "${archivePath}" -C "${javaDir}"`)

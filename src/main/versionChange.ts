@@ -1,7 +1,7 @@
 import { BrowserWindow } from 'electron'
 import { join } from 'path'
-import { existsSync, unlinkSync, renameSync, statSync, readdirSync, readFileSync } from 'fs'
-import { createHash } from 'crypto'
+import { existsSync, unlinkSync, renameSync, statSync, readdirSync } from 'fs'
+import { sha1File } from './fileHash'
 import { Modpack, Mod } from '../types/modpack'
 import { store } from './store'
 import { getModVersions, getModrinthVersionByHash } from './modrinth'
@@ -106,9 +106,9 @@ async function resolveLoose(filename: string, kind: ItemKind, dir: string, newMc
   }
   try {
     // Файл может лежать как filename или filename.disabled.
-    let buf: Buffer
-    try { buf = readFileSync(join(dir, filename)) } catch { buf = readFileSync(join(dir, filename + '.disabled')) }
-    const sha1 = createHash('sha1').update(buf).digest('hex')
+    // Потоково — jar целиком в память не читаем.
+    let sha1: string
+    try { sha1 = await sha1File(join(dir, filename)) } catch { sha1 = await sha1File(join(dir, filename + '.disabled')) }
     const cur = await getModrinthVersionByHash(sha1)
     if (cur?.project_id) {
       const v = (await getModVersions(cur.project_id, newMc, loader, MR_TYPE[kind]))[0]

@@ -50,7 +50,8 @@ interface StoreSchema {
   backupFolders?: Record<string, string>
   // Последние известные удалённые флаги (кэш на случай «нет сети» при запуске).
   flagsCache?: Record<string, unknown>
-  // Кэш резолва модов для бэкапов (имя|размер|mtime → источник), чтобы не перехешивать каждый раз.
+  // УСТАРЕЛО: кэш резолва модов старых zip-бэкапов (до 5000 записей). Бэкапы теперь — копии папок,
+  // кэш не нужен. Ключ остаётся в схеме только чтобы удалить его у старых установок (см. ниже).
   modResolveCache?: Record<string, unknown>
 }
 
@@ -70,6 +71,9 @@ export const store = new Store<StoreSchema>({
     devSettings: {}
   }
 })
+
+// electron-store перечитывает и парсит весь config.json на каждый get — мёртвый кэш раздувал каждое чтение.
+if (store.has('modResolveCache')) store.delete('modResolveCache')
 
 /** ОЗУ (МБ) для конкретной сборки: своё значение, иначе общий дефолт allocatedMemory. */
 export function getPackMemory(id: string): number {

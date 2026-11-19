@@ -1,10 +1,13 @@
 import { dialog, app } from 'electron'
-import { join, dirname, sep, resolve } from 'path'
-import { existsSync, mkdirSync, rmSync, statSync, writeFileSync, readFileSync, readdirSync } from 'fs'
-import { createHash } from 'crypto'
+import { join, sep, resolve } from 'path'
+import { existsSync, mkdirSync, rmSync, statSync, readdirSync, renameSync, createWriteStream } from 'fs'
+import { pipeline } from 'stream/promises'
+import type { Readable } from 'stream'
 import axios from 'axios'
-import AdmZip from 'adm-zip'
 import { store } from './store'
+import { ZipWriter } from './zipWriter'
+import { openZipReader, safeTarget, ZipReader } from './zipReader'
+import { hashFile } from './fileHash'
 import { fetchModpack } from './modpacks'
 import { Modpack, Mod } from '../types/modpack'
 import { slugify, baseCustomId } from '../shared/slug'
@@ -71,7 +74,7 @@ function hasDescendantMark(rel: string, marks: Record<string, ExportMark>): bool
 }
 
 /** Кладёт в zip выбранные файлы/папки, отсекая целиком невыбранные поддеревья (saves/versions/assets и т.п.). */
-function collectSelected(gameRoot: string, relDir: string, marks: Record<string, ExportMark>, zip: AdmZip): void {
+async function collectSelected(gameRoot: string, relDir: string, marks: Record<string, ExportMark>, zip: ZipWriter): Promise<void> {
   const absDir = relDir ? join(gameRoot, relDir) : gameRoot
   let names: string[]
   try { names = readdirSync(absDir) } catch { return }
@@ -81,13 +84,30 @@ function collectSelected(gameRoot: string, relDir: string, marks: Record<string,
     let isDir: boolean
     try { isDir = statSync(abs).isDirectory() } catch { continue }
     if (isDir) {
-      if (hasDescendantMark(rel, marks)) collectSelected(gameRoot, rel, marks, zip) // смешанное — вглубь
-      else if (resolveMark(rel, marks) === 'in') zip.addLocalFolder(abs, rel)        // папка целиком
+      if (hasDescendantMark(rel, marks)) await collectSelected(gameRoot, rel, marks, zip) // смешанное — вглубь
+      else if (resolveMark(rel, marks) === 'in') await zip.addDir(abs, rel)               // папка целиком
       // 'out' и без вложенных отметок — пропускаем целиком (не ходим внутрь)
     } else if (resolveMark(rel, marks) === 'in') {
-      zip.addLocalFile(abs, relDir)
+      await zip.addFile(abs, rel)
     }
   }
+}
+
+/** Пишет архив потоком во временный файл рядом с целью и подменяет цель только целиком: на диске нет
+ *  недописанного архива, а прежний файл (если пользователь его перезаписывает) не теряется при сбое. */
+async function writeZipAtomically(target: string, fill: (zip: ZipWriter) => Promise<void>): Promise<void> {
+  const part = `${target}.part`
+  const zip = await ZipWriter.create(part)
+  try {
+    await fill(zip)
+    await zip.finish()
+  } catch (e) {
+    await zip.abort()
+    try { rmSync(part, { force: true }) } catch { /* ignore */ }
+    throw e
+  }
+  try { rmSync(target, { force: true }) } catch { /* ignore */ }
+  renameSync(part, target)
 }
 
 /** Экспорт сборки в .fwpack по выбору пользователя (modpack.json + выбранные файлы/папки). */
@@ -103,11 +123,10 @@ export async function exportModpackSelected(id: string, marks: Record<string, Ex
   })
   if (res.canceled || !res.filePath) return { cancelled: true }
 
-  const zip = new AdmZip()
-  zip.addFile('modpack.json', Buffer.from(JSON.stringify(modpack, null, 2), 'utf8'))
-  if (existsSync(gameRoot) && statSync(gameRoot).isDirectory()) collectSelected(gameRoot, '', marks, zip)
-
-  zip.writeZip(res.filePath)
+  await writeZipAtomically(res.filePath, async (zip) => {
+    await zip.addBuffer('modpack.json', Buffer.from(JSON.stringify(modpack, null, 2), 'utf8'))
+    if (existsSync(gameRoot) && statSync(gameRoot).isDirectory()) await collectSelected(gameRoot, '', marks, zip)
+  })
   return { ok: true, path: res.filePath }
 }
 
@@ -166,22 +185,30 @@ export async function exportModpackMrpack(id: string, marks: Record<string, Expo
   addRefs(modpack.resourcepacks, 'resourcepacks', true)
   addRefs(modpack.shaders, 'shaderpacks', true)
 
-  const zip = new AdmZip()
   const files: MrFile[] = []
-
+  const selected: { rel: string; abs: string }[] = []
   if (existsSync(gameRoot) && statSync(gameRoot).isDirectory()) {
-    eachSelectedFile(gameRoot, '', marks, (rel, abs) => {
+    eachSelectedFile(gameRoot, '', marks, (rel, abs) => { selected.push({ rel, abs }) })
+  }
+
+  const deps: Record<string, string> = { minecraft: modpack.mc_version }
+  const loaderKey: Record<string, string> = { fabric: 'fabric-loader', quilt: 'quilt-loader', forge: 'forge', neoforge: 'neoforge' }
+  const lk = loaderKey[modpack.loader]
+  if (lk && modpack.loader_version) deps[lk] = modpack.loader_version
+
+  await writeZipAtomically(res.filePath, async (zip) => {
+    for (const { rel, abs } of selected) {
       const ref = refMap.get(rel)
       if (ref) {
-        // Хэши считаем с диска - так они гарантированно совпадают с тем, что ставится по ссылке.
+        // Хэши считаем с диска (потоково) - так они гарантированно совпадают с тем, что ставится по ссылке.
         let sha1 = ref.sha1
         let sha512 = ref.sha512
         let size = 0
         try {
-          const buf = readFileSync(abs)
-          size = buf.length
-          sha1 = createHash('sha1').update(buf).digest('hex')
-          sha512 = createHash('sha512').update(buf).digest('hex')
+          const h = await hashFile(abs, ['sha1', 'sha512'] as const)
+          size = h.size
+          sha1 = h.hex.sha1
+          sha512 = h.hex.sha512
         } catch { /* нет файла на диске - используем объявленные хэши */ }
         const hashes: MrFile['hashes'] = {}
         if (sha1) hashes.sha1 = sha1
@@ -192,28 +219,22 @@ export async function exportModpackMrpack(id: string, marks: Record<string, Expo
         files.push({ path: rel, hashes, env, downloads: [ref.url], ...(size ? { fileSize: size } : {}) })
       } else {
         // Без ссылки - упаковываем как есть в overrides (Modrinth разложит их в корень игры).
-        try { zip.addFile(`overrides/${rel}`, readFileSync(abs)) } catch { /* пропускаем недоступный файл */ }
+        // Недоступный файл addFile просто пропускает.
+        await zip.addFile(abs, `overrides/${rel}`)
       }
-    })
-  }
+    }
 
-  const deps: Record<string, string> = { minecraft: modpack.mc_version }
-  const loaderKey: Record<string, string> = { fabric: 'fabric-loader', quilt: 'quilt-loader', forge: 'forge', neoforge: 'neoforge' }
-  const lk = loaderKey[modpack.loader]
-  if (lk && modpack.loader_version) deps[lk] = modpack.loader_version
-
-  const index = {
-    formatVersion: 1,
-    game: 'minecraft',
-    versionId: modpack.changelog?.[0]?.version || '1.0.0',
-    name: modpack.name,
-    summary: modpack.description || '',
-    files,
-    dependencies: deps
-  }
-  zip.addFile('modrinth.index.json', Buffer.from(JSON.stringify(index, null, 2), 'utf8'))
-
-  zip.writeZip(res.filePath)
+    const index = {
+      formatVersion: 1,
+      game: 'minecraft',
+      versionId: modpack.changelog?.[0]?.version || '1.0.0',
+      name: modpack.name,
+      summary: modpack.description || '',
+      files,
+      dependencies: deps
+    }
+    await zip.addBuffer('modrinth.index.json', Buffer.from(JSON.stringify(index, null, 2), 'utf8'))
+  })
   return { ok: true, path: res.filePath }
 }
 
@@ -233,15 +254,20 @@ export async function importFromFile(filePath: string): Promise<ImportResult> {
   const installPath = store.get('installPath') as string
   if (!installPath) throw new Error('Сначала завершите настройку лаунчера (выбор папки установки)')
 
-  const zip = new AdmZip(filePath)
-  if (zip.getEntry('modrinth.index.json')) return importMrpack(zip, installPath)
-  if (zip.getEntry('modpack.json')) return importFwpack(zip, installPath)
+  // Потоково: в памяти только оглавление архива, файлы распаковываются прямо на диск.
+  const zip = await openZipReader(filePath)
+  try {
+    if (zip.get('modrinth.index.json')) return await importMrpack(zip, installPath)
+    if (zip.get('modpack.json')) return await importFwpack(zip, installPath)
+  } finally {
+    zip.close()
+  }
   throw new Error('Неизвестный формат: это не .fwpack и не .mrpack')
 }
 
 /** .fwpack → кастомная сборка (modpack.json + распаковка mods/config/... в папку игры). */
-function importFwpack(zip: AdmZip, installPath: string): ImportResult {
-  const meta = JSON.parse(zip.readAsText(zip.getEntry('modpack.json')!)) as Modpack
+async function importFwpack(zip: ZipReader, installPath: string): Promise<ImportResult> {
+  const meta = JSON.parse((await zip.readText('modpack.json')) ?? '{}') as Modpack
   if (!meta.mc_version || !meta.loader || !meta.loader_version) {
     throw new Error('Повреждённый файл сборки: не хватает данных о версии/загрузчике')
   }
@@ -250,8 +276,11 @@ function importFwpack(zip: AdmZip, installPath: string): ImportResult {
   const gameRoot = packDir(id)
   mkdirSync(gameRoot, { recursive: true })
 
-  zip.extractAllTo(gameRoot, true)
-  rmSync(join(gameRoot, 'modpack.json'), { force: true }) // не нужен в папке игры
+  for (const it of zip.items) {
+    if (it.name === 'modpack.json') continue // не нужен в папке игры
+    const dest = safeTarget(gameRoot, it.name)
+    if (dest) await zip.extractTo(it, dest)
+  }
 
   const modpack: Modpack = {
     ...meta,
@@ -280,8 +309,8 @@ interface MrpackIndex {
 
 /** .mrpack (Modrinth) → кастомная сборка: моды/пакеты качаются по URL из манифеста,
  *  overrides (конфиги и прочие файлы) распаковываются прямо в папку игры. */
-function importMrpack(zip: AdmZip, installPath: string): ImportResult {
-  const idx = JSON.parse(zip.readAsText(zip.getEntry('modrinth.index.json')!)) as MrpackIndex
+async function importMrpack(zip: ZipReader, installPath: string): Promise<ImportResult> {
+  const idx = JSON.parse((await zip.readText('modrinth.index.json')) ?? '{}') as MrpackIndex
   const deps = idx.dependencies ?? {}
   const mc = deps.minecraft
   if (!mc) throw new Error('В .mrpack не указана версия Minecraft')
@@ -326,8 +355,8 @@ function importMrpack(zip: AdmZip, installPath: string): ImportResult {
   }
 
   // overrides / client-overrides - статические файлы, кладём как есть в папку игры
-  extractOverrides(zip, gameRoot, 'overrides')
-  extractOverrides(zip, gameRoot, 'client-overrides')
+  await extractOverrides(zip, gameRoot, 'overrides')
+  await extractOverrides(zip, gameRoot, 'client-overrides')
 
   const modpack: Modpack = {
     id,
@@ -349,16 +378,15 @@ function importMrpack(zip: AdmZip, installPath: string): ImportResult {
 }
 
 /** Распаковывает поддерево zip (напр. overrides/…) в gameRoot, защищаясь от zip-slip (выход за пределы). */
-function extractOverrides(zip: AdmZip, gameRoot: string, prefix: string): void {
+async function extractOverrides(zip: ZipReader, gameRoot: string, prefix: string): Promise<void> {
   const base = prefix + '/'
-  for (const e of zip.getEntries()) {
-    if (e.isDirectory || !e.entryName.startsWith(base)) continue
-    const rel = e.entryName.slice(base.length)
+  for (const it of zip.items) {
+    if (it.isDir || !it.name.startsWith(base)) continue
+    const rel = it.name.slice(base.length)
     if (!rel) continue
     const dest = join(gameRoot, rel)
     if (dest !== gameRoot && !dest.startsWith(gameRoot + sep)) continue
-    mkdirSync(dirname(dest), { recursive: true })
-    writeFileSync(dest, e.getData())
+    await zip.extractTo(it, dest)
   }
 }
 
@@ -387,9 +415,10 @@ export async function installModrinthModpack(projectId: string): Promise<ImportR
   if (!file) throw new Error('У этой сборки нет файла .mrpack для установки')
 
   const tmp = join(app.getPath('temp'), `fw-${Date.now()}-${file.filename}`)
-  const resp = await axios.get(file.url, { responseType: 'arraybuffer', timeout: 60000, maxRedirects: 5 })
-  writeFileSync(tmp, Buffer.from(resp.data))
   try {
+    // Качаем потоком прямо в файл (а не arraybuffer целиком в память — .mrpack с overrides бывает большим).
+    const resp = await axios.get<Readable>(file.url, { responseType: 'stream', timeout: 60000, maxRedirects: 5 })
+    await pipeline(resp.data, createWriteStream(tmp))
     return await importFromFile(tmp)
   } finally {
     try { rmSync(tmp, { force: true }) } catch {}

@@ -1,5 +1,5 @@
 import { ipcMain, dialog, BrowserWindow, shell, app } from 'electron'
-import { copyFileSync, mkdirSync, rmSync, existsSync, readFileSync, writeFileSync } from 'fs'
+import { copyFileSync, mkdirSync, rmSync, existsSync, writeFileSync } from 'fs'
 import { basename, join as pathJoin } from 'path'
 import { store, getPackMemory, setPackMemory } from './store'
 import { fetchModpackIndex, fetchModpack, fetchPackIcons } from './modpacks'
@@ -9,7 +9,7 @@ import { killInstance, listInstances, onInstancesChange, reattachInstances } fro
 import { setupLoader, latestLoaderVersion, LoaderId } from './loaders'
 import { packDir, packFolderOf, ensurePackFolder, forgetPackFolder } from './packpaths'
 import { validateInstallPath, defaultInstallPath } from './installpath'
-import { listAllBackups, listBackups, createBackup, restoreBackup, deleteBackup, defaultBackupDir, autoBackupMap, setAutoBackup, autoBackupGlobal, setAutoBackupGlobal, backupAsked, answerBackupAsk, backupPath, isBackingUp, autoBackupCatsMap, setAutoBackupCats } from './backup'
+import { listAllBackups, listBackups, createBackup, restoreBackup, deleteBackup, defaultBackupDir, autoBackupMap, setAutoBackup, autoBackupGlobal, setAutoBackupGlobal, backupAsked, answerBackupAsk, backupPath, isBackingUp, waitForBackup, autoBackupCatsMap, setAutoBackupCats } from './backup'
 import { analyticsEnabled, setAnalyticsEnabled, trackInstallError } from './analytics'
 import { searchModrinth, getModVersions, getModrinthIcons, getModrinthAuthors } from './modrinth'
 import { microsoftLogin, microsoftRefresh } from './msAuth'
@@ -21,7 +21,17 @@ function getWindow(): BrowserWindow {
   return BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
 }
 
+/** Авто-копия сборки идёт асинхронно — установка не должна менять её файлы, пока они копируются.
+ *  (Запуск игры ждёт копию сам — см. launchGame в launcher.ts.) */
+async function waitPackBackup(win: BrowserWindow, packId: string): Promise<void> {
+  if (!isBackingUp(packId)) return
+  win.webContents.send('install:progress', { phase: 'check', message: 'Завершается резервное копирование…' })
+  await waitForBackup(packId)
+}
+
 export function setupIpcHandlers() {
+  // Старые сцены (base64 в config.json) — в файлы, до первых обращений рендера к store.
+  void import('./background').then(({ migrateSceneOverrides }) => { try { migrateSceneOverrides() } catch { /* не критично */ } })
   onBusyChange((id) => getWindow()?.webContents.send('busy:changed', id))
   ipcMain.handle('busy:get', () => getBusyId())
 
@@ -137,15 +147,27 @@ export function setupIpcHandlers() {
     const map = (store.get('characterOverrides') as Record<string, unknown>) ?? {}
     return map[id] ?? null
   })
-  ipcMain.handle('character:set-override', (_, id: string, character: unknown) => {
+  // Файл сцены, на который больше никто не ссылается, удаляем (иначе userData/scenes копит старые сцены).
+  const dropUnusedScene = async (oldScene: unknown, map: Record<string, unknown>): Promise<void> => {
+    if (typeof oldScene !== 'string') return
+    const used = Object.values(map).some(v => (v as { scene?: unknown } | null)?.scene === oldScene)
+    if (used) return
+    const { deleteSceneUrl } = await import('./background')
+    deleteSceneUrl(oldScene)
+  }
+  ipcMain.handle('character:set-override', async (_, id: string, character: unknown) => {
     const map = { ...((store.get('characterOverrides') as Record<string, unknown>) ?? {}) }
+    const oldScene = (map[id] as { scene?: unknown } | undefined)?.scene
     map[id] = character
     store.set('characterOverrides', map)
+    await dropUnusedScene(oldScene, map)
   })
-  ipcMain.handle('character:clear-override', (_, id: string) => {
+  ipcMain.handle('character:clear-override', async (_, id: string) => {
     const map = { ...((store.get('characterOverrides') as Record<string, unknown>) ?? {}) }
+    const oldScene = (map[id] as { scene?: unknown } | undefined)?.scene
     delete map[id]
     store.set('characterOverrides', map)
+    await dropUnusedScene(oldScene, map)
   })
 
   ipcMain.handle('skin:get', async () => {
@@ -165,7 +187,8 @@ export function setupIpcHandlers() {
     return url
   })
 
-  // Выбор 3D-сцены (.glb/.gltf из Blockbench: игрок + объекты + анимации) — читаем в data-URL.
+  // Выбор 3D-сцены (.glb/.gltf из Blockbench: игрок + объекты + анимации) — копия в userData/scenes,
+  // рендеру отдаём fwbg://scene/… (не data-URL: тот оседал base64-строкой в config.json).
   ipcMain.handle('scene:pick', async () => {
     const res = await dialog.showOpenDialog({
       title: '3D-сцена (.glb или .gltf)',
@@ -173,12 +196,9 @@ export function setupIpcHandlers() {
       properties: ['openFile']
     })
     if (res.canceled || !res.filePaths[0]) return { cancelled: true }
-    const file = res.filePaths[0]
     try {
-      const buf = readFileSync(file)
-      const glb = file.toLowerCase().endsWith('.glb')
-      const mime = glb ? 'model/gltf-binary' : 'model/gltf+json'
-      return { dataUrl: `data:${mime};base64,${buf.toString('base64')}` }
+      const { storeSceneFile } = await import('./background')
+      return { url: storeSceneFile(res.filePaths[0]) }
     } catch (e) {
       return { error: e instanceof Error ? e.message : String(e) }
     }
@@ -278,6 +298,7 @@ export function setupIpcHandlers() {
     beginOperation()
     setBusy(modpackId)
     try {
+      await waitPackBackup(win, modpackId)
       const modpack = await fetchModpack(modpackId)
       const installPath = store.get('installPath') as string
       const gameRoot = packDir(modpack.id)

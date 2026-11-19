@@ -1,6 +1,6 @@
 import { join } from 'path'
-import { createHash } from 'crypto'
-import { existsSync, readdirSync, readFileSync, renameSync, unlinkSync } from 'fs'
+import { sha1File } from './fileHash'
+import { existsSync, readdirSync, renameSync, unlinkSync } from 'fs'
 import { store, getPackMemory, setPackMemory } from './store'
 import { fetchModpack } from './modpacks'
 import { searchModrinth, getModVersions, getModrinthVersionByHash } from './modrinth'
@@ -47,7 +47,7 @@ export async function applyCrashFix(modpackId: string, fix: Fix): Promise<{ ok: 
     const name = fix.mod ?? fix.file ?? 'мод'
     const path = fix.file ? join(modsDir, fix.file) : ''
     if (!path || !existsSync(path)) return { ok: false, error: `Не нашёл файл мода «${name}» в папке модов` }
-    const sha1 = createHash('sha1').update(readFileSync(path)).digest('hex')
+    const sha1 = await sha1File(path)
     const cur = await getModrinthVersionByHash(sha1)
     if (!cur?.project_id) return { ok: false, error: `«${name}» не найден на Modrinth - обновите его вручную или отключите` }
     const versions = await getModVersions(cur.project_id, modpack.mc_version, modpack.loader, 'mod')
